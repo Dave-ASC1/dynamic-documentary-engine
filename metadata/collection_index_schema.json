@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Collection Index",
+  "description": "Master index schema for a Dynamic Documentary Engine collection — aggregates all artifacts and collection-level rules",
+  "type": "object",
+  "required": [
+    "collection_id",
+    "collection_name",
+    "created_at",
+    "runtime_rules",
+    "artifacts"
+  ],
+  "properties": {
+
+    "collection_id": {
+      "type": "string",
+      "description": "Unique identifier for this collection",
+      "example": "ww2"
+    },
+
+    "collection_name": {
+      "type": "string",
+      "description": "Human-readable name for this collection",
+      "example": "World War II Documentary Collection"
+    },
+
+    "description": {
+      "type": "string",
+      "description": "A short description of what this collection covers",
+      "example": "A collection of archival audio and video artifacts documenting World War II for use in generative documentary film generation"
+    },
+
+    "version": {
+      "type": "string",
+      "description": "Version of this collection index",
+      "example": "1.0.0"
+    },
+
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this collection was created"
+    },
+
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the last update to this collection"
+    },
+
+    "runtime_rules": {
+      "type": "object",
+      "description": "Collection-level rules that govern every film generated from this collection",
+      "required": [
+        "min_duration_seconds",
+        "max_duration_seconds",
+        "opening_artifact_id",
+        "closing_artifact_id"
+      ],
+      "properties": {
+        "min_duration_seconds": {
+          "type": "number",
+          "description": "Minimum total runtime for a generated film in seconds",
+          "example": 300
+        },
+        "max_duration_seconds": {
+          "type": "number",
+          "description": "Maximum total runtime for a generated film in seconds",
+          "example": 1800
+        },
+        "opening_artifact_id": {
+          "type": "string",
+          "description": "Artifact ID of the opening A/V — always appears first in every generated film",
+          "example": "ww2_av_001"
+        },
+        "closing_artifact_id": {
+          "type": "string",
+          "description": "Artifact ID of the closing A/V — always appears last in every generated film",
+          "example": "ww2_av_002"
+        },
+        "allow_repeat_artifacts": {
+          "type": "boolean",
+          "description": "Global toggle — whether any artifact can repeat within a single film",
+          "default": false
+        },
+        "save_generated_films": {
+          "type": "boolean",
+          "description": "Whether generated films are saved as analytical artifacts",
+          "default": true
+        }
+      }
+    },
+
+    "artifact_counts": {
+      "type": "object",
+      "description": "Summary count of artifacts by type — auto-generated, do not edit manually",
+      "properties": {
+        "total": { "type": "integer", "example": 18 },
+        "a_roll": { "type": "integer", "example": 8 },
+        "b_roll": { "type": "integer", "example": 6 },
+        "x_roll": { "type": "integer", "example": 4 }
+      }
+    },
+
+    "artifacts": {
+      "type": "array",
+      "description": "Summarized index of all artifacts in this collection — full metadata lives in each artifact's individual JSON file",
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "artifact_type", "role", "filename", "duration_seconds"],
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "description": "Unique identifier matching the individual artifact JSON file",
+            "example": "ww2_av_003"
+          },
+          "artifact_type": {
+            "type": "string",
+            "enum": ["A-roll", "B-roll", "X-roll"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["opening", "closing", "body"]
+          },
+          "filename": {
+            "type": "string",
+            "example": "ww2_av_003.mp4"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "example": 24.5
+          },
+          "mood": {
+            "type": "string",
+            "example": "somber"
+          },
+          "pacing": {
+            "type": "string",
+            "enum": ["slow", "medium", "fast"]
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+
+  }
+}

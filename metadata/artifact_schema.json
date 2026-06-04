@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Artifact",
+  "description": "Metadata schema for a single media artifact within a Dynamic Documentary Engine collection",
+  "type": "object",
+  "required": [
+    "artifact_id",
+    "collection_id",
+    "artifact_type",
+    "role",
+    "file",
+    "content",
+    "sequencing"
+  ],
+  "properties": {
+
+    "artifact_id": {
+      "type": "string",
+      "description": "Unique identifier for this artifact",
+      "example": "ww2_av_003"
+    },
+
+    "collection_id": {
+      "type": "string",
+      "description": "The collection this artifact belongs to",
+      "example": "ww2"
+    },
+
+    "artifact_type": {
+      "type": "string",
+      "description": "The media class of this artifact",
+      "enum": ["A-roll", "B-roll", "X-roll"],
+      "enumDescriptions": {
+        "A-roll": "Synchronized audio and video — main footage",
+        "B-roll": "Supplemental video — may carry silent audio",
+        "X-roll": "Pure audio only — narration, ambient sound, or music"
+      }
+    },
+
+    "role": {
+      "type": "string",
+      "description": "The functional role of this artifact in a generated film",
+      "enum": ["opening", "closing", "body"],
+      "enumDescriptions": {
+        "opening": "Always appears at the start of every generated film in this collection",
+        "closing": "Always appears at the end of every generated film in this collection",
+        "body": "Available for selection by the sequencing engine"
+      }
+    },
+
+    "file": {
+      "type": "object",
+      "description": "File-level information for this artifact",
+      "required": ["filename", "format", "duration_seconds", "has_video", "has_audio"],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "The filename including extension",
+          "example": "ww2_av_003.mp4"
+        },
+        "format": {
+          "type": "string",
+          "description": "File format",
+          "enum": ["mp4", "mov", "wav", "mp3", "webm"]
+        },
+        "duration_seconds": {
+          "type": "number",
+          "description": "Duration of the artifact in seconds",
+          "minimum": 0,
+          "example": 24.5
+        },
+        "has_video": {
+          "type": "boolean",
+          "description": "Whether this artifact contains a video track"
+        },
+        "has_audio": {
+          "type": "boolean",
+          "description": "Whether this artifact contains an audio track"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Video resolution if applicable",
+          "example": "1920x1080"
+        },
+        "source": {
+          "type": "string",
+          "description": "Origin of the artifact",
+          "enum": ["self-recorded", "public-domain", "live-webcam"],
+          "example": "public-domain"
+        },
+        "copyright_cleared": {
+          "type": "boolean",
+          "description": "Whether this artifact is cleared for use in the project"
+        }
+      }
+    },
+
+    "content": {
+      "type": "object",
+      "description": "Descriptive metadata about the content of this artifact",
+      "required": ["title", "description", "theme", "mood", "pacing", "tags"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Short human-readable title for this artifact",
+          "example": "Soldiers marching through village"
+        },
+        "description": {
+          "type": "string",
+          "description": "Longer description of what this artifact contains",
+          "example": "Black and white footage of soldiers moving through a destroyed village, ambient sounds of distant artillery"
+        },
+        "theme": {
+          "type": "array",
+          "description": "Thematic tags describing the subject matter",
+          "items": { "type": "string" },
+          "example": ["war", "movement", "destruction", "soldiers"]
+        },
+        "mood": {
+          "type": "string",
+          "description": "The dominant emotional tone of this artifact",
+          "enum": ["somber", "tense", "hopeful", "neutral", "triumphant", "melancholic", "urgent", "reflective"],
+          "example": "somber"
+        },
+        "pacing": {
+          "type": "string",
+          "description": "The visual and editorial pacing of this artifact",
+          "enum": ["slow", "medium", "fast"],
+          "example": "slow"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Free-form keyword tags for flexible querying",
+          "items": { "type": "string" },
+          "example": ["black-and-white", "exterior", "ambient-audio", "movement"]
+        },
+        "dominant_colors": {
+          "type": "array",
+          "description": "Dominant color palette — used by the Dyn UIS Engine for visual continuity",
+          "items": { "type": "string" },
+          "example": ["gray", "brown", "black"]
+        },
+        "dominant_lines": {
+          "type": "string",
+          "description": "Dominant compositional line direction — used by the Dyn UIS Engine",
+          "enum": ["horizontal", "vertical", "diagonal", "curved", "mixed"],
+          "example": "horizontal"
+        }
+      }
+    },
+
+    "sequencing": {
+      "type": "object",
+      "description": "Rules and hints that guide the sequencing engine when selecting this artifact",
+      "required": ["can_repeat", "min_gap_seconds"],
+      "properties": {
+        "can_repeat": {
+          "type": "boolean",
+          "description": "Whether this artifact can appear more than once in a single generated film",
+          "default": false
+        },
+        "min_gap_seconds": {
+          "type": "number",
+          "description": "Minimum seconds that must pass before this artifact can be used again",
+          "default": 0,
+          "example": 120
+        },
+        "must_follow": {
+          "type": "array",
+          "description": "Artifact IDs that should precede this artifact when possible",
+          "items": { "type": "string" },
+          "example": ["ww2_av_001"]
+        },
+        "must_not_follow": {
+          "type": "array",
+          "description": "Artifact IDs that should never directly precede this artifact",
+          "items": { "type": "string" },
+          "example": ["ww2_av_007"]
+        },
+        "weight": {
+          "type": "number",
+          "description": "Selection weight — higher values make this artifact more likely to be selected",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "example": 0.8
+        }
+      }
+    },
+
+    "ai_enrichment": {
+      "type": "object",
+      "description": "Metadata generated or validated by the Claude API",
+      "properties": {
+        "auto_tagged": {
+          "type": "boolean",
+          "description": "Whether this artifact was auto-tagged by the Claude API"
+        },
+        "enrichment_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date the AI enrichment was last run",
+          "example": "2025-06-04"
+        },
+        "suggested_tags": {
+          "type": "array",
+          "description": "Additional tags suggested by the Claude API",
+          "items": { "type": "string" }
+        },
+        "confidence_score": {
+          "type": "number",
+          "description": "AI confidence in the metadata accuracy (0-1)",
+          "minimum": 0,
+          "maximum": 1,
+          "example": 0.91
+        }
+      }
+    },
+
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this artifact was added to the collection"
+    },
+
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the last metadata update"
+    }
+
+  }
+}
