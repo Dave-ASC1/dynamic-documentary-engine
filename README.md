@@ -92,7 +92,7 @@ dynamic-documentary-engine/
 
 - [x] Project architecture and meeting documentation
 - [x] GitHub repository setup
-- [ ] Metadata schema (JSON) for A-roll, B-roll, and X-roll artifacts
+- [x] Metadata schema (JSON) for A-roll, B-roll, and X-roll artifacts
 - [ ] Sample collection (10–20 artifacts, self-recorded + public domain)
 - [ ] Python sequencing engine (rule-based + AI logic)
 - [ ] FFmpeg rendering pipeline
@@ -117,6 +117,11 @@ dynamic-documentary-engine/
 ## Inspiration
 
 This project draws directly from the *Eno* documentary (2024), directed by Gary Hustwit, and the Brain One generative engine built by Brendan Dawes — a system that produces a algorithmically different cut of the film at every screening. This project asks: can that same generative approach be rebuilt with modern AI tooling and applied broadly to documentary collections?
+
+---
+## Research Context
+
+This project builds directly on the generative documentary approach pioneered by Brain One. For a detailed comparative analysis of the two systems — including shared foundations, key technical differences, the authorship question, emotional arc modeling, and the open-world retrieval vision — see [docs/comparative_analysis_brain_one.md](docs/comparative_analysis_brain_one.md).
 
 ---
 
