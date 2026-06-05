@@ -19,7 +19,7 @@ Usage:
     film = sequencer.generate(target_duration=600)
     print(film)
 
-Author: Oluwafemisola (David)
+Author: Oluwafemisola David Ademoye
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
