@@ -11,7 +11,7 @@ The selector works alongside the SequencingRules engine — rules
 determine eligibility, the selector determines which eligible
 artifact to pick next.
 
-Author: Oluwafemisola (David)
+Author: Oluwafemisola David Ademoye
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
