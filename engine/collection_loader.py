@@ -11,7 +11,7 @@ A collection is the full set of media artifacts for a given project
 (e.g. a WW2 documentary collection). Each collection has a master
 index file that aggregates all artifacts and defines runtime rules.
 
-Author: Oluwafemisola (David)
+Author: Oluwafemisola David Ademoye
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
