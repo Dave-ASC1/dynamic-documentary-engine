@@ -67,7 +67,7 @@ The engine accepts a `target_duration` parameter in seconds to control the total
 
 ## B-roll and X-roll Pairing
 
-B-roll artifacts carry video but no audio. Whenever the engine selects a B-roll artifact, it immediately pairs it with an X-roll artifact to provide the audio layer. The FFmpeg assembler overlays the two tracks during rendering. A-roll artifacts always stand alone as they carry synchronized audio and video.
+B-roll artifacts will carry video but no audio. Whenever the engine selects a B-roll artifact, it immediately pairs it with an X-roll artifact to provide the audio layer. The FFmpeg assembler overlays the two tracks during rendering. A-roll artifacts always stand alone as they carry synchronized audio and video.
 
 ---
 
@@ -115,8 +115,8 @@ dynamic-documentary-engine/
 - [x] Project architecture and meeting documentation
 - [x] GitHub repository setup
 - [x] Metadata schema (JSON) for A-roll, B-roll, and X-roll artifacts
+- [x] Python sequencing engine — rule-based creative code
 - [ ] Sample collection (10–20 artifacts, self-recorded + public domain)
-- [ ] Python sequencing engine (rule-based + AI logic)
 - [ ] FFmpeg rendering pipeline
 - [ ] React/Flask web interface
 - [ ] Technical documentation report targeting academic publication
@@ -132,7 +132,6 @@ dynamic-documentary-engine/
 - **FFmpeg** — video and audio assembly and rendering
 - **React** — frontend director's console
 - **Flask** — backend API
-- **Claude API (Anthropic)** — AI-driven artifact selection and metadata enrichment
 
 ---
 
