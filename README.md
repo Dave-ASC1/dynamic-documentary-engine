@@ -16,6 +16,8 @@ An AI-powered generative documentary engine that dynamically assembles films fro
 
 Inspired by the *Eno* documentary (2024) and its Brain One engine built by Brendan Dawes, this engine uses AI as a director by pulling from a curated collection of modular media artifacts and dynamically assembling them into a unique film on every run. No human curation happens at runtime. The engine decides.
 
+All sequencing logic is creative code — and selection decisions are driven entirely by metadata rules, pacing arc, mood transition logic, and weighted random selection. With no external AI engines utilized.
+
 The project also explores whether modern AI tooling can replicate and extend the generative documentary approach — making it accessible, extensible, and applicable to new collections beyond a single film.
 
 ---
@@ -25,10 +27,12 @@ The project also explores whether modern AI tooling can replicate and extend the
 Each time the engine runs, it:
 
 1. Reads a **collection** of tagged media **artifacts** (A-roll, B-roll, X-roll)
-2. Uses AI-driven sequencing logic to select and order artifacts based on metadata rules
-3. Always opens and closes with designated opening/closing A/V artifacts
-4. Assembles the sequence into a rendered **film** via FFmpeg
-5. Saves the generated film for analytical review
+2. Accepts a target runtime in seconds (1–9999) to control film length
+3. Uses rule-based sequencing logic to select and order artifacts based on metadata
+4. Always opens and closes with designated opening/closing A/V artifacts
+5. Pairs B-roll artifacts with X-roll artifacts to ensure every video clip has audio
+6. Assembles the sequence into a rendered **film** via FFmpeg
+7. Saves the generated film for analytical review
 
 ---
 
@@ -44,11 +48,26 @@ Each time the engine runs, it:
 
 | Type | Description |
 |------|-------------|
-| **A-roll** | Main footage — synchronized audio and video |
-| **B-roll** | Supplemental video — may carry silent audio |
-| **X-roll** | Pure audio only — narration, ambient sound, music |
+| **A-roll** | Main footage — synchronized audio and video. Stands alone. |
+| **B-roll** | Supplemental video — no audio track. Always paired with an X-roll. |
+| **X-roll** | Pure audio only — narration, ambient sound, music. Layered over B-roll. |
 
 All artifacts are tagged with structured JSON metadata that drives the sequencing engine's decisions.
+
+---
+## Runtime Control
+
+The engine accepts a `target_duration` parameter in seconds to control the total length of every generated film:
+
+- Supports values from **1 to 9999 seconds**
+- Supports both short-form clips and full-length feature documentaries
+- The sequencing engine uses the target duration to shape pacing arc decisions throughout the film
+
+---
+
+## B-roll and X-roll Pairing
+
+B-roll artifacts carry video but no audio. Whenever the engine selects a B-roll artifact, it immediately pairs it with an X-roll artifact to provide the audio layer. The FFmpeg assembler overlays the two tracks during rendering. A-roll artifacts always stand alone as they carry synchronized audio and video.
 
 ---
 
@@ -59,11 +78,11 @@ Each collection follows a class-based hierarchy:
 ```
 Collection (e.g. "WW2")
 ├── CL-AV  →  A-roll artifacts (synchronized audio + video)
-├── CL-V   →  B-roll artifacts (visual only)
-└── CL-A   →  X-roll artifacts (audio only)
+├── CL-V   →  B-roll artifacts (visual only — paired with X-roll)
+└── CL-A   →  X-roll artifacts (audio only - layered over B-roll)
 ```
 
-Every collection includes designated **opening** and **closing** A/V artifacts that bookend every generated film regardless of what the engine selects in between.
+Every collection includes designated **opening** and **closing** A/V artifacts that will bookend every generated film regardless of what the engine selects in between.
 
 ---
 
@@ -73,9 +92,12 @@ Every collection includes designated **opening** and **closing** A/V artifacts t
 dynamic-documentary-engine/
 ├── assets/                   # Media artifact library (organized by collection)
 ├── metadata/                 # JSON metadata schema and tagged artifact index
-├── engine/                   # Python sequencing engine
-│   ├── sequencer.py          # AI-driven selection and ordering logic
-│   └── rules.py              # Pacing, arc, no-repeat, and runtime rules
+├── engine/                   # Python sequencing engine (creative code only)
+│   ├── __init__.py           # Package entry point
+│   ├── sequencer.py          # Main sequencing coordinator
+│   ├── rules.py              # Pacing arc, no-repeat, and runtime rules
+│   ├── artifact_selector.py  # Weighted selection and mood transition logic
+│   └── collection_loader.py  # Collection index loader and validator
 ├── pipeline/                 # FFmpeg rendering pipeline
 │   └── assembler.py          # Clip concatenation and audio mixing
 ├── web/                      # React/Flask web interface
@@ -100,7 +122,7 @@ dynamic-documentary-engine/
 - [ ] Technical documentation report targeting academic publication
 - [ ] Generated film artifacts saved for analytical review
 
-**Target completion: August 8th**
+**Target completion: To be Decided**
 
 ---
 
