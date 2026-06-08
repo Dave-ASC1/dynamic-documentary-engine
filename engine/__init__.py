@@ -4,6 +4,7 @@ __init__.py
 Dynamic Documentary Engine — Engine Package
 
 Exposes the primary public interface of the engine package.
+All sequencing logic is creative code — no external AI engines are used.
 Import the Sequencer class directly from this package to generate films.
 
 Usage:
@@ -14,6 +15,7 @@ Usage:
     print(film)
 
 Author: Oluwafemisola David Ademoye
+Supporting: Omotola Ajibike Ajao
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
