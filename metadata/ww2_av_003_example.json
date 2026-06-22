@@ -5,7 +5,9 @@
   "role": "body",
 
   "file": {
+    "source_type": "local",
     "filename": "ww2_av_003.mp4",
+    "stream_url": null,
     "format": "mp4",
     "duration_seconds": 24.5,
     "has_video": true,
