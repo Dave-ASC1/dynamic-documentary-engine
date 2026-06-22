@@ -31,9 +31,9 @@
       "description": "The media class of this artifact",
       "enum": ["A-roll", "B-roll", "X-roll"],
       "enumDescriptions": {
-        "A-roll": "Synchronized audio and video — main footage",
-        "B-roll": "Supplemental video — may carry silent audio",
-        "X-roll": "Pure audio only — narration, ambient sound, or music"
+        "A-roll": "Synchronized audio and video â€” stands alone in the sequence",
+        "B-roll": "Video only â€” must always be paired with an X-roll for audio",
+        "X-roll": "Audio only â€” always layered over a B-roll clip, never placed alone"
       }
     },
 
@@ -50,54 +50,98 @@
 
     "file": {
       "type": "object",
-      "description": "File-level information for this artifact",
-      "required": ["filename", "format", "duration_seconds", "has_video", "has_audio"],
+      "description": "File-level information for this artifact, including its source type and location",
+      "required": ["source_type", "format", "duration_seconds", "has_video", "has_audio"],
       "properties": {
+
+        "source_type": {
+          "type": "string",
+          "description": "Where the media comes from. 'local' means a stored file on disk or an external drive. 'stream' means a live source such as a webcam RTSP or HLS feed. The assembler uses this field to determine how to pass the source to FFmpeg.",
+          "enum": ["local", "stream"],
+          "default": "local"
+        },
+
         "filename": {
           "type": "string",
-          "description": "The filename including extension",
+          "description": "The filename including extension. Required when source_type is 'local'. Omit when source_type is 'stream'.",
           "example": "ww2_av_003.mp4"
         },
+
+        "stream_url": {
+          "type": "string",
+          "description": "Full URL of the live stream. Required when source_type is 'stream'. Omit when source_type is 'local'. Supports RTSP, HLS (.m3u8), and HTTP direct streams.",
+          "example": "rtsp://camera.example.com/normandy_beach_live"
+        },
+
         "format": {
           "type": "string",
-          "description": "File format",
-          "enum": ["mp4", "mov", "wav", "mp3", "webm"]
+          "description": "File format or stream container",
+          "enum": ["mp4", "mov", "wav", "mp3", "webm", "m3u8", "rtsp"]
         },
+
         "duration_seconds": {
           "type": "number",
-          "description": "Duration of the artifact in seconds",
+          "description": "Duration of the artifact in seconds. For live stream artifacts, this is the number of seconds the assembler will capture from the stream for this slot.",
           "minimum": 0,
           "example": 24.5
         },
+
         "has_video": {
           "type": "boolean",
-          "description": "Whether this artifact contains a video track"
+          "description": "Whether this artifact contains a video track. Always true for A-roll and B-roll. Always false for X-roll."
         },
+
         "has_audio": {
           "type": "boolean",
-          "description": "Whether this artifact contains an audio track"
+          "description": "Whether this artifact contains an audio track. Always true for A-roll and X-roll. Always false for B-roll."
         },
+
         "resolution": {
           "type": "string",
-          "description": "Video resolution if applicable",
+          "description": "Video resolution if applicable. Omit for audio-only X-roll artifacts.",
           "example": "1920x1080"
         },
+
         "source": {
           "type": "string",
           "description": "Origin of the artifact",
           "enum": ["self-recorded", "public-domain", "live-webcam"],
           "example": "public-domain"
         },
+
         "copyright_cleared": {
           "type": "boolean",
           "description": "Whether this artifact is cleared for use in the project"
         }
-      }
+
+      },
+
+      "allOf": [
+        {
+          "if": {
+            "properties": { "source_type": { "const": "local" } },
+            "required": ["source_type"]
+          },
+          "then": {
+            "required": ["filename"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "source_type": { "const": "stream" } },
+            "required": ["source_type"]
+          },
+          "then": {
+            "required": ["stream_url"]
+          }
+        }
+      ]
+
     },
 
     "content": {
       "type": "object",
-      "description": "Descriptive metadata about the content of this artifact",
+      "description": "Descriptive metadata about the content of this artifact. These fields are for human reference and collection-design purposes. The sequencing engine uses them only for dissimilarity scoring â€” to maximise contrast between consecutive clips â€” never to enforce tonal matching, mood continuity, or emotional arcs.",
       "required": ["title", "description", "theme", "mood", "pacing", "tags"],
       "properties": {
         "title": {
@@ -112,37 +156,37 @@
         },
         "theme": {
           "type": "array",
-          "description": "Thematic tags describing the subject matter",
+          "description": "Thematic tags describing the subject matter. Used by the selector for dissimilarity scoring only â€” not for thematic matching.",
           "items": { "type": "string" },
           "example": ["war", "movement", "destruction", "soldiers"]
         },
         "mood": {
           "type": "string",
-          "description": "The dominant emotional tone of this artifact",
+          "description": "The dominant emotional tone of this artifact. Present for human reference and used by the selector as one dissimilarity dimension â€” the engine actively seeks mood contrast, not mood continuity.",
           "enum": ["somber", "tense", "hopeful", "neutral", "triumphant", "melancholic", "urgent", "reflective"],
           "example": "somber"
         },
         "pacing": {
           "type": "string",
-          "description": "The visual and editorial pacing of this artifact",
+          "description": "The visual and editorial pacing of this artifact. Used by the selector as one dissimilarity dimension â€” the engine prefers pacing contrast between consecutive clips.",
           "enum": ["slow", "medium", "fast"],
           "example": "slow"
         },
         "tags": {
           "type": "array",
-          "description": "Free-form keyword tags for flexible querying",
+          "description": "Free-form keyword tags. Used by the selector for dissimilarity scoring â€” the engine prefers candidates with fewer overlapping tags with the previous clip.",
           "items": { "type": "string" },
           "example": ["black-and-white", "exterior", "ambient-audio", "movement"]
         },
         "dominant_colors": {
           "type": "array",
-          "description": "Dominant color palette — used by the Dyn UIS Engine for visual continuity",
+          "description": "Dominant color palette â€” used by the Dyn UIS Engine for visual continuity",
           "items": { "type": "string" },
           "example": ["gray", "brown", "black"]
         },
         "dominant_lines": {
           "type": "string",
-          "description": "Dominant compositional line direction — used by the Dyn UIS Engine",
+          "description": "Dominant compositional line direction â€” used by the Dyn UIS Engine and by the selector as a dissimilarity dimension.",
           "enum": ["horizontal", "vertical", "diagonal", "curved", "mixed"],
           "example": "horizontal"
         }
@@ -167,19 +211,19 @@
         },
         "must_follow": {
           "type": "array",
-          "description": "Artifact IDs that should precede this artifact when possible",
+          "description": "Artifact IDs that should precede this artifact when possible. For editorial/technical reasons specific to this collection â€” not for mood or tonal shaping.",
           "items": { "type": "string" },
           "example": ["ww2_av_001"]
         },
         "must_not_follow": {
           "type": "array",
-          "description": "Artifact IDs that should never directly precede this artifact",
+          "description": "Artifact IDs that must never directly precede this artifact. A hard structural constraint â€” use only for genuine editorial or technical incompatibilities.",
           "items": { "type": "string" },
           "example": ["ww2_av_007"]
         },
         "weight": {
           "type": "number",
-          "description": "Selection weight — higher values make this artifact more likely to be selected",
+          "description": "Selection weight â€” higher values make this artifact more likely to be selected during weighted random selection. A frequency control tool only, with no emotional significance.",
           "minimum": 0,
           "maximum": 1,
           "default": 0.5,
