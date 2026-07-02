@@ -234,11 +234,11 @@
 
     "ai_enrichment": {
       "type": "object",
-      "description": "Metadata generated or validated by the Claude API",
+      "description": "Metadata generated or validated by an automated enrichment process",
       "properties": {
         "auto_tagged": {
           "type": "boolean",
-          "description": "Whether this artifact was auto-tagged by the Claude API"
+          "description": "Whether this artifact was auto-tagged by an automated enrichment process"
         },
         "enrichment_date": {
           "type": "string",
@@ -248,7 +248,7 @@
         },
         "suggested_tags": {
           "type": "array",
-          "description": "Additional tags suggested by the Claude API",
+          "description": "Additional tags suggested by an automated enrichment process",
           "items": { "type": "string" }
         },
         "confidence_score": {

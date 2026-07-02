@@ -39,7 +39,7 @@ The following table summarizes the most significant differences between the two 
 
 | Area | Brain One | Dynamic Documentary Engine |
 |------|-----------|---------------------------|
-| Selection logic | Deterministic algorithm | AI-driven (Claude API) |
+| Selection logic | Deterministic algorithm | Original algorithmic "creative code" — no external AI |
 | Scope | Single film — *Eno* (2024) | Any collection, any subject |
 | Metadata approach | Structural and timing based | Mood, theme, pacing, tags, emotional transitions |
 | Codebase | Proprietary, not publicly available | Open source, MIT licensed |
