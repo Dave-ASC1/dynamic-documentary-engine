@@ -114,6 +114,29 @@ class SequencingRules:
             return False
         return True
 
+    def is_eligible_for_pairing(self, artifact):
+        """
+        Evaluates whether an X-roll artifact is eligible to be paired with
+        a B-roll as its audio layer.
+
+        Pairing eligibility skips the duration budget rule. At render time
+        the X-roll's audio is looped underneath the B-roll's video and cut
+        to the B-roll's length (-stream_loop -1, -shortest) — it does not
+        add separate screen time, so it must not consume runtime budget the
+        way a standalone selection does.
+
+        Args:
+            artifact (dict): The X-roll artifact summary dictionary to evaluate.
+
+        Returns:
+            bool: True if the artifact is eligible for pairing.
+        """
+        if not self._passes_no_repeat_rule(artifact):
+            return False
+        if not self._passes_must_not_follow_rule(artifact):
+            return False
+        return True
+
     def get_target_pacing(self):
         """
         Returns a pacing hint to encourage media-type variety between slots.
@@ -213,6 +236,22 @@ class SequencingRules:
         self.used_artifact_ids.append(artifact.get("artifact_id"))
         self.current_duration += artifact.get("duration_seconds", 0)
         self.last_artifact_type = artifact.get("artifact_type")
+
+    def register_pairing_selection(self, artifact):
+        """
+        Registers an X-roll artifact as used for pairing with a B-roll.
+
+        Only records the artifact ID for no-repeat tracking. Unlike
+        register_selection(), this does NOT add the artifact's duration to
+        current_duration (its audio does not occupy separate screen time —
+        see is_eligible_for_pairing()) and does NOT update
+        last_artifact_type, so the media-type pacing signal continues to
+        reflect the paired B-roll rather than its audio layer.
+
+        Args:
+            artifact (dict): The X-roll artifact dictionary that was selected.
+        """
+        self.used_artifact_ids.append(artifact.get("artifact_id"))
 
     def has_reached_minimum_duration(self):
         """

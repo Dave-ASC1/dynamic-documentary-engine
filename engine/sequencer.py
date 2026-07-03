@@ -152,6 +152,13 @@ class Sequencer:
                 "Collection has no body artifacts available for selection."
             )
 
+        # X-roll is audio-only and must never stand alone — it is only ever
+        # selected via the pairing branch below, layered under a B-roll.
+        # Exclude it from the pool used for primary (standalone) picks.
+        standalone_candidates = [
+            a for a in body_artifacts if a.get("artifact_type") != "X-roll"
+        ]
+
         current_mood = opening_artifact.get("mood") if opening_artifact else None
 
         while not self.rules.has_reached_maximum_duration():
@@ -159,7 +166,7 @@ class Sequencer:
             target_pacing = self.rules.get_target_pacing()
 
             selected = self.selector.select_next(
-                body_artifacts,
+                standalone_candidates,
                 current_mood=current_mood,
                 target_pacing=target_pacing
             )
@@ -171,11 +178,13 @@ class Sequencer:
 
             if artifact_type == "B-roll":
                 # B-roll must always be paired with an X-roll for audio.
-                # Select an X-roll to layer over this B-roll clip.
+                # Select an X-roll to layer over this B-roll clip. Pairing
+                # does not charge the X-roll's duration against the runtime
+                # budget — see ArtifactSelector.select_pairing().
                 x_roll_artifacts = [
                     a for a in body_artifacts if a.get("artifact_type") == "X-roll"
                 ]
-                x_roll = self.selector.select_next(x_roll_artifacts)
+                x_roll = self.selector.select_pairing(x_roll_artifacts)
 
                 if x_roll:
                     # Store as a paired tuple — assembler will overlay these

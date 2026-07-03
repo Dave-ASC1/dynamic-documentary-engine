@@ -134,6 +134,44 @@ class ArtifactSelector:
 
         return selected
 
+    def select_pairing(self, candidates):
+        """
+        Selects an X-roll artifact to pair with a just-selected B-roll.
+
+        Unlike select_next(), pairing selection uses
+        rules.is_eligible_for_pairing() instead of rules.is_eligible() — the
+        X-roll's duration does not consume runtime budget, since its audio
+        is layered underneath the B-roll's video at render time rather than
+        adding separate screen time. Dissimilarity scoring still applies
+        (against self._last_selected, the B-roll just chosen), so the paired
+        audio still contrasts with its video. self._last_selected is left
+        unchanged so the next primary pick's contrast baseline remains the
+        B-roll's visual identity.
+
+        Args:
+            candidates (list): List of X-roll artifact dictionaries to
+                               select from.
+
+        Returns:
+            dict: The selected X-roll artifact, or None if no eligible
+                  candidates are available.
+        """
+        eligible = [a for a in candidates if self.rules.is_eligible_for_pairing(a)]
+
+        if not eligible:
+            return None
+
+        if self._last_selected is not None:
+            eligible = self._apply_juxtaposition_filter(eligible)
+
+        top_candidates = eligible[:self._JUXTAPOSITION_POOL_SIZE]
+        selected = self._weighted_random_select(top_candidates)
+
+        if selected:
+            self.rules.register_pairing_selection(selected)
+
+        return selected
+
     def select_by_type(self, candidates, artifact_type):
         """
         Filters candidates to a specific artifact type and selects one.
