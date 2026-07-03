@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic Documentary Engine</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Dynamic Documentary Engine</h1>
+    <p class="tagline">Every screening assembles a unique film — maximum juxtaposition, not emotional continuity.</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <label for="duration">Target length (seconds)</label>
+      <input type="number" id="duration" min="1" max="9999" value="90" />
+      <button id="generate-btn">Generate Film</button>
+      <span id="status"></span>
+    </section>
+
+    <section id="player-section" class="hidden">
+      <video id="player" controls></video>
+      <div id="meta"></div>
+    </section>
+
+    <section id="trace-section" class="hidden">
+      <h2>Why this cut — the sequence &amp; its contrast reasoning</h2>
+      <ol id="trace-list"></ol>
+    </section>
+
+    <section id="history-section">
+      <h2>Previously generated films</h2>
+      <ul id="history-list"><li class="empty">No films generated yet this session.</li></ul>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

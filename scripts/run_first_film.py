@@ -18,9 +18,9 @@ gitignored demo folder. Drop your real files into the same folder later
 (matching each artifact's filename) and the exact same run produces a real
 documentary — nothing in the engine changes.
 
-The instrumentation here is READ-ONLY: it wraps the selector's internal
-scoring methods to observe the ranked candidate pool at each decision. It
-never alters what the engine chooses.
+Shared logic (tracing, placeholder media generation) lives in
+dde_runtime.py so this CLI script and the Flask backend (web/backend/app.py)
+never drift apart on how a film is actually generated.
 
 Usage:
     python3 scripts/run_first_film.py                 # full run + render
@@ -33,146 +33,25 @@ Supporting: Omotola Ajibike Ajao
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import argparse
 import os
 import random
-import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(HERE)
-sys.path.insert(0, REPO_ROOT)
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
 
+from dde_runtime import (  # noqa: E402
+    INDEX_PATH, METADATA_PATH, DEFAULT_ASSETS, DEFAULT_FILMS,
+    art_map, label, dims, SelectionTracer, instrument_pairing, ensure_assets,
+)
 from engine import Sequencer, Assembler  # noqa: E402
 
-INDEX_PATH = os.path.join(
-    REPO_ROOT, "metadata", "validation", "validation_collection_index.json"
-)
-METADATA_PATH = os.path.join(REPO_ROOT, "metadata", "validation")
-DEFAULT_ASSETS = os.path.join(REPO_ROOT, "demo", "assets")
-DEFAULT_FILMS = os.path.join(REPO_ROOT, "demo", "films")
-
 BAR = "=" * 72
-DIM = "-" * 72
-
-
-# ----------------------------------------------------------------------
-# Small formatting helpers
-# ----------------------------------------------------------------------
-
-def _art_map(loader):
-    """id -> enriched index summary dict."""
-    return {a["artifact_id"]: a for a in loader.get_artifacts()}
-
-
-def _label(a):
-    """Short human label for an artifact summary dict."""
-    if a is None:
-        return "(none)"
-    return f"{a.get('title', a['artifact_id'])} [{a.get('artifact_type')}]"
-
-
-def _dims(prev, cand):
-    """Per-dimension contrast breakdown, mirroring the engine's scorer.
-
-    Returns a list of short strings describing each dimension that adds
-    to the dissimilarity score, so a human can see *why* the cut contrasts.
-    """
-    if prev is None:
-        return ["first body pick — no previous clip to contrast against"]
-
-    def g(d, k):
-        return d.get(k) or d.get("content", {}).get(k)
-
-    out = []
-    if prev.get("artifact_type") != cand.get("artifact_type"):
-        out.append(f"media type ({prev.get('artifact_type')}->{cand.get('artifact_type')})")
-    if g(prev, "mood") and g(cand, "mood") and g(prev, "mood") != g(cand, "mood"):
-        out.append(f"mood ({g(prev, 'mood')}->{g(cand, 'mood')})")
-    if g(prev, "pacing") and g(cand, "pacing") and g(prev, "pacing") != g(cand, "pacing"):
-        out.append(f"pacing ({g(prev, 'pacing')}->{g(cand, 'pacing')})")
-
-    pt = set(prev.get("tags") or prev.get("content", {}).get("tags", []))
-    ct = set(cand.get("tags") or cand.get("content", {}).get("tags", []))
-    new_tags = ct - pt
-    if new_tags:
-        out.append(f"+{len(new_tags)} new tags")
-
-    pth = set(prev.get("theme") or prev.get("content", {}).get("theme", []))
-    cth = set(cand.get("theme") or cand.get("content", {}).get("theme", []))
-    new_th = cth - pth
-    if new_th:
-        out.append(f"+{len(new_th)} new themes")
-
-    pg = prev.get("geography") or prev.get("file", {}).get("geography")
-    cg = cand.get("geography") or cand.get("file", {}).get("geography")
-    if pg and cg and pg != cg:
-        out.append(f"geography ({pg}->{cg})")
-
-    pl = g(prev, "dominant_lines")
-    cl = g(cand, "dominant_lines")
-    if pl and cl and pl != cl:
-        out.append(f"lines ({pl}->{cl})")
-
-    return out or ["(identical on every scored dimension)"]
-
-
-# ----------------------------------------------------------------------
-# Read-only instrumentation of the selector
-# ----------------------------------------------------------------------
-
-class SelectionTracer:
-    """Wraps a live ArtifactSelector to record each decision, without
-    changing any selection behavior."""
-
-    def __init__(self, selector):
-        self.selector = selector
-        self.events = []
-        self._state = {}
-
-        self._orig_select = selector.select_next
-        self._orig_juxta = selector._apply_juxtaposition_filter
-        self._orig_weighted = selector._weighted_random_select
-
-        selector.select_next = self._select_next
-        selector._apply_juxtaposition_filter = self._juxta
-        selector._weighted_random_select = self._weighted
-
-    def _select_next(self, candidates, current_mood=None, target_pacing=None):
-        types = {a.get("artifact_type") for a in candidates}
-        # A pool that is entirely X-roll is the sequencer asking for a B-roll's
-        # audio partner; anything else is a normal body pick.
-        self._state["kind"] = "pairing" if types == {"X-roll"} else "primary"
-        return self._orig_select(
-            candidates, current_mood=current_mood, target_pacing=target_pacing
-        )
-
-    def _juxta(self, candidates):
-        prev = self.selector._last_selected
-        ranking = [
-            (a, self.selector._compute_dissimilarity_score(prev, a))
-            for a in candidates
-        ]
-        ranking.sort(key=lambda t: t[1], reverse=True)
-        self._state["prev"] = prev
-        self._state["ranking"] = ranking
-        return self._orig_juxta(candidates)
-
-    def _weighted(self, candidates):
-        chosen = self._orig_weighted(candidates)
-        self.events.append({
-            "kind": self._state.get("kind", "primary"),
-            "prev": self._state.get("prev"),
-            "ranking": self._state.get("ranking"),
-            "pool": list(candidates),
-            "chosen": chosen,
-        })
-        self._state["prev"] = None
-        self._state["ranking"] = None
-        return chosen
 
 
 # ----------------------------------------------------------------------
@@ -191,7 +70,7 @@ def print_trace(events):
         step += 1
         tag = "B-roll audio pairing" if kind == "pairing" else "body pick"
         print(f"\nStep {step}  [{tag}]")
-        print(f"  previous : {_label(prev)}")
+        print(f"  previous : {label(prev)}")
 
         ranking = ev["ranking"]
         if ranking:
@@ -199,17 +78,17 @@ def print_trace(events):
             print("  candidates by dissimilarity (higher = more unlike previous):")
             for a, s in ranking[:6]:
                 mark = " <== CHOSEN" if a is chosen else ""
-                print(f"      {s:>2}  {_label(a)}{mark}")
+                print(f"      {s:>2}  {label(a)}{mark}")
             if len(ranking) > 6:
                 print(f"      ... (+{len(ranking) - 6} more)")
             pool_ids = ", ".join(p.get("artifact_id") for p in ev["pool"])
             print(f"  juxtaposition pool (top candidates): {pool_ids}")
             chosen_score = score_of.get(id(chosen))
-            print(f"  --> chose {_label(chosen)}  (dissimilarity {chosen_score})")
-            print(f"      contrast: {', '.join(_dims(prev, chosen))}")
+            print(f"  --> chose {label(chosen)}  (dissimilarity {chosen_score})")
+            print(f"      contrast: {', '.join(dims(prev, chosen))}")
         else:
-            print(f"  --> chose {_label(chosen)}")
-            print(f"      {_dims(prev, chosen)[0]}")
+            print(f"  --> chose {label(chosen)}")
+            print(f"      {dims(prev, chosen)[0]}")
 
 
 def print_sequence(sequence, amap):
@@ -254,94 +133,6 @@ def print_uniqueness(sequencer, amap, target, runs):
 
 
 # ----------------------------------------------------------------------
-# Placeholder media generation
-# ----------------------------------------------------------------------
-
-_FFMPEG_COLORS = {
-    "orange": "orange", "gray": "gray", "blue": "blue", "green": "green",
-    "red": "red", "yellow": "yellow", "white": "white", "black": "black",
-    "brown": "0x8B4513", "purple": "0x800080", "silver": "0xC0C0C0",
-    "amber": "0xFFBF00",
-}
-_FALLBACK_PALETTE = ["red", "green", "blue", "orange", "purple",
-                     "teal", "0x8B4513", "gray", "0xFF1493", "0x00CED1"]
-
-
-def _find_font():
-    for p in ("/System/Library/Fonts/Supplemental/Arial.ttf",
-              "/Library/Fonts/Arial.ttf",
-              "/System/Library/Fonts/Supplemental/Times New Roman.ttf"):
-        if os.path.exists(p):
-            return p
-    return None
-
-
-def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
-
-
-def _make_video(path, color, dur, freq, has_audio, label, font):
-    dur = max(1, int(round(dur)))
-    safe = "".join(c for c in label if c.isalnum() or c == " ").strip()[:28]
-    inputs = ["-f", "lavfi", "-i", f"color=c={color}:s=320x180:r=25:d={dur}"]
-    if has_audio:
-        inputs += ["-f", "lavfi", "-i", f"sine=frequency={freq}:d={dur}"]
-    vf = []
-    if font and safe:
-        vf = ["-vf", (f"drawtext=fontfile={font}:text='{safe}':fontcolor=white:"
-                      f"fontsize=18:x=(w-text_w)/2:y=(h-text_h)/2:"
-                      f"box=1:boxcolor=black@0.5:boxborderw=6")]
-    tail = ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
-    if has_audio:
-        tail += ["-c:a", "aac", "-shortest"]
-    cmd = ["ffmpeg", "-y"] + inputs + vf + tail + [path]
-    if _run(cmd):
-        return True
-    # Retry without the text overlay if drawtext is unavailable.
-    cmd = ["ffmpeg", "-y"] + inputs + tail + [path]
-    return _run(cmd)
-
-
-def _make_audio(path, dur, freq):
-    dur = max(1, int(round(dur)))
-    return _run(["ffmpeg", "-y", "-f", "lavfi", "-i",
-                 f"sine=frequency={freq}:d={dur}", path])
-
-
-def ensure_assets(loader, assets_path):
-    """Create a disposable placeholder file for every artifact that lacks one."""
-    os.makedirs(assets_path, exist_ok=True)
-    font = _find_font()
-    made, existed = 0, 0
-    for i, a in enumerate(loader.get_artifacts()):
-        fname = a.get("filename")
-        if not fname:
-            continue
-        out = os.path.join(assets_path, fname)
-        if os.path.exists(out):
-            existed += 1
-            continue
-        dur = a.get("duration_seconds", 8)
-        freq = 220 + (i * 55) % 880
-        colors = a.get("dominant_colors") or []
-        color = _FFMPEG_COLORS.get(colors[0], _FALLBACK_PALETTE[i % len(_FALLBACK_PALETTE)]) \
-            if colors else _FALLBACK_PALETTE[i % len(_FALLBACK_PALETTE)]
-        atype = a.get("artifact_type")
-        title = a.get("title", a["artifact_id"])
-        if atype == "X-roll":
-            ok = _make_audio(out, dur, freq)
-        elif atype == "B-roll":
-            ok = _make_video(out, color, dur, freq, has_audio=False, label=title, font=font)
-        else:  # A-roll
-            ok = _make_video(out, color, dur, freq, has_audio=True, label=title, font=font)
-        made += 1
-        if not ok:
-            print(f"  ! failed to generate placeholder for {a['artifact_id']}")
-    print(f"  placeholder assets: {made} created, {existed} already present "
-          f"(font overlay: {'yes' if font else 'no'})")
-
-
-# ----------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------
 
@@ -366,7 +157,7 @@ def main():
 
     sequencer = Sequencer(INDEX_PATH)
     loader = sequencer.loader
-    amap = _art_map(loader)
+    amap = art_map(loader)
     coll = loader.collection
 
     counts = coll.get("artifact_counts", {})
@@ -374,13 +165,14 @@ def main():
     print(f"artifacts  : {counts.get('total')} total — "
           f"{counts.get('a_roll')} A-roll, {counts.get('b_roll')} B-roll, "
           f"{counts.get('x_roll')} X-roll")
-    print(f"opening    : {_label(amap.get(loader.get_opening_artifact_id()))}")
-    print(f"closing    : {_label(amap.get(loader.get_closing_artifact_id()))}")
+    print(f"opening    : {label(amap.get(loader.get_opening_artifact_id()))}")
+    print(f"closing    : {label(amap.get(loader.get_closing_artifact_id()))}")
     print(f"target     : {args.target}s"
           + (f"   (seed {args.seed})" if args.seed is not None else "   (unseeded)"))
 
     # Instrument, then generate through the real API.
     tracer = SelectionTracer(sequencer.selector)
+    instrument_pairing(sequencer.selector, tracer)
     sequence = sequencer.generate(target_duration=args.target)
 
     print_trace(tracer.events)
@@ -396,7 +188,10 @@ def main():
         return 0
 
     print(f"\n{BAR}\nRENDER — placeholder media -> film\n{BAR}")
-    ensure_assets(loader, args.assets_path)
+    stats = ensure_assets(loader, args.assets_path)
+    print(f"  placeholder assets: {stats['created']} created, "
+          f"{stats['existing']} already present")
+
     assembler = Assembler(
         loader=loader,
         assets_path=args.assets_path,
