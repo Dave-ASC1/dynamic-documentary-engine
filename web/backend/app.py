@@ -10,6 +10,14 @@ pipeline (Sequencer.generate -> Assembler.render) — it contains no
 sequencing logic of its own; that all lives in engine/ and is shared with
 the CLI script via scripts/dde_runtime.py.
 
+Media source:
+    By default the backend generates from the real footage in
+    local-media/assets/ (and writes films to local-media/films/) when that
+    folder exists, so a browser demo uses real clips. If it does not exist
+    (e.g. a fresh clone with no media yet), it falls back to the disposable
+    placeholder workspace in demo/. Override either path explicitly with the
+    DDE_ASSETS_PATH / DDE_FILMS_PATH environment variables.
+
 Endpoints:
     GET  /                   Serves the single-page frontend.
     POST /api/generate       Generates + renders a new film. Returns its
@@ -28,7 +36,7 @@ Supporting: Omotola Ajibike Ajao
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import json
@@ -51,6 +59,30 @@ import dde_runtime  # noqa: E402
 from flask import Flask, abort, jsonify, request, send_from_directory  # noqa: E402
 
 app = Flask(__name__, static_folder=None)
+
+
+def _resolve_media_paths():
+    """Pick the assets/films directories the demo should use.
+
+    Priority: explicit env vars > real local media (if present) > the
+    disposable placeholder workspace. Returned as absolute paths.
+    """
+    local_assets = os.path.join(REPO_ROOT, "local-media", "assets")
+    local_films = os.path.join(REPO_ROOT, "local-media", "films")
+
+    assets = os.environ.get("DDE_ASSETS_PATH")
+    if not assets:
+        assets = local_assets if os.path.isdir(local_assets) else dde_runtime.DEFAULT_ASSETS
+
+    films = os.environ.get("DDE_FILMS_PATH")
+    if not films:
+        # Keep films next to whichever assets we chose.
+        films = local_films if assets == local_assets else dde_runtime.DEFAULT_FILMS
+
+    return os.path.abspath(assets), os.path.abspath(films)
+
+
+ASSETS_PATH, FILMS_PATH = _resolve_media_paths()
 
 
 @app.route("/")
@@ -78,7 +110,11 @@ def generate():
             return jsonify({"error": "target_duration must be an integer"}), 400
 
     try:
-        result = dde_runtime.generate_and_render(target_duration=target)
+        result = dde_runtime.generate_and_render(
+            target_duration=target,
+            assets_path=ASSETS_PATH,
+            films_path=FILMS_PATH,
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -88,20 +124,19 @@ def generate():
 
 @app.route("/films/<path:filename>")
 def films(filename):
-    return send_from_directory(dde_runtime.DEFAULT_FILMS, filename)
+    return send_from_directory(FILMS_PATH, filename)
 
 
 @app.route("/api/films")
 def list_films():
-    films_dir = dde_runtime.DEFAULT_FILMS
-    if not os.path.isdir(films_dir):
+    if not os.path.isdir(FILMS_PATH):
         return jsonify([])
 
     items = []
-    for fname in os.listdir(films_dir):
+    for fname in os.listdir(FILMS_PATH):
         if not fname.endswith(".mp4"):
             continue
-        manifest_path = os.path.join(films_dir, os.path.splitext(fname)[0] + ".json")
+        manifest_path = os.path.join(FILMS_PATH, os.path.splitext(fname)[0] + ".json")
         entry = {"film_url": f"/films/{fname}", "filename": fname}
         if os.path.exists(manifest_path):
             with open(manifest_path) as f:
@@ -117,7 +152,9 @@ def list_films():
 
 
 if __name__ == "__main__":
-    os.makedirs(dde_runtime.DEFAULT_FILMS, exist_ok=True)
-    os.makedirs(dde_runtime.DEFAULT_ASSETS, exist_ok=True)
+    os.makedirs(FILMS_PATH, exist_ok=True)
+    os.makedirs(ASSETS_PATH, exist_ok=True)
     port = int(os.environ.get("PORT", 5000))
+    print(f" * DDE media source : {ASSETS_PATH}")
+    print(f" * DDE films output : {FILMS_PATH}")
     app.run(debug=True, port=port)
