@@ -5,28 +5,29 @@
   "role": "body",
   "file": {
     "source_type": "local",
-    "filename": "val_xa_002.wav",
+    "filename": "x-roll/water_stream.wav",
     "format": "wav",
-    "duration_seconds": 25,
+    "duration_seconds": 10.096625,
     "has_video": false,
     "has_audio": true,
     "source": "self-recorded",
     "copyright_cleared": true
   },
   "content": {
-    "title": "Cello drone",
-    "description": "A sustained, mournful cello drone with slow harmonic movement.",
+    "title": "Water stream",
+    "description": "Flowing water audio used as an ambient X-roll layer.",
     "theme": [
-      "music",
-      "drone",
-      "melancholy"
+      "water",
+      "nature",
+      "sound"
     ],
-    "mood": "melancholic",
+    "mood": "neutral",
     "pacing": "slow",
     "tags": [
-      "cello",
-      "music",
-      "drone"
+      "water",
+      "stream",
+      "ambient",
+      "flow"
     ]
   },
   "sequencing": {
@@ -37,5 +38,5 @@
     "weight": 0.5
   },
   "created_at": "2026-07-02T00:00:00Z",
-  "updated_at": "2026-07-02T00:00:00Z"
+  "updated_at": "2026-07-03T00:00:00Z"
 }

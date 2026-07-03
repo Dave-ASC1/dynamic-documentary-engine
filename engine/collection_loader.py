@@ -28,7 +28,7 @@ class CollectionLoader:
 
     A collection index contains:
         - Collection-level metadata (id, name, description)
-        - Runtime rules (min/max duration, opening/closing artifacts)
+        - Runtime rules (min/max duration and output controls)
         - A summary index of all artifacts in the collection
 
     Attributes:
@@ -101,8 +101,6 @@ class CollectionLoader:
         required_runtime_rules = [
             "min_duration_seconds",
             "max_duration_seconds",
-            "opening_artifact_id",
-            "closing_artifact_id"
         ]
 
         for rule in required_runtime_rules:
@@ -123,18 +121,10 @@ class CollectionLoader:
             raise RuntimeError("Collection has not been loaded. Call load() first.")
         return self.collection.get("runtime_rules", {})
 
-    def get_opening_artifact_id(self):
-        """Returns the artifact ID designated as the opening of every generated film."""
-        return self.get_runtime_rules().get("opening_artifact_id")
-
-    def get_closing_artifact_id(self):
-        """Returns the artifact ID designated as the closing of every generated film."""
-        return self.get_runtime_rules().get("closing_artifact_id")
-
     def get_body_artifacts(self):
         """
         Returns only body artifacts — those available for selection
-        by the sequencing engine. Excludes opening and closing artifacts.
+        by the sequencing engine.
 
         Returns:
             list: Artifact dictionaries with role == 'body'.

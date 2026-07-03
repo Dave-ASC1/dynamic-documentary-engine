@@ -9,8 +9,8 @@ sequencing rules, and artifact selector to produce a unique ordered
 sequence of artifacts on every run.
 
 All sequencing logic is creative code — no external AI engines are used.
-Selection decisions are driven entirely by metadata rules, pacing arc,
-mood transition logic, and weighted random selection.
+Selection decisions are driven entirely by metadata rules, dissimilarity
+scoring, and weighted random selection.
 
 Inspired by the Brain One engine built by Brendan Dawes for the
 Eno documentary (2024) — a system that produces an algorithmically
@@ -42,10 +42,10 @@ class Sequencer:
     Coordinates the full film generation pipeline:
         1. Loads a collection index from disk
         2. Accepts a target runtime in seconds (4-digit max: 0001–9999)
-        3. Always opens the film with the designated opening artifact
-        4. Selects body artifacts using rules, pacing arc, and mood transitions
+        3. Opens with a generated B-roll + X-roll pair
+        4. Selects body artifacts using rules, dissimilarity, and weights
         5. Enforces B-roll + X-roll pairing — B-roll is never placed alone
-        6. Always closes the film with the designated closing artifact
+        6. Closes with a generated B-roll + X-roll pair
         7. Returns the complete ordered film sequence
 
     Runtime Control:
@@ -97,13 +97,13 @@ class Sequencer:
         """
         Generates a unique ordered film sequence from the loaded collection.
 
-        The sequence always begins with the designated opening artifact and
-        ends with the designated closing artifact. Body artifacts are selected
-        in between using pacing arc, mood transitions, and weighted random
-        selection until the target duration is reached.
+        The sequence begins and ends with generated B-roll + X-roll pairs
+        drawn from the normal body artifact pool. Body artifacts between
+        those bookends are selected from any eligible A-roll or B-roll using
+        dissimilarity scoring and weighted random selection.
 
-        B-roll artifacts are always paired with an X-roll artifact immediately
-        following them to provide an audio layer. A-roll artifacts stand alone.
+        B-roll artifacts are always paired with an X-roll artifact to provide
+        an audio layer. A-roll artifacts stand alone.
 
         Args:
             target_duration (int, optional): Desired film runtime in seconds.
@@ -113,53 +113,82 @@ class Sequencer:
                                              max_duration_seconds runtime rule.
 
         Returns:
-            list: An ordered list of artifact ID strings representing the
-                  generated film sequence. B-roll entries are paired tuples:
-                  ('broll_id', 'xroll_id'). A-roll entries are plain strings.
-                  Example:
-                  ['ww2_av_001', ('ww2_broll_002', 'ww2_xroll_003'), 'ww2_av_002']
+            list: An ordered list of artifact ID strings and paired tuples.
+                  B-roll entries are tuples: ('broll_id', 'xroll_id').
+                  A-roll entries are plain strings.
 
         Raises:
             ValueError: If target_duration is outside the 1–9999 second range.
-            RuntimeError: If the collection has no body artifacts to select from.
+            RuntimeError: If the collection cannot produce generated bookends.
         """
-        # Validate target duration is within the 4-digit range
         if target_duration is not None:
             if not (self.MIN_DURATION <= target_duration <= self.MAX_DURATION):
                 raise ValueError(
                     f"target_duration must be between {self.MIN_DURATION} and "
                     f"{self.MAX_DURATION} seconds. Got: {target_duration}"
                 )
-            # Override the collection's max duration with the requested target
             self.rules.runtime_rules["max_duration_seconds"] = target_duration
 
         self.rules.reset()
         sequence = []
 
-        # Step 1 — Always open with the designated opening artifact
-        opening_id = self.loader.get_opening_artifact_id()
-        opening_artifact = self._find_artifact_by_id(opening_id)
-
-        if opening_artifact:
-            sequence.append(opening_id)
-            self.rules.register_selection(opening_artifact)
-
-        # Step 2 — Select body artifacts until target duration is reached
         body_artifacts = self.loader.get_body_artifacts()
-
         if not body_artifacts:
             raise RuntimeError(
                 "Collection has no body artifacts available for selection."
             )
 
-        # X-roll is audio-only and must never stand alone — it is only ever
-        # selected via the pairing branch below, layered under a B-roll.
-        # Exclude it from the pool used for primary (standalone) picks.
-        standalone_candidates = [
-            a for a in body_artifacts if a.get("artifact_type") != "X-roll"
+        b_roll_artifacts = [
+            a for a in body_artifacts if a.get("artifact_type") == "B-roll"
+        ]
+        x_roll_artifacts = [
+            a for a in body_artifacts if a.get("artifact_type") == "X-roll"
         ]
 
-        current_mood = opening_artifact.get("mood") if opening_artifact else None
+        if not b_roll_artifacts or not x_roll_artifacts:
+            raise RuntimeError(
+                "Generated bookends require at least one B-roll artifact and "
+                "one X-roll artifact in the body pool."
+            )
+
+        # Step 1 — Open with a generated B-roll + X-roll pair from the body pool.
+        opening_pair = self._select_random_broll_xroll_pair(
+            b_roll_artifacts,
+            x_roll_artifacts,
+        )
+        if opening_pair is None:
+            raise RuntimeError("Could not generate an opening B-roll/X-roll pair.")
+
+        opening_broll, opening_xroll = opening_pair
+        sequence.append((
+            opening_broll.get("artifact_id"),
+            opening_xroll.get("artifact_id"),
+        ))
+        self.rules.register_selection(opening_broll)
+        self.rules.register_pairing_selection(opening_xroll)
+        self.selector.set_previous_artifact(opening_broll)
+
+        # Reserve the closing pair before body selection so the body cannot
+        # consume every B-roll/X-roll and leave the film without an ending.
+        closing_pair = self._select_random_broll_xroll_pair(
+            b_roll_artifacts,
+            x_roll_artifacts,
+        )
+        if closing_pair is None:
+            raise RuntimeError("Could not generate a closing B-roll/X-roll pair.")
+
+        reserved_closing_ids = {a.get("artifact_id") for a in closing_pair}
+
+        # Step 2 — Select body artifacts until target duration is reached.
+        standalone_candidates = [
+            a for a in body_artifacts
+            if (
+                a.get("artifact_type") != "X-roll"
+                and a.get("artifact_id") not in reserved_closing_ids
+            )
+        ]
+
+        current_mood = opening_broll.get("mood")
 
         while not self.rules.has_reached_maximum_duration():
 
@@ -177,50 +206,65 @@ class Sequencer:
             artifact_type = selected.get("artifact_type")
 
             if artifact_type == "B-roll":
-                # B-roll must always be paired with an X-roll for audio.
-                # Select an X-roll to layer over this B-roll clip. Pairing
-                # does not charge the X-roll's duration against the runtime
-                # budget — see ArtifactSelector.select_pairing().
-                x_roll_artifacts = [
-                    a for a in body_artifacts if a.get("artifact_type") == "X-roll"
+                x_roll_pool = [
+                    a for a in body_artifacts
+                    if (
+                        a.get("artifact_type") == "X-roll"
+                        and a.get("artifact_id") not in reserved_closing_ids
+                    )
                 ]
-                x_roll = self.selector.select_pairing(x_roll_artifacts)
+                x_roll = self.selector.select_pairing(x_roll_pool)
 
                 if x_roll:
-                    # Store as a paired tuple — assembler will overlay these
-                    sequence.append((selected.get("artifact_id"), x_roll.get("artifact_id")))
+                    sequence.append((
+                        selected.get("artifact_id"),
+                        x_roll.get("artifact_id"),
+                    ))
                 else:
-                    # No X-roll available — skip this B-roll to avoid silent video
                     continue
             else:
-                # A-roll stands alone — has its own synchronized audio
                 sequence.append(selected.get("artifact_id"))
 
             current_mood = selected.get("mood")
 
-        # Step 3 — Always close with the designated closing artifact
-        closing_id = self.loader.get_closing_artifact_id()
-        closing_artifact = self._find_artifact_by_id(closing_id)
-
-        if closing_artifact:
-            sequence.append(closing_id)
+        # Step 3 — Close with the reserved generated B-roll + X-roll pair.
+        closing_broll, closing_xroll = closing_pair
+        sequence.append((
+            closing_broll.get("artifact_id"),
+            closing_xroll.get("artifact_id"),
+        ))
+        self.rules.register_selection(closing_broll)
+        self.rules.register_pairing_selection(closing_xroll)
 
         return sequence
 
-    def _find_artifact_by_id(self, artifact_id):
+    def _select_random_broll_xroll_pair(self, b_roll_artifacts, x_roll_artifacts):
         """
-        Finds and returns an artifact from the collection by its ID.
+        Selects a weighted-random B-roll + X-roll pair for generated bookends.
+
+        This method does not register the artifacts. The caller decides when
+        to charge the pair against rule state, which allows the closing pair
+        to be reserved before body selection and appended at the end.
 
         Args:
-            artifact_id (str): The artifact ID to search for.
+            b_roll_artifacts (list): Candidate B-roll artifacts.
+            x_roll_artifacts (list): Candidate X-roll artifacts.
 
         Returns:
-            dict: The artifact dictionary if found, or None if not found.
+            tuple: (b_roll, x_roll), or None if no complete pair is available.
         """
-        for artifact in self.loader.get_artifacts():
-            if artifact.get("artifact_id") == artifact_id:
-                return artifact
-        return None
+        b_candidates = [a for a in b_roll_artifacts if self.rules.is_eligible(a)]
+        x_candidates = [
+            a for a in x_roll_artifacts if self.rules.is_eligible_for_pairing(a)
+        ]
+
+        b_roll = self.selector.weighted_random_choice(b_candidates)
+        x_roll = self.selector.weighted_random_choice(x_candidates)
+
+        if not b_roll or not x_roll:
+            return None
+
+        return b_roll, x_roll
 
     def generate_multiple(self, count, target_duration=None):
         """

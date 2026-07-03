@@ -1,15 +1,13 @@
 {
   "collection_id": "validation",
   "collection_name": "Cross-Category Validation Collection",
-  "description": "A small, deliberately cross-category set of artifacts (war, nature, industry, cosmos, celebration, music, weather) used to validate the engine's juxtaposition sequencing end to end. Variety is the point: unlike clips maximise the contrast the selector is built to find.",
+  "description": "Validation collection wired to real files in local-media/assets. All artifacts are body material; generated films choose randomized B-roll/X-roll bookends at runtime.",
   "version": "1.0.0",
   "created_at": "2026-07-02T00:00:00Z",
-  "updated_at": "2026-07-02T00:00:00Z",
+  "updated_at": "2026-07-03T00:00:00Z",
   "runtime_rules": {
-    "min_duration_seconds": 45,
-    "max_duration_seconds": 300,
-    "opening_artifact_id": "val_av_001",
-    "closing_artifact_id": "val_av_002",
+    "min_duration_seconds": 35,
+    "max_duration_seconds": 120,
     "allow_repeat_artifacts": false,
     "save_generated_films": true
   },
@@ -23,283 +21,287 @@
     {
       "artifact_id": "val_av_001",
       "artifact_type": "A-roll",
-      "role": "opening",
-      "filename": "val_av_001.mp4",
-      "duration_seconds": 10,
-      "title": "Empty highway at dawn",
-      "mood": "reflective",
-      "pacing": "slow",
+      "role": "body",
+      "filename": "a-roll/First_skate.mov",
+      "duration_seconds": 5.136667,
+      "title": "First skate",
+      "mood": "hopeful",
+      "pacing": "medium",
       "tags": [
-        "exterior",
-        "road",
-        "sunrise",
-        "quiet"
+        "skateboard",
+        "outdoor",
+        "movement",
+        "personal"
       ],
       "theme": [
-        "road",
-        "dawn",
-        "stillness"
+        "skateboarding",
+        "first-attempt",
+        "motion"
       ],
-      "weight": 0.5,
+      "weight": 0.7,
+      "dominant_lines": "diagonal",
+      "geography": "local",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "horizontal",
-      "geography": "Nevada"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_av_002",
       "artifact_type": "A-roll",
-      "role": "closing",
-      "filename": "val_av_002.mp4",
-      "duration_seconds": 12,
-      "title": "City skyline at night",
-      "mood": "hopeful",
-      "pacing": "medium",
+      "role": "body",
+      "filename": "a-roll/SF_Zoo.MOV",
+      "duration_seconds": 12.348333,
+      "title": "San Francisco zoo",
+      "mood": "reflective",
+      "pacing": "slow",
       "tags": [
-        "cityscape",
-        "lights",
-        "night",
-        "urban"
+        "zoo",
+        "san-francisco",
+        "outdoor",
+        "visit"
       ],
       "theme": [
-        "city",
-        "night",
-        "energy"
+        "animals",
+        "public-space",
+        "observation"
       ],
-      "weight": 0.5,
+      "weight": 0.6,
+      "dominant_lines": "mixed",
+      "geography": "San Francisco",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "vertical",
-      "geography": "Tokyo"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_av_003",
       "artifact_type": "A-roll",
       "role": "body",
-      "filename": "val_av_003.mp4",
-      "duration_seconds": 14,
-      "title": "Soldiers marching through ruins",
-      "mood": "somber",
-      "pacing": "slow",
+      "filename": "a-roll/chick_stir_fry.mov",
+      "duration_seconds": 7.705,
+      "title": "Chicken stir fry",
+      "mood": "neutral",
+      "pacing": "medium",
       "tags": [
-        "archival",
-        "black-and-white",
-        "infantry",
-        "war"
+        "cooking",
+        "kitchen",
+        "hands",
+        "sizzle"
       ],
       "theme": [
-        "war",
-        "soldiers",
-        "destruction"
+        "food",
+        "domestic-labor",
+        "preparation"
       ],
-      "weight": 0.8,
+      "weight": 0.6,
+      "dominant_lines": "mixed",
+      "geography": "kitchen",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "horizontal",
-      "geography": "France"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_av_004",
       "artifact_type": "A-roll",
       "role": "body",
-      "filename": "val_av_004.mp4",
-      "duration_seconds": 9,
-      "title": "Carnival crowd cheering",
-      "mood": "triumphant",
-      "pacing": "fast",
+      "filename": "a-roll/robotic_arm.mov",
+      "duration_seconds": 11.903333,
+      "title": "Robotic arm",
+      "mood": "tense",
+      "pacing": "slow",
       "tags": [
-        "color",
-        "crowd",
-        "festival",
-        "motion"
+        "robot",
+        "machine",
+        "arm",
+        "controlled-motion"
       ],
       "theme": [
-        "celebration",
-        "crowd",
-        "joy"
+        "technology",
+        "automation",
+        "precision"
       ],
-      "weight": 0.7,
+      "weight": 0.8,
+      "dominant_lines": "vertical",
+      "geography": "lab",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "mixed",
-      "geography": "Brazil"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_av_005",
       "artifact_type": "A-roll",
       "role": "body",
-      "filename": "val_av_005.mp4",
-      "duration_seconds": 11,
-      "title": "Storm waves strike a lighthouse",
-      "mood": "urgent",
-      "pacing": "fast",
+      "filename": "a-roll/gallery_monkey.mov",
+      "duration_seconds": 12.64,
+      "title": "Gallery monkey",
+      "mood": "triumphant",
+      "pacing": "medium",
       "tags": [
-        "sea",
-        "spray",
-        "weather",
-        "coast"
+        "gallery",
+        "monkey",
+        "display",
+        "interior"
       ],
       "theme": [
-        "ocean",
-        "storm",
-        "power"
+        "art-space",
+        "animal-image",
+        "looking"
       ],
       "weight": 0.6,
+      "dominant_lines": "vertical",
+      "geography": "gallery",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "diagonal",
-      "geography": "Ireland"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_av_006",
       "artifact_type": "A-roll",
       "role": "body",
-      "filename": "val_av_006.mp4",
-      "duration_seconds": 16,
-      "title": "Street violinist at dusk",
-      "mood": "melancholic",
-      "pacing": "slow",
+      "filename": "a-roll/skate_boarding.mov",
+      "duration_seconds": 11.261678,
+      "title": "Skate boarding",
+      "mood": "urgent",
+      "pacing": "fast",
       "tags": [
-        "music",
-        "portrait",
-        "urban",
-        "evening"
+        "skateboard",
+        "street",
+        "movement",
+        "youth"
       ],
       "theme": [
-        "music",
-        "solitude",
-        "city"
+        "skateboarding",
+        "street",
+        "motion"
       ],
-      "weight": 0.5,
+      "weight": 0.7,
+      "dominant_lines": "diagonal",
+      "geography": "street",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "vertical",
-      "geography": "Vienna"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_bv_001",
       "artifact_type": "B-roll",
       "role": "body",
-      "filename": "val_bv_001.mp4",
-      "duration_seconds": 13,
-      "title": "Time-lapse of storm clouds",
-      "mood": "tense",
-      "pacing": "fast",
+      "filename": "b-roll/warship_cruising.mp4",
+      "duration_seconds": 10.09,
+      "title": "Warship cruising",
+      "mood": "somber",
+      "pacing": "slow",
       "tags": [
-        "timelapse",
-        "clouds",
-        "sky"
+        "warship",
+        "ocean",
+        "vessel",
+        "horizontal"
       ],
       "theme": [
-        "sky",
-        "weather",
-        "time"
+        "military",
+        "sea",
+        "power"
       ],
-      "weight": 0.6,
+      "weight": 0.8,
+      "dominant_lines": "horizontal",
+      "geography": "open water",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "mixed",
-      "geography": "Kansas"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_bv_002",
       "artifact_type": "B-roll",
       "role": "body",
-      "filename": "val_bv_002.mp4",
-      "duration_seconds": 15,
-      "title": "Forest canopy from below",
-      "mood": "neutral",
+      "filename": "b-roll/waves_sunset.mp4",
+      "duration_seconds": 9.033333,
+      "title": "Waves at sunset",
+      "mood": "melancholic",
       "pacing": "slow",
       "tags": [
-        "trees",
-        "green",
-        "canopy",
-        "nature"
+        "waves",
+        "sunset",
+        "water",
+        "horizon"
       ],
       "theme": [
-        "nature",
-        "forest",
-        "calm"
+        "ocean",
+        "sunset",
+        "weather"
       ],
-      "weight": 0.5,
+      "weight": 0.7,
+      "dominant_lines": "horizontal",
+      "geography": "coast",
       "can_repeat": false,
       "must_not_follow": [
         "val_bv_001"
-      ],
-      "dominant_lines": "vertical",
-      "geography": "Oregon"
+      ]
     },
     {
       "artifact_id": "val_bv_003",
       "artifact_type": "B-roll",
       "role": "body",
-      "filename": "val_bv_003.mp4",
-      "duration_seconds": 12,
-      "title": "Factory assembly line",
-      "mood": "neutral",
-      "pacing": "medium",
+      "filename": "b-roll/plane_drop.mp4",
+      "duration_seconds": 8.133333,
+      "title": "Plane drop",
+      "mood": "urgent",
+      "pacing": "fast",
       "tags": [
-        "factory",
-        "machinery",
-        "industrial"
+        "plane",
+        "drop",
+        "sky",
+        "motion"
       ],
       "theme": [
-        "industry",
-        "machines",
-        "labor"
+        "flight",
+        "risk",
+        "sky"
       ],
-      "weight": 0.5,
+      "weight": 0.7,
+      "dominant_lines": "diagonal",
+      "geography": "sky",
       "can_repeat": false,
-      "must_not_follow": [],
-      "dominant_lines": "horizontal",
-      "geography": "Detroit"
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_bv_004",
       "artifact_type": "B-roll",
       "role": "body",
-      "filename": "val_bv_004.mp4",
-      "duration_seconds": 18,
-      "title": "Aurora over snow",
-      "mood": "hopeful",
-      "pacing": "slow",
+      "filename": "b-roll/colorful_ballerina.mp4",
+      "duration_seconds": 9.008984,
+      "title": "Colorful ballerina",
+      "mood": "triumphant",
+      "pacing": "medium",
       "tags": [
-        "aurora",
-        "night",
-        "arctic",
-        "sky"
+        "ballerina",
+        "dance",
+        "color",
+        "stage"
       ],
       "theme": [
-        "cosmos",
-        "night",
-        "cold"
+        "dance",
+        "performance",
+        "color"
       ],
-      "weight": 0.7,
-      "can_repeat": false,
-      "must_not_follow": [],
+      "weight": 0.6,
       "dominant_lines": "curved",
-      "geography": "Norway"
+      "geography": "stage",
+      "can_repeat": false,
+      "must_not_follow": []
     },
     {
       "artifact_id": "val_xa_001",
       "artifact_type": "X-roll",
       "role": "body",
-      "filename": "val_xa_001.wav",
-      "duration_seconds": 20,
-      "title": "Distant thunder",
-      "mood": "tense",
+      "filename": "x-roll/piano_sound.wav",
+      "duration_seconds": 10.105261,
+      "title": "Piano sound",
+      "mood": "reflective",
       "pacing": "slow",
       "tags": [
-        "thunder",
-        "ambient",
-        "storm"
+        "piano",
+        "music",
+        "audio",
+        "melody"
       ],
       "theme": [
-        "weather",
-        "sound",
-        "storm"
+        "music",
+        "piano",
+        "sound"
       ],
-      "weight": 0.5,
+      "weight": 0.6,
+      "geography": "studio",
       "can_repeat": false,
       "must_not_follow": []
     },
@@ -307,22 +309,24 @@
       "artifact_id": "val_xa_002",
       "artifact_type": "X-roll",
       "role": "body",
-      "filename": "val_xa_002.wav",
-      "duration_seconds": 25,
-      "title": "Cello drone",
-      "mood": "melancholic",
+      "filename": "x-roll/water_stream.wav",
+      "duration_seconds": 10.096625,
+      "title": "Water stream",
+      "mood": "neutral",
       "pacing": "slow",
       "tags": [
-        "cello",
-        "music",
-        "drone"
+        "water",
+        "stream",
+        "ambient",
+        "flow"
       ],
       "theme": [
-        "music",
-        "drone",
-        "melancholy"
+        "water",
+        "nature",
+        "sound"
       ],
       "weight": 0.5,
+      "geography": "stream",
       "can_repeat": false,
       "must_not_follow": []
     },
@@ -330,22 +334,24 @@
       "artifact_id": "val_xa_003",
       "artifact_type": "X-roll",
       "role": "body",
-      "filename": "val_xa_003.wav",
-      "duration_seconds": 18,
-      "title": "Marketplace chatter",
-      "mood": "neutral",
+      "filename": "x-roll/war_bong.wav",
+      "duration_seconds": 6.615979,
+      "title": "War bong",
+      "mood": "tense",
       "pacing": "fast",
       "tags": [
-        "crowd",
-        "voices",
-        "ambient"
+        "percussion",
+        "impact",
+        "warning",
+        "audio"
       ],
       "theme": [
-        "human",
-        "voices",
-        "city"
+        "percussion",
+        "alarm",
+        "impact"
       ],
-      "weight": 0.5,
+      "weight": 0.7,
+      "geography": "sound-library",
       "can_repeat": false,
       "must_not_follow": []
     },
@@ -353,22 +359,24 @@
       "artifact_id": "val_xa_004",
       "artifact_type": "X-roll",
       "role": "body",
-      "filename": "val_xa_004.wav",
-      "duration_seconds": 22,
-      "title": "Synth pulse",
-      "mood": "urgent",
-      "pacing": "fast",
+      "filename": "x-roll/birds_call.wav",
+      "duration_seconds": 10.478776,
+      "title": "Bird calls",
+      "mood": "hopeful",
+      "pacing": "medium",
       "tags": [
-        "synth",
-        "electronic",
-        "pulse"
+        "birds",
+        "calls",
+        "ambient",
+        "nature"
       ],
       "theme": [
-        "electronic",
-        "rhythm",
-        "tension"
+        "birds",
+        "nature",
+        "sound"
       ],
       "weight": 0.6,
+      "geography": "outdoors",
       "can_repeat": false,
       "must_not_follow": []
     }

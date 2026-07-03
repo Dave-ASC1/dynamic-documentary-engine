@@ -110,6 +110,10 @@ class Assembler:
     DEFAULT_AUDIO_CODEC = "aac"
     DEFAULT_PIX_FMT    = "yuv420p"
     DEFAULT_FORMAT     = "mp4"
+    DEFAULT_OUTPUT_WIDTH = 1280
+    DEFAULT_OUTPUT_HEIGHT = 720
+    DEFAULT_OUTPUT_FPS = 30
+    DEFAULT_VIDEO_PRESET = "veryfast"
 
     # Seconds to capture from a live stream per slot.
     # Overridden by the artifact's duration_seconds if present.
@@ -125,6 +129,10 @@ class Assembler:
         audio_codec: str = DEFAULT_AUDIO_CODEC,
         pix_fmt: str = DEFAULT_PIX_FMT,
         output_format: str = DEFAULT_FORMAT,
+        output_width: int = DEFAULT_OUTPUT_WIDTH,
+        output_height: int = DEFAULT_OUTPUT_HEIGHT,
+        output_fps: int = DEFAULT_OUTPUT_FPS,
+        video_preset: str = DEFAULT_VIDEO_PRESET,
     ):
         """
         Initializes the Assembler.
@@ -142,6 +150,10 @@ class Assembler:
             audio_codec (str):   FFmpeg audio codec string.
             pix_fmt (str):       FFmpeg pixel format string.
             output_format (str): Output container format extension (e.g. "mp4").
+            output_width (int):  Normalized segment width in pixels.
+            output_height (int): Normalized segment height in pixels.
+            output_fps (int):    Normalized segment frame rate.
+            video_preset (str):  FFmpeg encoder preset for segment rendering.
         """
         self.loader        = loader
         self.assets_path   = os.path.normpath(assets_path)
@@ -151,6 +163,10 @@ class Assembler:
         self.audio_codec   = audio_codec
         self.pix_fmt       = pix_fmt
         self.output_format = output_format
+        self.output_width  = output_width
+        self.output_height = output_height
+        self.output_fps    = output_fps
+        self.video_preset  = video_preset
 
     # ------------------------------------------------------------------
     # Public Interface
@@ -496,9 +512,17 @@ class Assembler:
             cmd += ["-t", str(duration)]
 
         cmd += [
+            "-map", "0:v:0",
+            "-map", "0:a:0?",
+            "-vf", self._build_normalize_video_filter(),
+            "-r", str(self.output_fps),
             "-vcodec", self.video_codec,
+            "-preset", self.video_preset,
             "-acodec", self.audio_codec,
+            "-ar", "48000",
+            "-ac", "2",
             "-pix_fmt", self.pix_fmt,
+            "-movflags", "+faststart",
             output_path,
         ]
 
@@ -557,10 +581,16 @@ class Assembler:
         cmd += [
             "-map", "0:v",      # Video from input 0 (B-roll)
             "-map", "1:a",      # Audio from input 1 (X-roll)
+            "-vf", self._build_normalize_video_filter(),
+            "-r", str(self.output_fps),
             "-shortest",         # Stop at end of B-roll video
             "-vcodec", self.video_codec,
+            "-preset", self.video_preset,
             "-acodec", self.audio_codec,
+            "-ar", "48000",
+            "-ac", "2",
             "-pix_fmt", self.pix_fmt,
+            "-movflags", "+faststart",
             output_path,
         ]
 
@@ -589,11 +619,30 @@ class Assembler:
             "-f", "concat",
             "-safe", "0",       # Allow absolute paths in the concat list
             "-i", concat_list_path,
-            "-vcodec", self.video_codec,
-            "-acodec", self.audio_codec,
-            "-pix_fmt", self.pix_fmt,
+            "-c", "copy",
+            "-movflags", "+faststart",
             output_path,
         ]
+
+    def _build_normalize_video_filter(self) -> str:
+        """
+        Returns a video filter that gives every segment identical geometry.
+
+        Local validation media can mix portrait, landscape, 4K, 1080p, and
+        older low-resolution clips. Normalizing each segment before concat
+        keeps the final assembly predictable and fast.
+
+        Returns:
+            str: FFmpeg filter graph for scale, pad, sample aspect, and pixel format.
+        """
+        return (
+            f"scale={self.output_width}:{self.output_height}:"
+            "force_original_aspect_ratio=decrease,"
+            f"pad={self.output_width}:{self.output_height}:"
+            "(ow-iw)/2:(oh-ih)/2,"
+            "setsar=1,"
+            f"format={self.pix_fmt}"
+        )
 
     # ------------------------------------------------------------------
     # Concat List Writer

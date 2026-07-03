@@ -5,28 +5,29 @@
   "role": "body",
   "file": {
     "source_type": "local",
-    "filename": "val_xa_004.wav",
+    "filename": "x-roll/birds_call.wav",
     "format": "wav",
-    "duration_seconds": 22,
+    "duration_seconds": 10.478776,
     "has_video": false,
     "has_audio": true,
     "source": "self-recorded",
     "copyright_cleared": true
   },
   "content": {
-    "title": "Synth pulse",
-    "description": "A driving electronic synth pulse with rising tension.",
+    "title": "Bird calls",
+    "description": "Bird call ambience used as a natural X-roll layer under unrelated visuals.",
     "theme": [
-      "electronic",
-      "rhythm",
-      "tension"
+      "birds",
+      "nature",
+      "sound"
     ],
-    "mood": "urgent",
-    "pacing": "fast",
+    "mood": "hopeful",
+    "pacing": "medium",
     "tags": [
-      "synth",
-      "electronic",
-      "pulse"
+      "birds",
+      "calls",
+      "ambient",
+      "nature"
     ]
   },
   "sequencing": {
@@ -37,5 +38,5 @@
     "weight": 0.6
   },
   "created_at": "2026-07-02T00:00:00Z",
-  "updated_at": "2026-07-02T00:00:00Z"
+  "updated_at": "2026-07-03T00:00:00Z"
 }

@@ -53,9 +53,7 @@
       "description": "Collection-level rules that govern every film generated from this collection",
       "required": [
         "min_duration_seconds",
-        "max_duration_seconds",
-        "opening_artifact_id",
-        "closing_artifact_id"
+        "max_duration_seconds"
       ],
       "properties": {
         "min_duration_seconds": {
@@ -70,12 +68,12 @@
         },
         "opening_artifact_id": {
           "type": "string",
-          "description": "Artifact ID of the opening A/V — always appears first in every generated film",
+          "description": "Deprecated / unused by the current engine. Generated films open with a randomized B-roll + X-roll pair from role == 'body' artifacts. Kept optional for backward compatibility with older collection indexes; safe to omit.",
           "example": "ww2_av_001"
         },
         "closing_artifact_id": {
           "type": "string",
-          "description": "Artifact ID of the closing A/V — always appears last in every generated film",
+          "description": "Deprecated / unused by the current engine. Generated films close with a randomized B-roll + X-roll pair from role == 'body' artifacts. Kept optional for backward compatibility with older collection indexes; safe to omit.",
           "example": "ww2_av_002"
         },
         "allow_repeat_artifacts": {

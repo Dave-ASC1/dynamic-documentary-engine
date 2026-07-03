@@ -59,6 +59,16 @@ def label(a):
     return f"{a.get('title', a['artifact_id'])} [{a.get('artifact_type')}]"
 
 
+def slot_label(slot):
+    """Human label for a built slot dict (see generate_and_render()),
+    regardless of whether it's a standalone artifact or a B-roll+X-roll
+    pair — used to describe whichever artifact actually opened/closed a
+    given run, since that's now chosen automatically per generation."""
+    if slot["kind"] == "broll_xroll":
+        return f"{slot['broll_title']} + {slot['xroll_title']} [B-roll+X-roll]"
+    return f"{slot['title']} [{slot.get('artifact_type')}]"
+
+
 def dims(prev, cand):
     """Per-dimension contrast breakdown, mirroring the engine's scorer.
 
@@ -301,6 +311,7 @@ def generate_and_render(
                 "xroll_id": x,
                 "broll_title": bd.get("title", b),
                 "xroll_title": xd.get("title", x),
+                "role": bd.get("role", "body"),
                 "duration_seconds": bd.get("duration_seconds", 0),
             })
         else:
@@ -340,11 +351,9 @@ def generate_and_render(
     )
     film_path = assembler.render(sequence)
 
-    # sequencer.rules.current_duration is a body-selection *budget* counter —
-    # it never includes the closing artifact, which is appended directly
-    # without going through register_selection(). Summing slot durations
-    # (as the CLI script's print_sequence() already does) gives the true
-    # total screen time, matching the actual rendered film length.
+    # Summing slot durations gives the true screen time, matching the
+    # actual rendered film length for both standalone A-roll and paired
+    # B-roll/X-roll slots.
     actual_duration = sum(s["duration_seconds"] for s in slots)
 
     result = {
@@ -353,8 +362,10 @@ def generate_and_render(
         "collection_name": loader.collection.get("collection_name"),
         "target_duration": target_duration,
         "actual_duration": actual_duration,
-        "opening": label(amap.get(loader.get_opening_artifact_id())),
-        "closing": label(amap.get(loader.get_closing_artifact_id())),
+        # Opening/closing are generated per run — read the label off the
+        # actual chosen slots, not fixed collection metadata.
+        "opening": slot_label(slots[0]) if slots else "(none)",
+        "closing": slot_label(slots[-1]) if slots else "(none)",
         "slots": slots,
         "trace": trace,
         "film_path": film_path,

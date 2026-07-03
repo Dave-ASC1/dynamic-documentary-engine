@@ -95,6 +95,8 @@ def print_sequence(sequence, amap):
     print(f"\n{BAR}\nASSEMBLED FILM ORDER  ({len(sequence)} slots)\n{BAR}")
     total = 0.0
     for i, entry in enumerate(sequence):
+        anchor = "  <-- generated opening" if i == 0 else (
+            "  <-- generated closing" if i == len(sequence) - 1 else "")
         if isinstance(entry, tuple):
             b, x = entry
             bd = amap.get(b, {})
@@ -102,14 +104,11 @@ def print_sequence(sequence, amap):
             dur = bd.get("duration_seconds", 0)
             total += dur
             print(f"  {i + 1:>2}. [B+X {dur:>4.0f}s]  {bd.get('title', b)}"
-                  f"  +audio: {xd.get('title', x)}")
+                  f"  +audio: {xd.get('title', x)}{anchor}")
         else:
             d = amap.get(entry, {})
             dur = d.get("duration_seconds", 0)
             total += dur
-            role = d.get("role", "body")
-            anchor = "  <-- opening" if role == "opening" else (
-                "  <-- closing" if role == "closing" else "")
             print(f"  {i + 1:>2}. [{d.get('artifact_type', '?'):<6} {dur:>4.0f}s]"
                   f"  {d.get('title', entry)}{anchor}")
     print(f"\n  approx. total runtime: {total:.0f}s")
@@ -165,8 +164,7 @@ def main():
     print(f"artifacts  : {counts.get('total')} total — "
           f"{counts.get('a_roll')} A-roll, {counts.get('b_roll')} B-roll, "
           f"{counts.get('x_roll')} X-roll")
-    print(f"opening    : {label(amap.get(loader.get_opening_artifact_id()))}")
-    print(f"closing    : {label(amap.get(loader.get_closing_artifact_id()))}")
+    print("bookends   : generated per run from B-roll + X-roll body artifacts")
     print(f"target     : {args.target}s"
           + (f"   (seed {args.seed})" if args.seed is not None else "   (unseeded)"))
 

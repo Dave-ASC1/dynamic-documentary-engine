@@ -19,10 +19,9 @@ Design Philosophy:
     have been removed entirely. They enforced emotional continuity — the
     opposite of what this engine is designed to produce.
 
-    The previous _apply_pacing_preference() method has been replaced with
-    _apply_media_type_variety(), which nudges selection toward alternating
-    between A-roll and B-roll. This creates visual rhythm without imposing
-    any emotional arc.
+    The selector does not force A-roll/B-roll alternation. A-roll and B-roll
+    compete in the same primary candidate pool, and the engine chooses from
+    that pool using dissimilarity scoring plus weighted randomness.
 
     Weighted random selection is preserved. Weight is a collection-designer
     tool for controlling relative frequency of appearance, not for emotional
@@ -77,6 +76,20 @@ class ArtifactSelector:
         self.rules = rules
         self._last_selected = None
 
+    def set_previous_artifact(self, artifact):
+        """
+        Sets the comparison baseline for the next primary selection.
+
+        Used when a structural artifact, such as a generated opening B-roll,
+        is placed directly by the sequencer rather than selected through
+        select_next(). This lets the first body pick still be chosen by
+        contrast against the actual previous clip.
+
+        Args:
+            artifact (dict): The artifact to compare the next candidate against.
+        """
+        self._last_selected = artifact
+
     def select_next(self, candidates, current_mood=None, target_pacing=None):
         """
         Selects the next artifact from a pool of candidates.
@@ -85,11 +98,9 @@ class ArtifactSelector:
             1. Filter candidates through the rule engine for structural eligibility.
             2. If a previous artifact exists, score all eligible candidates by
                dissimilarity and sort descending (most different first).
-            3. Apply media-type variety nudge using target_pacing as a signal
-               from rules.get_target_pacing().
-            4. Take the top _JUXTAPOSITION_POOL_SIZE candidates.
-            5. Apply weighted random selection within that pool.
-            6. Register the selection and update internal state.
+            3. Take the top _JUXTAPOSITION_POOL_SIZE candidates.
+            4. Apply weighted random selection within that pool.
+            5. Register the selection and update internal state.
 
         The current_mood parameter is accepted for interface compatibility with
         sequencer.py but is no longer used to guide selection toward emotionally
@@ -102,9 +113,8 @@ class ArtifactSelector:
                                      Accepted for interface compatibility; not used
                                      to enforce mood continuity.
             target_pacing (str):     Pacing hint from rules.get_target_pacing().
-                                     Interpreted as a media-type variety signal:
-                                     'slow' = prefer A-roll, 'medium' = prefer B-roll,
-                                     no override if pool is small.
+                                     Accepted for interface compatibility; not used
+                                     to prefer A-roll or B-roll.
 
         Returns:
             dict: The selected artifact dictionary, or None if no eligible
@@ -118,9 +128,6 @@ class ArtifactSelector:
         if self._last_selected is not None:
             # Score and sort by dissimilarity — most different first
             eligible = self._apply_juxtaposition_filter(eligible)
-
-        # Apply media-type variety nudge within the dissimilarity-sorted pool
-        eligible = self._apply_media_type_variety(eligible, target_pacing)
 
         # Take top candidates to maintain strong juxtaposition while
         # allowing weighted randomness within that tier
@@ -309,54 +316,6 @@ class ArtifactSelector:
         )
 
     # ------------------------------------------------------------------
-    # Media-Type Variety
-    # ------------------------------------------------------------------
-
-    def _apply_media_type_variety(self, candidates: list, target_pacing: str) -> list:
-        """
-        Nudges the candidate pool to prefer alternating between A-roll and
-        B-roll by surfacing the preferred type at the top of the list.
-
-        This replaces the old _apply_pacing_preference() method. The pacing
-        signal from rules.get_target_pacing() is repurposed here as a
-        media-type variety hint (see rules.py get_target_pacing() docstring
-        for the mapping). Non-preferred candidates remain available as
-        fallbacks — this is a soft preference, not a hard filter.
-
-        The nudge is applied AFTER juxtaposition sorting, so it only
-        reorders within the already-sorted pool rather than overriding
-        the dissimilarity ranking.
-
-        Args:
-            candidates:    Candidates already sorted by dissimilarity.
-            target_pacing: Pacing hint from rules.get_target_pacing().
-                           'slow' signals prefer A-roll.
-                           'medium' signals prefer B-roll.
-                           'fast' signals no media-type preference.
-
-        Returns:
-            List of candidates with the preferred media type surfaced first,
-            followed by remaining candidates in their original order.
-        """
-        if target_pacing == "slow":
-            preferred_type = "A-roll"
-        elif target_pacing == "medium":
-            preferred_type = "B-roll"
-        else:
-            # 'fast' or unrecognised: no media-type preference
-            return candidates
-
-        preferred = [a for a in candidates if a.get("artifact_type") == preferred_type]
-        others = [a for a in candidates if a.get("artifact_type") != preferred_type]
-
-        # Only apply the nudge if there are preferred candidates — never
-        # remove the fallback pool, so the engine always has something to pick
-        if preferred:
-            return preferred + others
-
-        return candidates
-
-    # ------------------------------------------------------------------
     # Weighted Random Selection
     # ------------------------------------------------------------------
 
@@ -377,6 +336,26 @@ class ArtifactSelector:
 
         Returns:
             dict: The randomly selected artifact, or None if candidates is empty.
+        """
+        if not candidates:
+            return None
+
+        weights = [a.get("weight", 0.5) for a in candidates]
+        return random.choices(candidates, weights=weights, k=1)[0]
+
+    def weighted_random_choice(self, candidates: list) -> dict:
+        """
+        Selects one artifact by weight without registering it as used.
+
+        This is useful for reserving generated structural choices, such as
+        randomized B-roll/X-roll bookends, before the main body sequence is
+        assembled.
+
+        Args:
+            candidates: List of artifact dictionaries to choose from.
+
+        Returns:
+            dict: The selected artifact, or None if candidates is empty.
         """
         if not candidates:
             return None

@@ -18,6 +18,14 @@ celebration, music, weather...) so adjacent clips have strong contrast for
 the dissimilarity scorer to work with. This is a TEST FIXTURE, not a cap:
 add more rows to SPECS as real media comes in.
 
+WARNING — this generator emits the ORIGINAL placeholder bootstrap data.
+The live collection in metadata/validation/ has since been hand-wired to
+the real footage in local-media/assets/ (different filenames, durations,
+and descriptions). Re-running this script would OVERWRITE that real-media
+collection with these placeholder specs. To prevent accidental data loss,
+main() refuses to overwrite an existing collection unless --force is
+passed. Update SPECS to match the real media before ever using --force.
+
 Each index entry is enriched with the top-level fields the engine actually
 reads during selection (mood, pacing, tags, theme, dominant_lines,
 geography, weight, can_repeat, must_not_follow, duration_seconds, title) —
@@ -32,6 +40,7 @@ Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
 Version: 1.0.0
 """
 
+import argparse
 import json
 import os
 
@@ -62,28 +71,27 @@ CREATED_AT = "2026-07-02T00:00:00Z"
 # ----------------------------------------------------------------------
 # Artifact specifications — compact table, expanded to full JSON below.
 # To grow the collection, add rows here. Fields:
-#   id, type ('A-roll'|'B-roll'|'X-roll'), role ('opening'|'closing'|'body'),
+#   id, type ('A-roll'|'B-roll'|'X-roll'), role ('body'),
 #   dur (seconds), title, desc, theme[], mood, pacing, tags[], colors[],
 #   lines, geo, weight, must_not_follow[]
 # ----------------------------------------------------------------------
 
 SPECS = [
-    # --- Designated opening / closing A-roll (the only imposed structure) ---
-    dict(id="val_av_001", type="A-roll", role="opening", dur=10,
+    # --- A-roll (stand-alone, synchronized audio + video) ---
+    dict(id="val_av_001", type="A-roll", role="body", dur=10,
          title="Empty highway at dawn",
          desc="A deserted desert highway stretches to the horizon as the sun rises. Faint wind and distant birds.",
          theme=["road", "dawn", "stillness"], mood="reflective", pacing="slow",
          tags=["exterior", "road", "sunrise", "quiet"], colors=["orange", "gray"],
          lines="horizontal", geo="Nevada", weight=0.5, must_not_follow=[]),
 
-    dict(id="val_av_002", type="A-roll", role="closing", dur=12,
+    dict(id="val_av_002", type="A-roll", role="body", dur=12,
          title="City skyline at night",
          desc="A dense city skyline pulses with light after dark, traffic streaming below. Ambient urban hum.",
          theme=["city", "night", "energy"], mood="hopeful", pacing="medium",
          tags=["cityscape", "lights", "night", "urban"], colors=["blue", "black"],
          lines="vertical", geo="Tokyo", weight=0.5, must_not_follow=[]),
 
-    # --- Body: A-roll (stand-alone, synchronized audio + video) ---
     dict(id="val_av_003", type="A-roll", role="body", dur=14,
          title="Soldiers marching through ruins",
          desc="Black-and-white archival footage of infantry moving through a bombed-out town, distant artillery.",
@@ -174,8 +182,6 @@ SPECS = [
 RUNTIME_RULES = {
     "min_duration_seconds": 45,
     "max_duration_seconds": 300,
-    "opening_artifact_id": "val_av_001",
-    "closing_artifact_id": "val_av_002",
     "allow_repeat_artifacts": False,
     "save_generated_films": True,
 }
@@ -331,6 +337,30 @@ def _validate(instance, schema_path, label):
 # ----------------------------------------------------------------------
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Generate the placeholder validation collection. "
+                    "Refuses to overwrite an existing collection unless --force."
+    )
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Overwrite an existing collection in metadata/validation/. "
+             "DANGER: this replaces the hand-wired real-media collection with "
+             "the placeholder SPECS in this file. See the module docstring."
+    )
+    args = parser.parse_args()
+
+    index_path = os.path.join(OUTPUT_DIR, INDEX_FILENAME)
+    if os.path.exists(index_path) and not args.force:
+        print(
+            "Refusing to overwrite the existing collection at "
+            f"{os.path.relpath(OUTPUT_DIR, REPO_ROOT)}/.\n"
+            "The live collection is hand-wired to real media; re-running this "
+            "generator would replace it with placeholder data.\n"
+            "If you really intend to regenerate from the placeholder SPECS in "
+            "this file, pass --force."
+        )
+        return 1
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     all_valid = True
 

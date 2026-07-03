@@ -2,47 +2,47 @@
   "artifact_id": "val_av_001",
   "collection_id": "validation",
   "artifact_type": "A-roll",
-  "role": "opening",
+  "role": "body",
   "file": {
     "source_type": "local",
-    "filename": "val_av_001.mp4",
-    "format": "mp4",
-    "duration_seconds": 10,
+    "filename": "a-roll/First_skate.mov",
+    "format": "mov",
+    "duration_seconds": 5.136667,
     "has_video": true,
     "has_audio": true,
     "source": "self-recorded",
     "copyright_cleared": true,
-    "resolution": "640x360"
+    "resolution": "3840x2160"
   },
   "content": {
-    "title": "Empty highway at dawn",
-    "description": "A deserted desert highway stretches to the horizon as the sun rises. Faint wind and distant birds.",
+    "title": "First skate",
+    "description": "A first skateboarding moment, handheld and immediate, with the original synchronized sound.",
     "theme": [
-      "road",
-      "dawn",
-      "stillness"
+      "skateboarding",
+      "first-attempt",
+      "motion"
     ],
-    "mood": "reflective",
-    "pacing": "slow",
+    "mood": "hopeful",
+    "pacing": "medium",
     "tags": [
-      "exterior",
-      "road",
-      "sunrise",
-      "quiet"
+      "skateboard",
+      "outdoor",
+      "movement",
+      "personal"
     ],
     "dominant_colors": [
-      "orange",
-      "gray"
+      "gray",
+      "green"
     ],
-    "dominant_lines": "horizontal"
+    "dominant_lines": "diagonal"
   },
   "sequencing": {
     "can_repeat": false,
     "min_gap_seconds": 0,
     "must_follow": [],
     "must_not_follow": [],
-    "weight": 0.5
+    "weight": 0.7
   },
   "created_at": "2026-07-02T00:00:00Z",
-  "updated_at": "2026-07-02T00:00:00Z"
+  "updated_at": "2026-07-03T00:00:00Z"
 }

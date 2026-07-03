@@ -1,0 +1,19 @@
+# Keep local media out of Git. These files can be large and/or rights-sensitive.
+raw/*
+assets/a-roll/*
+assets/b-roll/*
+assets/x-roll/*
+films/*
+
+# Keep the folder structure visible in the repo.
+!raw/.gitkeep
+!assets/.gitkeep
+!assets/a-roll/
+!assets/a-roll/.gitkeep
+!assets/b-roll/
+!assets/b-roll/.gitkeep
+!assets/x-roll/
+!assets/x-roll/.gitkeep
+!films/.gitkeep
+!README.md
+!.gitignore

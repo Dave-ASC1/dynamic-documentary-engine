@@ -8,8 +8,7 @@ and orders artifacts when assembling a generated film.
 
 Rules are applied in order during artifact selection to ensure:
     - No artifact repeats within a single film (unless explicitly allowed)
-    - Pacing varies by alternating media types rather than following a
-      predetermined emotional arc
+    - Primary picks can come from any eligible visual roll
     - Total runtime stays within collection-defined bounds
 
 Design Philosophy:
@@ -20,9 +19,9 @@ Design Philosophy:
     not incidental; it is the engine's core aesthetic purpose.
 
     Accordingly, PACING_ARC has been removed. The engine no longer tracks
-    position in a film or shapes an emotional curve. Pacing guidance from
-    get_target_pacing() now serves only to encourage media-type variety
-    (alternating A-roll and B-roll), not to enforce a predetermined feel.
+    position in a film or shapes an emotional curve. Pacing metadata remains
+    available as one scored contrast dimension, but the rule engine does not
+    force A-roll/B-roll alternation.
 
     Mood and pacing metadata on artifacts remain in the schema for human
     reference and collection-design purposes only. The rule engine does not
@@ -64,8 +63,8 @@ class SequencingRules:
         current_duration (float):   Total duration accumulated so far in seconds.
         last_artifact_type (str):   The artifact_type of the most recently selected
                                     artifact ('A-roll', 'B-roll', or 'X-roll').
-                                    Used by get_target_pacing() to encourage
-                                    media-type variety between consecutive slots.
+                                    Stored for review/debugging and possible future
+                                    collection rules.
     """
 
     def __init__(self, runtime_rules):
@@ -139,32 +138,18 @@ class SequencingRules:
 
     def get_target_pacing(self):
         """
-        Returns a pacing hint to encourage media-type variety between slots.
+        Returns no pacing preference.
 
-        This method no longer drives an emotional arc. Instead, it signals
-        to the ArtifactSelector which media type was used last, so the
-        selector can prefer the opposite type for the next slot — alternating
-        between A-roll and B-roll to create visual rhythm without imposing
-        any predetermined emotional shape.
-
-        The return values map to sequencer.py's expectations ('slow',
-        'medium', 'fast') for interface compatibility, but the selector
-        interprets them as media-type variety hints rather than emotional
-        pacing targets.
-
-        Mapping:
-            last was A-roll  → return 'medium'  (prefer B-roll next)
-            last was B-roll  → return 'slow'    (prefer A-roll next)
-            no prior slot    → return 'medium'  (no preference)
+        Body selection should be an engine decision across any eligible
+        visual artifact: A-roll can stand alone, while B-roll is selected
+        only when it can be paired with X-roll audio. The selector uses
+        dissimilarity scoring and weights to choose; this rule layer does
+        not push it toward A-roll or B-roll.
 
         Returns:
-            str: A pacing hint string — 'slow', 'medium', or 'fast'.
+            None: No pacing or media-type preference.
         """
-        if self.last_artifact_type == "A-roll":
-            return "medium"   # Signal: try B-roll next
-        if self.last_artifact_type == "B-roll":
-            return "slow"     # Signal: try A-roll next
-        return "medium"       # No prior selection — no preference
+        return None
 
     def _passes_no_repeat_rule(self, artifact):
         """
@@ -227,8 +212,8 @@ class SequencingRules:
         Registers an artifact as selected and updates rule state.
 
         Records the artifact ID in the used list, adds its duration to
-        the running total, and updates last_artifact_type so that
-        get_target_pacing() can encourage variety on the next selection.
+        the running total, and updates last_artifact_type for review and
+        possible future rules.
 
         Args:
             artifact (dict): The artifact dictionary that was selected.

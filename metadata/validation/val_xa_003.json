@@ -5,28 +5,29 @@
   "role": "body",
   "file": {
     "source_type": "local",
-    "filename": "val_xa_003.wav",
+    "filename": "x-roll/war_bong.wav",
     "format": "wav",
-    "duration_seconds": 18,
+    "duration_seconds": 6.615979,
     "has_video": false,
     "has_audio": true,
     "source": "self-recorded",
     "copyright_cleared": true
   },
   "content": {
-    "title": "Marketplace chatter",
-    "description": "Overlapping voices, footsteps and clatter of a busy open-air market.",
+    "title": "War bong",
+    "description": "A sharp percussive audio element for abrupt X-roll contrast.",
     "theme": [
-      "human",
-      "voices",
-      "city"
+      "percussion",
+      "alarm",
+      "impact"
     ],
-    "mood": "neutral",
+    "mood": "tense",
     "pacing": "fast",
     "tags": [
-      "crowd",
-      "voices",
-      "ambient"
+      "percussion",
+      "impact",
+      "warning",
+      "audio"
     ]
   },
   "sequencing": {
@@ -34,8 +35,8 @@
     "min_gap_seconds": 0,
     "must_follow": [],
     "must_not_follow": [],
-    "weight": 0.5
+    "weight": 0.7
   },
   "created_at": "2026-07-02T00:00:00Z",
-  "updated_at": "2026-07-02T00:00:00Z"
+  "updated_at": "2026-07-03T00:00:00Z"
 }

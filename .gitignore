@@ -229,3 +229,6 @@ films/
 *.mov
 *.wav
 *.mp3
+
+# macOS
+.DS_Store

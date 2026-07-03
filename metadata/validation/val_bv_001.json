@@ -5,43 +5,44 @@
   "role": "body",
   "file": {
     "source_type": "local",
-    "filename": "val_bv_001.mp4",
+    "filename": "b-roll/warship_cruising.mp4",
     "format": "mp4",
-    "duration_seconds": 13,
+    "duration_seconds": 10.09,
     "has_video": true,
     "has_audio": false,
     "source": "self-recorded",
     "copyright_cleared": true,
-    "resolution": "640x360"
+    "resolution": "1920x1080"
   },
   "content": {
-    "title": "Time-lapse of storm clouds",
-    "description": "Fast time-lapse of towering storm clouds boiling across a wide sky.",
+    "title": "Warship cruising",
+    "description": "A warship cuts across open water, used as silent visual B-roll in the generated sequence.",
     "theme": [
-      "sky",
-      "weather",
-      "time"
+      "military",
+      "sea",
+      "power"
     ],
-    "mood": "tense",
-    "pacing": "fast",
+    "mood": "somber",
+    "pacing": "slow",
     "tags": [
-      "timelapse",
-      "clouds",
-      "sky"
+      "warship",
+      "ocean",
+      "vessel",
+      "horizontal"
     ],
     "dominant_colors": [
-      "gray",
-      "white"
+      "blue",
+      "gray"
     ],
-    "dominant_lines": "mixed"
+    "dominant_lines": "horizontal"
   },
   "sequencing": {
     "can_repeat": false,
     "min_gap_seconds": 0,
     "must_follow": [],
     "must_not_follow": [],
-    "weight": 0.6
+    "weight": 0.8
   },
   "created_at": "2026-07-02T00:00:00Z",
-  "updated_at": "2026-07-02T00:00:00Z"
+  "updated_at": "2026-07-03T00:00:00Z"
 }
