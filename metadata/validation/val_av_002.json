@@ -1,0 +1,48 @@
+{
+  "artifact_id": "val_av_002",
+  "collection_id": "validation",
+  "artifact_type": "A-roll",
+  "role": "closing",
+  "file": {
+    "source_type": "local",
+    "filename": "val_av_002.mp4",
+    "format": "mp4",
+    "duration_seconds": 12,
+    "has_video": true,
+    "has_audio": true,
+    "source": "self-recorded",
+    "copyright_cleared": true,
+    "resolution": "640x360"
+  },
+  "content": {
+    "title": "City skyline at night",
+    "description": "A dense city skyline pulses with light after dark, traffic streaming below. Ambient urban hum.",
+    "theme": [
+      "city",
+      "night",
+      "energy"
+    ],
+    "mood": "hopeful",
+    "pacing": "medium",
+    "tags": [
+      "cityscape",
+      "lights",
+      "night",
+      "urban"
+    ],
+    "dominant_colors": [
+      "blue",
+      "black"
+    ],
+    "dominant_lines": "vertical"
+  },
+  "sequencing": {
+    "can_repeat": false,
+    "min_gap_seconds": 0,
+    "must_follow": [],
+    "must_not_follow": [],
+    "weight": 0.5
+  },
+  "created_at": "2026-07-02T00:00:00Z",
+  "updated_at": "2026-07-02T00:00:00Z"
+}

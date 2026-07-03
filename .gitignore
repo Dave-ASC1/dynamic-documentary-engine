@@ -1,6 +1,9 @@
 # Claude Code local settings (personal, not shared)
 .claude/settings.local.json
 
+# Disposable placeholder media + rendered demo films (regenerated on demand)
+demo/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

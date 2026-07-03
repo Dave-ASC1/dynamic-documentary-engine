@@ -1,0 +1,376 @@
+{
+  "collection_id": "validation",
+  "collection_name": "Cross-Category Validation Collection",
+  "description": "A small, deliberately cross-category set of artifacts (war, nature, industry, cosmos, celebration, music, weather) used to validate the engine's juxtaposition sequencing end to end. Variety is the point: unlike clips maximise the contrast the selector is built to find.",
+  "version": "1.0.0",
+  "created_at": "2026-07-02T00:00:00Z",
+  "updated_at": "2026-07-02T00:00:00Z",
+  "runtime_rules": {
+    "min_duration_seconds": 45,
+    "max_duration_seconds": 300,
+    "opening_artifact_id": "val_av_001",
+    "closing_artifact_id": "val_av_002",
+    "allow_repeat_artifacts": false,
+    "save_generated_films": true
+  },
+  "artifact_counts": {
+    "total": 14,
+    "a_roll": 6,
+    "b_roll": 4,
+    "x_roll": 4
+  },
+  "artifacts": [
+    {
+      "artifact_id": "val_av_001",
+      "artifact_type": "A-roll",
+      "role": "opening",
+      "filename": "val_av_001.mp4",
+      "duration_seconds": 10,
+      "title": "Empty highway at dawn",
+      "mood": "reflective",
+      "pacing": "slow",
+      "tags": [
+        "exterior",
+        "road",
+        "sunrise",
+        "quiet"
+      ],
+      "theme": [
+        "road",
+        "dawn",
+        "stillness"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "horizontal",
+      "geography": "Nevada"
+    },
+    {
+      "artifact_id": "val_av_002",
+      "artifact_type": "A-roll",
+      "role": "closing",
+      "filename": "val_av_002.mp4",
+      "duration_seconds": 12,
+      "title": "City skyline at night",
+      "mood": "hopeful",
+      "pacing": "medium",
+      "tags": [
+        "cityscape",
+        "lights",
+        "night",
+        "urban"
+      ],
+      "theme": [
+        "city",
+        "night",
+        "energy"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "vertical",
+      "geography": "Tokyo"
+    },
+    {
+      "artifact_id": "val_av_003",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "filename": "val_av_003.mp4",
+      "duration_seconds": 14,
+      "title": "Soldiers marching through ruins",
+      "mood": "somber",
+      "pacing": "slow",
+      "tags": [
+        "archival",
+        "black-and-white",
+        "infantry",
+        "war"
+      ],
+      "theme": [
+        "war",
+        "soldiers",
+        "destruction"
+      ],
+      "weight": 0.8,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "horizontal",
+      "geography": "France"
+    },
+    {
+      "artifact_id": "val_av_004",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "filename": "val_av_004.mp4",
+      "duration_seconds": 9,
+      "title": "Carnival crowd cheering",
+      "mood": "triumphant",
+      "pacing": "fast",
+      "tags": [
+        "color",
+        "crowd",
+        "festival",
+        "motion"
+      ],
+      "theme": [
+        "celebration",
+        "crowd",
+        "joy"
+      ],
+      "weight": 0.7,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "mixed",
+      "geography": "Brazil"
+    },
+    {
+      "artifact_id": "val_av_005",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "filename": "val_av_005.mp4",
+      "duration_seconds": 11,
+      "title": "Storm waves strike a lighthouse",
+      "mood": "urgent",
+      "pacing": "fast",
+      "tags": [
+        "sea",
+        "spray",
+        "weather",
+        "coast"
+      ],
+      "theme": [
+        "ocean",
+        "storm",
+        "power"
+      ],
+      "weight": 0.6,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "diagonal",
+      "geography": "Ireland"
+    },
+    {
+      "artifact_id": "val_av_006",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "filename": "val_av_006.mp4",
+      "duration_seconds": 16,
+      "title": "Street violinist at dusk",
+      "mood": "melancholic",
+      "pacing": "slow",
+      "tags": [
+        "music",
+        "portrait",
+        "urban",
+        "evening"
+      ],
+      "theme": [
+        "music",
+        "solitude",
+        "city"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "vertical",
+      "geography": "Vienna"
+    },
+    {
+      "artifact_id": "val_bv_001",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "val_bv_001.mp4",
+      "duration_seconds": 13,
+      "title": "Time-lapse of storm clouds",
+      "mood": "tense",
+      "pacing": "fast",
+      "tags": [
+        "timelapse",
+        "clouds",
+        "sky"
+      ],
+      "theme": [
+        "sky",
+        "weather",
+        "time"
+      ],
+      "weight": 0.6,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "mixed",
+      "geography": "Kansas"
+    },
+    {
+      "artifact_id": "val_bv_002",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "val_bv_002.mp4",
+      "duration_seconds": 15,
+      "title": "Forest canopy from below",
+      "mood": "neutral",
+      "pacing": "slow",
+      "tags": [
+        "trees",
+        "green",
+        "canopy",
+        "nature"
+      ],
+      "theme": [
+        "nature",
+        "forest",
+        "calm"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [
+        "val_bv_001"
+      ],
+      "dominant_lines": "vertical",
+      "geography": "Oregon"
+    },
+    {
+      "artifact_id": "val_bv_003",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "val_bv_003.mp4",
+      "duration_seconds": 12,
+      "title": "Factory assembly line",
+      "mood": "neutral",
+      "pacing": "medium",
+      "tags": [
+        "factory",
+        "machinery",
+        "industrial"
+      ],
+      "theme": [
+        "industry",
+        "machines",
+        "labor"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "horizontal",
+      "geography": "Detroit"
+    },
+    {
+      "artifact_id": "val_bv_004",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "val_bv_004.mp4",
+      "duration_seconds": 18,
+      "title": "Aurora over snow",
+      "mood": "hopeful",
+      "pacing": "slow",
+      "tags": [
+        "aurora",
+        "night",
+        "arctic",
+        "sky"
+      ],
+      "theme": [
+        "cosmos",
+        "night",
+        "cold"
+      ],
+      "weight": 0.7,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "dominant_lines": "curved",
+      "geography": "Norway"
+    },
+    {
+      "artifact_id": "val_xa_001",
+      "artifact_type": "X-roll",
+      "role": "body",
+      "filename": "val_xa_001.wav",
+      "duration_seconds": 20,
+      "title": "Distant thunder",
+      "mood": "tense",
+      "pacing": "slow",
+      "tags": [
+        "thunder",
+        "ambient",
+        "storm"
+      ],
+      "theme": [
+        "weather",
+        "sound",
+        "storm"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": []
+    },
+    {
+      "artifact_id": "val_xa_002",
+      "artifact_type": "X-roll",
+      "role": "body",
+      "filename": "val_xa_002.wav",
+      "duration_seconds": 25,
+      "title": "Cello drone",
+      "mood": "melancholic",
+      "pacing": "slow",
+      "tags": [
+        "cello",
+        "music",
+        "drone"
+      ],
+      "theme": [
+        "music",
+        "drone",
+        "melancholy"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": []
+    },
+    {
+      "artifact_id": "val_xa_003",
+      "artifact_type": "X-roll",
+      "role": "body",
+      "filename": "val_xa_003.wav",
+      "duration_seconds": 18,
+      "title": "Marketplace chatter",
+      "mood": "neutral",
+      "pacing": "fast",
+      "tags": [
+        "crowd",
+        "voices",
+        "ambient"
+      ],
+      "theme": [
+        "human",
+        "voices",
+        "city"
+      ],
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": []
+    },
+    {
+      "artifact_id": "val_xa_004",
+      "artifact_type": "X-roll",
+      "role": "body",
+      "filename": "val_xa_004.wav",
+      "duration_seconds": 22,
+      "title": "Synth pulse",
+      "mood": "urgent",
+      "pacing": "fast",
+      "tags": [
+        "synth",
+        "electronic",
+        "pulse"
+      ],
+      "theme": [
+        "electronic",
+        "rhythm",
+        "tension"
+      ],
+      "weight": 0.6,
+      "can_repeat": false,
+      "must_not_follow": []
+    }
+  ]
+}

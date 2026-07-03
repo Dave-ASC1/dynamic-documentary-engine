@@ -1,0 +1,41 @@
+{
+  "artifact_id": "val_xa_001",
+  "collection_id": "validation",
+  "artifact_type": "X-roll",
+  "role": "body",
+  "file": {
+    "source_type": "local",
+    "filename": "val_xa_001.wav",
+    "format": "wav",
+    "duration_seconds": 20,
+    "has_video": false,
+    "has_audio": true,
+    "source": "self-recorded",
+    "copyright_cleared": true
+  },
+  "content": {
+    "title": "Distant thunder",
+    "description": "Low rolling thunder over faint rain \u2014 an ambient audio bed.",
+    "theme": [
+      "weather",
+      "sound",
+      "storm"
+    ],
+    "mood": "tense",
+    "pacing": "slow",
+    "tags": [
+      "thunder",
+      "ambient",
+      "storm"
+    ]
+  },
+  "sequencing": {
+    "can_repeat": false,
+    "min_gap_seconds": 0,
+    "must_follow": [],
+    "must_not_follow": [],
+    "weight": 0.5
+  },
+  "created_at": "2026-07-02T00:00:00Z",
+  "updated_at": "2026-07-02T00:00:00Z"
+}
