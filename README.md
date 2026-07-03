@@ -16,9 +16,9 @@ An AI-powered generative documentary engine that dynamically assembles films fro
 
 Inspired by the *Eno* documentary (2024) and its Brain One engine built by Brendan Dawes, this engine uses AI as a director by pulling from a curated collection of modular media artifacts and dynamically assembling them into a unique film on every run. No human curation happens at runtime. The engine decides.
 
-All sequencing logic is creative code — and selection decisions are driven entirely by metadata rules, pacing arc, mood transition logic, and weighted random selection. With no external AI engines utilized.
+All sequencing logic is implemented through a combination of creative code and AI-assisted decision-making. Selection decisions are guided by metadata rules, pacing arcs, mood transition logic, and weighted random selection to produce a unique film on every run. 
 
-The project also explores whether modern AI tooling can replicate and extend the generative documentary approach — making it accessible, extensible, and applicable to new collections beyond a single film.
+The project also explores whether modern large language models and AI systems can replicate and extend the generative documentary approach, making it accessible, extensible, and applicable to new collections beyond a single film.
 
 ---
 
@@ -132,12 +132,13 @@ dynamic-documentary-engine/
 - **FFmpeg** — video and audio assembly and rendering
 - **React** — frontend director's console
 - **Flask** — backend API
+- **Large Language Model (LLM) API** - AI-assisted artifact selection and metadata enrichment
 
 ---
 
 ## Inspiration
 
-This project draws directly from the *Eno* documentary (2024), directed by Gary Hustwit, and the Brain One generative engine built by Brendan Dawes — a system that produces a algorithmically different cut of the film at every screening. This project asks: can that same generative approach be rebuilt with modern AI tooling and applied broadly to documentary collections?
+This project draws directly from the *Eno* documentary (2024), directed by Gary Hustwit, and the Brain One generative engine built by Brendan Dawes — a system that produces an algorithmically different cut of the film at every screening. This project asks: can that same generative approach be rebuilt with modern AI tooling and applied broadly to documentary collections?
 
 ---
 ## Research Context

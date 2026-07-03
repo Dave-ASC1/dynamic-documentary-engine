@@ -1,8 +1,9 @@
-# CLAUDE.md — Dynamic Documentary Engine (DDE)
+# AGENT.md — Dynamic Documentary Engine (DDE)
 
-> Operating brief for Claude Code. Read it fully before doing anything.
+> Operating brief for AI coding assistants working on this repository.
+> Read this document before making changes.
 > Where this file and the code disagree, **trust the code** and flag the discrepancy to David.
-> Note: the repo `README.md` is partly **stale** (see §7) — do not treat it as ground truth.
+> Note: the repo `README.md` is partly **stale** (see §7) — and should not be treated as the authoritative source.
 
 ---
 
@@ -25,7 +26,7 @@ Guiding philosophy: **maximum juxtaposition, not emotional continuity.** Every c
 
 ## 2. Non-negotiable rules
 
-1. **No references to "Claude" anywhere in the codebase** — comments, docstrings, schema fields, variable names, filenames. (Explicit supervisor requirement. The repo is currently clean of these — keep it that way.)
+1. **Do not introduce references to any specific AI model, provider, or vendor in the codebase unless explicitly required by the project.** — comments, docstrings, schema fields, variable names, filenames. (Explicit supervisor requirement. The repo is currently clean of these — keep it that way.)
 2. **No external AI or generation services.** All sequencing is **original algorithmic "creative code."** No API calls to any AI engine for generation.
 3. **B-roll never stands alone** — always paired with an X-roll to supply audio.
 4. **Every film opens and closes** with the collection's designated opening/closing A-roll artifacts.
