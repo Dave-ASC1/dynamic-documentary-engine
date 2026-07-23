@@ -64,8 +64,6 @@ import logging
 import os
 import subprocess
 import tempfile
-import uuid
-from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -742,19 +740,33 @@ class Assembler:
         """
         Generates a unique filename for a rendered film.
 
-        Format: film_<collection_id>_<YYYYMMDD_HHMMSS>_<short_uuid>.<format>
-        Example: film_ww2_20260622_143201_a3f9.mp4
+        Format: film_test_<N>.<format>
+        Example: film_test_1.mp4, film_test_2.mp4, etc.
 
-        The timestamp + short UUID combination ensures no two rendered films
-        ever share a filename, even if generated within the same second.
+        Filenames are simple and sequential for easy reference in an exhibit.
+        The counter finds the highest existing number and increments it.
 
         Args:
-            collection_id (str): The collection identifier for the film.
+            collection_id (str): The collection identifier (unused in new format).
 
         Returns:
-            str: A unique filename string.
+            str: A unique filename string like film_test_42.mp4
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        short_uuid = str(uuid.uuid4())[:4]
-        safe_collection_id = collection_id.replace(" ", "_").lower()
-        return f"film_{safe_collection_id}_{timestamp}_{short_uuid}.{self.output_format}"
+        if not os.path.isdir(self.films_path):
+            return f"film_test_1.{self.output_format}"
+
+        # Find highest existing number
+        existing = [f for f in os.listdir(self.films_path) if f.startswith("film_test_")]
+        if not existing:
+            return f"film_test_1.{self.output_format}"
+
+        numbers = []
+        for fname in existing:
+            try:
+                num_str = fname.replace("film_test_", "").replace(f".{self.output_format}", "")
+                numbers.append(int(num_str))
+            except (ValueError, AttributeError):
+                pass
+
+        next_num = max(numbers) + 1 if numbers else 1
+        return f"film_test_{next_num}.{self.output_format}"

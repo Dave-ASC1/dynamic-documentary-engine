@@ -92,9 +92,13 @@ class SequencingRules:
         the current state of the film sequence.
 
         An artifact is eligible if it passes all of the following rules:
+            - Must be A-roll or B-roll (never X-roll as standalone)
             - No-repeat rule
             - Duration budget rule
             - Must-not-follow rule
+
+        X-roll is audio-only and must never be selected as standalone; it is
+        only eligible for pairing with B-roll (see is_eligible_for_pairing).
 
         No mood, pacing, or emotional checks are applied here. Those
         dimensions are not used by the rule engine.
@@ -105,6 +109,8 @@ class SequencingRules:
         Returns:
             bool: True if the artifact is eligible, False otherwise.
         """
+        if artifact.get("artifact_type") == "X-roll":
+            return False
         if not self._passes_no_repeat_rule(artifact):
             return False
         if not self._passes_duration_budget_rule(artifact):
