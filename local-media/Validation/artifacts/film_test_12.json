@@ -1,0 +1,343 @@
+{
+  "generated_at": "2026-07-23T17:30:25.143097+00:00",
+  "collection_id": "validation",
+  "collection_name": "Cross-Category Validation Collection",
+  "target_duration": 90,
+  "actual_duration": 90.033,
+  "opening": "Warship Cruising + Birds Call [B-roll+X-roll]",
+  "closing": "Waves Sunset + Water Stream [B-roll+X-roll]",
+  "slots": [
+    {
+      "kind": "broll_xroll",
+      "broll_id": "auto_b_warship_cruising",
+      "xroll_id": "auto_x_birds_call",
+      "broll_title": "Warship Cruising",
+      "xroll_title": "Birds Call",
+      "role": "body",
+      "duration_seconds": 10.09
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "auto_a_robotic_arm",
+      "title": "Robotic Arm",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 11.903
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "auto_a_first_skate",
+      "title": "First Skate",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 5.137
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "auto_a_gallery_monkey",
+      "title": "Gallery Monkey",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 12.64
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "auto_a_skate_boarding",
+      "title": "Skate Boarding",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 11.262
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "auto_a_chick_stir_fry",
+      "title": "Chick Stir Fry",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 7.705
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "auto_b_plane_drop",
+      "xroll_id": "auto_x_piano_sound",
+      "broll_title": "Plane Drop",
+      "xroll_title": "Piano Sound",
+      "role": "body",
+      "duration_seconds": 8.133
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "auto_b_colorful_ballerina",
+      "xroll_id": "auto_x_war_bong",
+      "broll_title": "Colorful Ballerina",
+      "xroll_title": "War Bong",
+      "role": "body",
+      "duration_seconds": 9.009
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "auto_b_waves_sunset",
+      "xroll_id": "auto_x_water_stream",
+      "broll_title": "Waves Sunset",
+      "xroll_title": "Water Stream",
+      "role": "body",
+      "duration_seconds": 9.033
+    }
+  ],
+  "trace": [
+    {
+      "kind": "primary",
+      "previous": "Warship Cruising [B-roll]",
+      "candidates": [
+        {
+          "title": "First Skate [A-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Chick Stir Fry [A-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Gallery Monkey [A-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Robotic Arm [A-roll]",
+          "score": 2,
+          "chosen": true
+        },
+        {
+          "title": "Skate Boarding [A-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Colorful Ballerina [B-roll]",
+          "score": 1,
+          "chosen": false
+        }
+      ],
+      "chosen": "Robotic Arm [A-roll]",
+      "contrast": [
+        "media type (B-roll->A-roll)",
+        "+1 new tags"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Robotic Arm [A-roll]",
+      "candidates": [
+        {
+          "title": "First Skate [A-roll]",
+          "score": 2,
+          "chosen": true
+        },
+        {
+          "title": "Colorful Ballerina [B-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Plane Drop [B-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Chick Stir Fry [A-roll]",
+          "score": 1,
+          "chosen": false
+        },
+        {
+          "title": "Gallery Monkey [A-roll]",
+          "score": 1,
+          "chosen": false
+        },
+        {
+          "title": "Skate Boarding [A-roll]",
+          "score": 1,
+          "chosen": false
+        }
+      ],
+      "chosen": "First Skate [A-roll]",
+      "contrast": [
+        "pacing (medium->fast)",
+        "+1 new tags"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "First Skate [A-roll]",
+      "candidates": [
+        {
+          "title": "Colorful Ballerina [B-roll]",
+          "score": 3,
+          "chosen": false
+        },
+        {
+          "title": "Plane Drop [B-roll]",
+          "score": 3,
+          "chosen": false
+        },
+        {
+          "title": "Chick Stir Fry [A-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Gallery Monkey [A-roll]",
+          "score": 2,
+          "chosen": true
+        },
+        {
+          "title": "Skate Boarding [A-roll]",
+          "score": 2,
+          "chosen": false
+        }
+      ],
+      "chosen": "Gallery Monkey [A-roll]",
+      "contrast": [
+        "pacing (fast->medium)",
+        "+1 new tags"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Gallery Monkey [A-roll]",
+      "candidates": [
+        {
+          "title": "Colorful Ballerina [B-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Plane Drop [B-roll]",
+          "score": 1,
+          "chosen": false
+        },
+        {
+          "title": "Chick Stir Fry [A-roll]",
+          "score": 0,
+          "chosen": false
+        },
+        {
+          "title": "Skate Boarding [A-roll]",
+          "score": 0,
+          "chosen": true
+        }
+      ],
+      "chosen": "Skate Boarding [A-roll]",
+      "contrast": [
+        "(identical on every scored dimension)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Skate Boarding [A-roll]",
+      "candidates": [
+        {
+          "title": "Colorful Ballerina [B-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Plane Drop [B-roll]",
+          "score": 1,
+          "chosen": false
+        },
+        {
+          "title": "Chick Stir Fry [A-roll]",
+          "score": 0,
+          "chosen": true
+        }
+      ],
+      "chosen": "Chick Stir Fry [A-roll]",
+      "contrast": [
+        "(identical on every scored dimension)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Chick Stir Fry [A-roll]",
+      "candidates": [
+        {
+          "title": "Colorful Ballerina [B-roll]",
+          "score": 2,
+          "chosen": false
+        },
+        {
+          "title": "Plane Drop [B-roll]",
+          "score": 1,
+          "chosen": true
+        }
+      ],
+      "chosen": "Plane Drop [B-roll]",
+      "contrast": [
+        "media type (A-roll->B-roll)"
+      ]
+    },
+    {
+      "kind": "pairing",
+      "previous": "Plane Drop [B-roll]",
+      "candidates": [
+        {
+          "title": "Piano Sound [X-roll]",
+          "score": 1,
+          "chosen": true
+        },
+        {
+          "title": "War Bong [X-roll]",
+          "score": 1,
+          "chosen": false
+        }
+      ],
+      "chosen": "Piano Sound [X-roll]",
+      "contrast": [
+        "media type (B-roll->X-roll)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Plane Drop [B-roll]",
+      "candidates": [
+        {
+          "title": "Colorful Ballerina [B-roll]",
+          "score": 1,
+          "chosen": true
+        }
+      ],
+      "chosen": "Colorful Ballerina [B-roll]",
+      "contrast": [
+        "+1 new tags"
+      ]
+    },
+    {
+      "kind": "pairing",
+      "previous": "Colorful Ballerina [B-roll]",
+      "candidates": [
+        {
+          "title": "War Bong [X-roll]",
+          "score": 1,
+          "chosen": true
+        }
+      ],
+      "chosen": "War Bong [X-roll]",
+      "contrast": [
+        "media type (B-roll->X-roll)"
+      ]
+    }
+  ],
+  "film_path": "/Users/kingdavid/documentary engine/dynamic-documentary-engine/local-media/films/film_test_12.mp4",
+  "film_filename": "film_test_12.mp4",
+  "diversity_mode": true,
+  "usage_stats_path": "/Users/kingdavid/documentary engine/dynamic-documentary-engine/local-media/films/usage_stats.json",
+  "library_sync": {
+    "added": [],
+    "removed": []
+  },
+  "exact_duration": true,
+  "trimmed": true,
+  "title_cards": true
+}

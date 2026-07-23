@@ -244,9 +244,9 @@ h2 {
   gap: 1rem;
 }
 
-.field { display: flex; flex-direction: column; gap: 0.4rem; }
+.field { display: flex; flex-direction: column; gap: 0.4rem; max-width: 100%; }
 
-.field-centered { align-items: center; }
+.field-centered { align-items: center; width: 100%; }
 .field-centered label { text-align: center; }
 
 .toggle-row {
@@ -290,6 +290,40 @@ h2 {
 .field-input .unit {
   color: var(--muted-dim);
   font-size: 0.82rem;
+}
+
+.field-input select {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  max-width: 320px;
+  padding: 0.1rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-input:has(select) {
+  width: 100%;
+  max-width: 340px;
+  box-sizing: border-box;
+}
+
+.field-input select:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.field-hint {
+  margin: -0.4rem 0 0;
+  color: var(--type-close);
+  font-size: 0.78rem;
+  text-align: center;
 }
 
 .toggle-field {

@@ -1,0 +1,32 @@
+{
+  "updated_at": "2026-07-23T17:30:25.098280+00:00",
+  "artifact_usage": {
+    "val_bv_001": 7,
+    "val_xa_003": 6,
+    "val_av_004": 6,
+    "val_av_005": 5,
+    "val_av_002": 1,
+    "val_bv_003": 8,
+    "val_xa_002": 7,
+    "val_av_006": 5,
+    "val_bv_002": 8,
+    "val_xa_001": 8,
+    "val_av_001": 7,
+    "val_av_003": 7,
+    "val_bv_004": 6,
+    "val_xa_004": 8,
+    "auto_b_warship_cruising": 1,
+    "auto_x_birds_call": 1,
+    "auto_a_robotic_arm": 1,
+    "auto_a_first_skate": 1,
+    "auto_a_gallery_monkey": 1,
+    "auto_a_skate_boarding": 1,
+    "auto_a_chick_stir_fry": 1,
+    "auto_b_plane_drop": 1,
+    "auto_x_piano_sound": 1,
+    "auto_b_colorful_ballerina": 1,
+    "auto_x_war_bong": 1,
+    "auto_b_waves_sunset": 1,
+    "auto_x_water_stream": 1
+  }
+}

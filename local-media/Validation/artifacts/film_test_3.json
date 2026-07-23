@@ -1,0 +1,195 @@
+{
+  "generated_at": "2026-07-23T14:37:57.931927+00:00",
+  "collection_id": "validation",
+  "collection_name": "Cross-Category Validation Collection",
+  "target_duration": 50,
+  "actual_duration": 41.887317,
+  "opening": "Colorful ballerina + Piano sound [B-roll+X-roll]",
+  "closing": "Plane drop + War bong [B-roll+X-roll]",
+  "slots": [
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_004",
+      "xroll_id": "val_xa_001",
+      "broll_title": "Colorful ballerina",
+      "xroll_title": "Piano sound",
+      "role": "body",
+      "duration_seconds": 9.008984
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_004",
+      "title": "Robotic arm",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 11.903333
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_001",
+      "title": "First skate",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 5.136667
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_003",
+      "title": "Chicken stir fry",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 7.705
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_003",
+      "xroll_id": "val_xa_003",
+      "broll_title": "Plane drop",
+      "xroll_title": "War bong",
+      "role": "body",
+      "duration_seconds": 8.133333
+    }
+  ],
+  "trace": [
+    {
+      "kind": "primary",
+      "previous": "Colorful ballerina [B-roll]",
+      "candidates": [
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 12,
+          "chosen": true
+        },
+        {
+          "title": "Skate boarding [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "First skate [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Warship cruising [B-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Waves at sunset [B-roll]",
+          "score": 11,
+          "chosen": false
+        }
+      ],
+      "chosen": "Robotic arm [A-roll]",
+      "contrast": [
+        "media type (B-roll->A-roll)",
+        "mood (triumphant->tense)",
+        "pacing (medium->slow)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (stage->lab)",
+        "lines (curved->vertical)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Robotic arm [A-roll]",
+      "candidates": [
+        {
+          "title": "First skate [A-roll]",
+          "score": 11,
+          "chosen": true
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Skate boarding [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Warship cruising [B-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Waves at sunset [B-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 10,
+          "chosen": false
+        }
+      ],
+      "chosen": "First skate [A-roll]",
+      "contrast": [
+        "mood (tense->hopeful)",
+        "pacing (slow->medium)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (lab->local)",
+        "lines (vertical->diagonal)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "First skate [A-roll]",
+      "candidates": [
+        {
+          "title": "Warship cruising [B-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Waves at sunset [B-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 10,
+          "chosen": true
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 10,
+          "chosen": false
+        },
+        {
+          "title": "Skate boarding [A-roll]",
+          "score": 6,
+          "chosen": false
+        }
+      ],
+      "chosen": "Chicken stir fry [A-roll]",
+      "contrast": [
+        "mood (hopeful->neutral)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (local->kitchen)",
+        "lines (diagonal->mixed)"
+      ]
+    }
+  ],
+  "film_path": "/Users/kingdavid/documentary engine/dynamic-documentary-engine/local-media/films/film_test_3.mp4",
+  "film_filename": "film_test_3.mp4",
+  "diversity_mode": false,
+  "usage_stats_path": null,
+  "library_sync": {
+    "added": [],
+    "removed": []
+  },
+  "exact_duration": false,
+  "trimmed": false
+}

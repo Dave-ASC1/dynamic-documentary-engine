@@ -1,0 +1,70 @@
+{
+  "generated_at": "2026-07-23T21:06:44.894429+00:00",
+  "collection_id": "validation",
+  "collection_name": "Cross-Category Validation Collection",
+  "target_duration": 25,
+  "actual_duration": 33.418,
+  "opening": "Plane drop + War bong [B-roll+X-roll]",
+  "closing": "Warship cruising + Bird calls [B-roll+X-roll]",
+  "slots": [
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_003",
+      "xroll_id": "val_xa_003",
+      "broll_title": "Plane drop",
+      "xroll_title": "War bong",
+      "role": "body",
+      "duration_seconds": 8.133333
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_001",
+      "title": "First skate",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 5.136667
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_001",
+      "xroll_id": "val_xa_004",
+      "broll_title": "Warship cruising",
+      "xroll_title": "Bird calls",
+      "role": "body",
+      "duration_seconds": 10.09
+    }
+  ],
+  "trace": [
+    {
+      "kind": "primary",
+      "previous": "Plane drop [B-roll]",
+      "candidates": [
+        {
+          "title": "First skate [A-roll]",
+          "score": 11,
+          "chosen": true
+        }
+      ],
+      "chosen": "First skate [A-roll]",
+      "contrast": [
+        "media type (B-roll->A-roll)",
+        "mood (urgent->hopeful)",
+        "pacing (fast->medium)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (sky->local)"
+      ]
+    }
+  ],
+  "film_path": "/Users/kingdavid/documentary engine/dynamic-documentary-engine/local-media/Validation/artifacts/film_test_14.mp4",
+  "film_filename": "film_test_14.mp4",
+  "diversity_mode": false,
+  "usage_stats_path": null,
+  "library_sync": {
+    "added": [],
+    "removed": []
+  },
+  "exact_duration": false,
+  "trimmed": false,
+  "title_cards": true
+}

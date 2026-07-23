@@ -1,0 +1,262 @@
+{
+  "generated_at": "2026-07-23T15:43:19.054097+00:00",
+  "collection_id": "validation",
+  "collection_name": "Cross-Category Validation Collection",
+  "target_duration": 60,
+  "actual_duration": 68.029,
+  "opening": "Colorful ballerina + Bird calls [B-roll+X-roll]",
+  "closing": "Warship cruising + Water stream [B-roll+X-roll]",
+  "slots": [
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_004",
+      "xroll_id": "val_xa_004",
+      "broll_title": "Colorful ballerina",
+      "xroll_title": "Bird calls",
+      "role": "body",
+      "duration_seconds": 9.008984
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_006",
+      "title": "Skate boarding",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 11.261678
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_004",
+      "title": "Robotic arm",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 11.903333
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_001",
+      "title": "First skate",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 5.136667
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_002",
+      "xroll_id": "val_xa_003",
+      "broll_title": "Waves at sunset",
+      "xroll_title": "War bong",
+      "role": "body",
+      "duration_seconds": 9.033333
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_001",
+      "xroll_id": "val_xa_002",
+      "broll_title": "Warship cruising",
+      "xroll_title": "Water stream",
+      "role": "body",
+      "duration_seconds": 10.09
+    }
+  ],
+  "trace": [
+    {
+      "kind": "primary",
+      "previous": "Colorful ballerina [B-roll]",
+      "candidates": [
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Skate boarding [A-roll]",
+          "score": 12,
+          "chosen": true
+        },
+        {
+          "title": "First skate [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Waves at sunset [B-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Plane drop [B-roll]",
+          "score": 11,
+          "chosen": false
+        }
+      ],
+      "chosen": "Skate boarding [A-roll]",
+      "contrast": [
+        "media type (B-roll->A-roll)",
+        "mood (triumphant->urgent)",
+        "pacing (medium->fast)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (stage->street)",
+        "lines (curved->diagonal)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Skate boarding [A-roll]",
+      "candidates": [
+        {
+          "title": "Waves at sunset [B-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 11,
+          "chosen": true
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Plane drop [B-roll]",
+          "score": 9,
+          "chosen": false
+        },
+        {
+          "title": "First skate [A-roll]",
+          "score": 6,
+          "chosen": false
+        }
+      ],
+      "chosen": "Robotic arm [A-roll]",
+      "contrast": [
+        "mood (urgent->tense)",
+        "pacing (fast->slow)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (street->lab)",
+        "lines (diagonal->vertical)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Robotic arm [A-roll]",
+      "candidates": [
+        {
+          "title": "Plane drop [B-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "First skate [A-roll]",
+          "score": 11,
+          "chosen": true
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Waves at sunset [B-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 10,
+          "chosen": false
+        }
+      ],
+      "chosen": "First skate [A-roll]",
+      "contrast": [
+        "mood (tense->hopeful)",
+        "pacing (slow->medium)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (lab->local)",
+        "lines (vertical->diagonal)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "First skate [A-roll]",
+      "candidates": [
+        {
+          "title": "Waves at sunset [B-roll]",
+          "score": 12,
+          "chosen": true
+        },
+        {
+          "title": "Plane drop [B-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 10,
+          "chosen": false
+        }
+      ],
+      "chosen": "Waves at sunset [B-roll]",
+      "contrast": [
+        "media type (A-roll->B-roll)",
+        "mood (hopeful->melancholic)",
+        "pacing (medium->slow)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (local->coast)",
+        "lines (diagonal->horizontal)"
+      ]
+    },
+    {
+      "kind": "pairing",
+      "previous": "Waves at sunset [B-roll]",
+      "candidates": [
+        {
+          "title": "War bong [X-roll]",
+          "score": 11,
+          "chosen": true
+        },
+        {
+          "title": "Piano sound [X-roll]",
+          "score": 10,
+          "chosen": false
+        }
+      ],
+      "chosen": "War bong [X-roll]",
+      "contrast": [
+        "media type (B-roll->X-roll)",
+        "mood (melancholic->tense)",
+        "pacing (slow->fast)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (coast->sound-library)"
+      ]
+    }
+  ],
+  "film_path": "/Users/kingdavid/documentary engine/dynamic-documentary-engine/local-media/films/film_test_9.mp4",
+  "film_filename": "film_test_9.mp4",
+  "diversity_mode": false,
+  "usage_stats_path": null,
+  "library_sync": {
+    "added": [],
+    "removed": []
+  },
+  "exact_duration": false,
+  "trimmed": false,
+  "title_cards": true
+}

@@ -35,6 +35,14 @@
   <main>
     <section class="controls-card" aria-label="Film generation controls">
       <div class="field field-centered">
+        <label for="collection-select">Film topic</label>
+        <div class="field-input">
+          <select id="collection-select"></select>
+        </div>
+      </div>
+      <p id="collection-hint" class="field-hint hidden"></p>
+
+      <div class="field field-centered">
         <label for="duration">Target length</label>
         <div class="field-input">
           <input type="number" id="duration" min="1" max="9999" value="90" />

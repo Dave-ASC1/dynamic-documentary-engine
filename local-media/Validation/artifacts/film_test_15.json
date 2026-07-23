@@ -1,0 +1,387 @@
+{
+  "generated_at": "2026-07-23T21:11:29.953562+00:00",
+  "collection_id": "validation",
+  "collection_name": "Cross-Category Validation Collection",
+  "target_duration": 90,
+  "actual_duration": 89.335,
+  "opening": "Waves at sunset + Piano sound [B-roll+X-roll]",
+  "closing": "Plane drop + War bong [B-roll+X-roll]",
+  "slots": [
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_002",
+      "xroll_id": "val_xa_001",
+      "broll_title": "Waves at sunset",
+      "xroll_title": "Piano sound",
+      "role": "body",
+      "duration_seconds": 9.033333
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_001",
+      "title": "First skate",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 5.136667
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_004",
+      "xroll_id": "val_xa_002",
+      "broll_title": "Colorful ballerina",
+      "xroll_title": "Water stream",
+      "role": "body",
+      "duration_seconds": 9.008984
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_006",
+      "title": "Skate boarding",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 11.261678
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_001",
+      "xroll_id": "val_xa_004",
+      "broll_title": "Warship cruising",
+      "xroll_title": "Bird calls",
+      "role": "body",
+      "duration_seconds": 10.09
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_004",
+      "title": "Robotic arm",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 11.903333
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_003",
+      "title": "Chicken stir fry",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 7.705
+    },
+    {
+      "kind": "standalone",
+      "artifact_id": "val_av_005",
+      "title": "Gallery monkey",
+      "artifact_type": "A-roll",
+      "role": "body",
+      "duration_seconds": 12.64
+    },
+    {
+      "kind": "broll_xroll",
+      "broll_id": "val_bv_003",
+      "xroll_id": "val_xa_003",
+      "broll_title": "Plane drop",
+      "xroll_title": "War bong",
+      "role": "body",
+      "duration_seconds": 8.133333
+    }
+  ],
+  "trace": [
+    {
+      "kind": "primary",
+      "previous": "Waves at sunset [B-roll]",
+      "candidates": [
+        {
+          "title": "First skate [A-roll]",
+          "score": 12,
+          "chosen": true
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Skate boarding [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Colorful ballerina [B-roll]",
+          "score": 11,
+          "chosen": false
+        }
+      ],
+      "chosen": "First skate [A-roll]",
+      "contrast": [
+        "media type (B-roll->A-roll)",
+        "mood (melancholic->hopeful)",
+        "pacing (slow->medium)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (coast->local)",
+        "lines (horizontal->diagonal)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "First skate [A-roll]",
+      "candidates": [
+        {
+          "title": "Warship cruising [B-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Colorful ballerina [B-roll]",
+          "score": 11,
+          "chosen": true
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 10,
+          "chosen": false
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 10,
+          "chosen": false
+        },
+        {
+          "title": "Skate boarding [A-roll]",
+          "score": 6,
+          "chosen": false
+        }
+      ],
+      "chosen": "Colorful ballerina [B-roll]",
+      "contrast": [
+        "media type (A-roll->B-roll)",
+        "mood (hopeful->triumphant)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (local->stage)",
+        "lines (diagonal->curved)"
+      ]
+    },
+    {
+      "kind": "pairing",
+      "previous": "Colorful ballerina [B-roll]",
+      "candidates": [
+        {
+          "title": "Water stream [X-roll]",
+          "score": 11,
+          "chosen": true
+        },
+        {
+          "title": "Bird calls [X-roll]",
+          "score": 10,
+          "chosen": false
+        }
+      ],
+      "chosen": "Water stream [X-roll]",
+      "contrast": [
+        "media type (B-roll->X-roll)",
+        "mood (triumphant->neutral)",
+        "pacing (medium->slow)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (stage->stream)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Colorful ballerina [B-roll]",
+      "candidates": [
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Skate boarding [A-roll]",
+          "score": 12,
+          "chosen": true
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Warship cruising [B-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 10,
+          "chosen": false
+        }
+      ],
+      "chosen": "Skate boarding [A-roll]",
+      "contrast": [
+        "media type (B-roll->A-roll)",
+        "mood (triumphant->urgent)",
+        "pacing (medium->fast)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (stage->street)",
+        "lines (curved->diagonal)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Skate boarding [A-roll]",
+      "candidates": [
+        {
+          "title": "Warship cruising [B-roll]",
+          "score": 12,
+          "chosen": true
+        },
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 11,
+          "chosen": false
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 11,
+          "chosen": false
+        }
+      ],
+      "chosen": "Warship cruising [B-roll]",
+      "contrast": [
+        "media type (A-roll->B-roll)",
+        "mood (urgent->somber)",
+        "pacing (fast->slow)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (street->open water)",
+        "lines (diagonal->horizontal)"
+      ]
+    },
+    {
+      "kind": "pairing",
+      "previous": "Warship cruising [B-roll]",
+      "candidates": [
+        {
+          "title": "Bird calls [X-roll]",
+          "score": 11,
+          "chosen": true
+        }
+      ],
+      "chosen": "Bird calls [X-roll]",
+      "contrast": [
+        "media type (B-roll->X-roll)",
+        "mood (somber->hopeful)",
+        "pacing (slow->medium)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (open water->outdoors)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Warship cruising [B-roll]",
+      "candidates": [
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 12,
+          "chosen": false
+        },
+        {
+          "title": "Robotic arm [A-roll]",
+          "score": 11,
+          "chosen": true
+        }
+      ],
+      "chosen": "Robotic arm [A-roll]",
+      "contrast": [
+        "media type (B-roll->A-roll)",
+        "mood (somber->tense)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (open water->lab)",
+        "lines (horizontal->vertical)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Robotic arm [A-roll]",
+      "candidates": [
+        {
+          "title": "Chicken stir fry [A-roll]",
+          "score": 11,
+          "chosen": true
+        },
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 10,
+          "chosen": false
+        }
+      ],
+      "chosen": "Chicken stir fry [A-roll]",
+      "contrast": [
+        "mood (tense->neutral)",
+        "pacing (slow->medium)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (lab->kitchen)",
+        "lines (vertical->mixed)"
+      ]
+    },
+    {
+      "kind": "primary",
+      "previous": "Chicken stir fry [A-roll]",
+      "candidates": [
+        {
+          "title": "Gallery monkey [A-roll]",
+          "score": 10,
+          "chosen": true
+        }
+      ],
+      "chosen": "Gallery monkey [A-roll]",
+      "contrast": [
+        "mood (neutral->triumphant)",
+        "+4 new tags",
+        "+3 new themes",
+        "geography (kitchen->gallery)",
+        "lines (mixed->vertical)"
+      ]
+    }
+  ],
+  "film_path": "/Users/kingdavid/documentary engine/dynamic-documentary-engine/local-media/Validation/artifacts/film_test_15.mp4",
+  "film_filename": "film_test_15.mp4",
+  "diversity_mode": false,
+  "usage_stats_path": null,
+  "library_sync": {
+    "added": [],
+    "removed": []
+  },
+  "exact_duration": false,
+  "trimmed": false,
+  "title_cards": true
+}

@@ -27,6 +27,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -37,13 +38,117 @@ if REPO_ROOT not in sys.path:
 
 from engine import Sequencer, Assembler  # noqa: E402
 
-INDEX_PATH = os.path.join(
-    REPO_ROOT, "metadata", "validation", "validation_collection_index.json"
-)
+METADATA_ROOT = os.path.join(REPO_ROOT, "metadata")
+COLLECTIONS_METADATA_DIR = os.path.join(METADATA_ROOT, "collections")
+COLLECTIONS_ROOT = os.path.join(REPO_ROOT, "local-media")
+
+# Kept for backward compatibility with the CLI script's defaults — the
+# "validation" collection specifically, not a stand-in for "whichever
+# collection is selected" (that's what list_collections()/get_collection()
+# below are for).
+INDEX_PATH = os.path.join(COLLECTIONS_METADATA_DIR, "validation_collection_index.json")
 METADATA_PATH = os.path.join(REPO_ROOT, "metadata", "validation")
 DEFAULT_ASSETS = os.path.join(REPO_ROOT, "demo", "assets")
 DEFAULT_FILMS = os.path.join(REPO_ROOT, "demo", "films")
 DEFAULT_USAGE_STATS = "usage_stats.json"
+
+
+# ----------------------------------------------------------------------
+# Multi-collection ("film topic") registry
+# ----------------------------------------------------------------------
+#
+# Per Dr. Campbell: each film topic (World War II, Swiss, ...) gets its
+# own self-contained folder under local-media/ — assets/ (source footage)
+# and artifacts/ (rendered films) — rather than one shared pool. A topic
+# folder is discovered automatically the same way sync_media_library()
+# auto-adopts new media files: anything under local-media/ shaped like
+# <Name>/assets/ + <Name>/artifacts/ becomes a selectable collection, and
+# gets an empty-but-valid metadata index the first time it's seen.
+
+def _slugify_topic(name):
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    return slug or "collection"
+
+
+def _create_empty_collection_index(index_path, topic_id, display_name):
+    """Schema-valid, zero-artifact index for a freshly-discovered topic
+    folder — mirrors what sync_media_library() will then populate once
+    real files land in that topic's assets/ subfolders.
+    """
+    os.makedirs(os.path.dirname(index_path), exist_ok=True)
+    now = datetime.now(timezone.utc).isoformat()
+    data = {
+        "collection_id": topic_id,
+        "collection_name": display_name,
+        "description": f"{display_name} film collection.",
+        "version": "1.0.0",
+        "created_at": now,
+        "updated_at": now,
+        "runtime_rules": {
+            "min_duration_seconds": 35,
+            "max_duration_seconds": 1800,
+            "allow_repeat_artifacts": False,
+            "save_generated_films": True,
+        },
+        "artifact_counts": {"total": 0, "a_roll": 0, "b_roll": 0, "x_roll": 0},
+        "artifacts": [],
+    }
+    with open(index_path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def list_collections():
+    """Discovers every film-topic folder under local-media/.
+
+    Returns a list of dicts, each: {id, name, folder, index_path,
+    assets_path, films_path, metadata_path, artifact_counts}, sorted by
+    display name.
+    """
+    if not os.path.isdir(COLLECTIONS_ROOT):
+        return []
+
+    results = []
+    for entry in sorted(os.listdir(COLLECTIONS_ROOT)):
+        folder = os.path.join(COLLECTIONS_ROOT, entry)
+        if entry.startswith(".") or not os.path.isdir(folder):
+            continue
+
+        assets_path = os.path.join(folder, "assets")
+        films_path = os.path.join(folder, "artifacts")
+        if not (os.path.isdir(assets_path) and os.path.isdir(films_path)):
+            continue  # doesn't have the expected topic-folder shape
+
+        topic_id = _slugify_topic(entry)
+        index_path = os.path.join(COLLECTIONS_METADATA_DIR, f"{topic_id}_collection_index.json")
+        if not os.path.isfile(index_path):
+            _create_empty_collection_index(index_path, topic_id, entry)
+
+        with open(index_path) as f:
+            data = json.load(f)
+
+        results.append({
+            "id": topic_id,
+            "name": data.get("collection_name", entry),
+            "folder": entry,
+            "index_path": index_path,
+            "assets_path": assets_path,
+            "films_path": films_path,
+            "metadata_path": os.path.join(METADATA_ROOT, topic_id),
+            "artifact_counts": data.get("artifact_counts", {"total": 0}),
+        })
+
+    results.sort(key=lambda c: c["name"].lower())
+    return results
+
+
+def get_collection(topic_id):
+    """Returns the collection dict matching topic_id (see list_collections()
+    for shape), or None if no such topic exists.
+    """
+    for c in list_collections():
+        if c["id"] == topic_id:
+            return c
+    return None
 
 
 # ----------------------------------------------------------------------
@@ -525,6 +630,161 @@ def _trim_film_to_duration(film_path, target_duration, video_codec="libx264",
 
 
 # ----------------------------------------------------------------------
+# Fixed opening/closing title cards
+# ----------------------------------------------------------------------
+#
+# Per Dr. Campbell: the randomized B-roll+X-roll bookends the sequencer
+# already generates stay as-is (that's the "every screening is different"
+# mechanic) — this is a separate, always-identical title card and end
+# card wrapped around the *entire* rendered film, the same way a real
+# screening opens on a title slate and closes on credits regardless of
+# what played in between.
+
+_SERIF_FONT = "/System/Library/Fonts/Supplemental/Georgia.ttf"
+_SANS_FONT = "/System/Library/Fonts/Supplemental/Arial.ttf"
+_CARD_WHITE = (255, 255, 255)
+_CARD_MUTED = (170, 176, 190)
+
+# Each line is (text, font_path, size, rgb_color); an empty text acts as a
+# vertical spacer sized to its own font size. Rendered via Pillow rather
+# than ffmpeg's drawtext filter, since drawtext requires libfreetype and
+# isn't reliably compiled into every ffmpeg build (it wasn't in this one).
+OPENING_CARD_LINES = [
+    ("WELCOME TO THE", _SANS_FONT, 30, _CARD_MUTED),
+    ("Dynamic Documentary Engine", _SERIF_FONT, 60, _CARD_WHITE),
+    ("", None, 34, _CARD_WHITE),
+    ("Faculty Supervisor: Dr. Betsy Campbell", _SANS_FONT, 26, _CARD_WHITE),
+    ("Created by: Oluwafemisola David Ademoye", _SANS_FONT, 26, _CARD_WHITE),
+    ("Collaborator: Omotola Ajibike Ajao", _SANS_FONT, 26, _CARD_WHITE),
+]
+
+CLOSING_CARD_LINES = [
+    ("THE END", _SERIF_FONT, 72, _CARD_WHITE),
+    ("", None, 34, _CARD_WHITE),
+    ("Thanks for watching", _SANS_FONT, 30, _CARD_MUTED),
+]
+
+OPENING_CARD_SECONDS = 6
+CLOSING_CARD_SECONDS = 4
+
+
+def _render_card_image(path, lines, width, height, bg_color=(0, 0, 0)):
+    """Renders a centered block of multi-line text onto a solid background
+    PNG. `lines` is [(text, font_path, size, rgb_color), ...]; a blank
+    text acts as a spacer sized to its own font size.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    img = Image.new("RGB", (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    resolved = []
+    for text, font_path, size, color in lines:
+        font = None
+        if font_path and os.path.exists(font_path):
+            try:
+                font = ImageFont.truetype(font_path, size)
+            except OSError:
+                font = None
+        if font is None:
+            font = ImageFont.load_default(size)
+        line_h = (draw.textbbox((0, 0), text, font=font)[3] if text else size)
+        resolved.append((text, font, color, line_h))
+
+    line_gap = 16
+    total_h = sum(h for _, _, _, h in resolved) + line_gap * (len(resolved) - 1)
+    y = (height - total_h) / 2
+
+    for text, font, color, line_h in resolved:
+        if text:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            x = (width - (bbox[2] - bbox[0])) / 2 - bbox[0]
+            draw.text((x, y - bbox[1]), text, font=font, fill=color)
+        y += line_h + line_gap
+
+    img.save(path)
+
+
+def _make_text_card(path, lines, duration, width, height, fps, bg_color=(0, 0, 0)):
+    """Renders a static, silent title/credits card: a Pillow-drawn PNG
+    looped into a short video clip. Silent audio track (rather than no
+    audio at all) so it concatenates cleanly with the main film's audio
+    stream via the concat demuxer.
+    """
+    duration = max(1, int(round(duration)))
+    with tempfile.TemporaryDirectory() as tmpdir:
+        png_path = os.path.join(tmpdir, "card.png")
+        try:
+            _render_card_image(png_path, lines, width, height, bg_color)
+        except Exception:
+            return False
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1", "-r", str(fps), "-i", png_path,
+            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-shortest", "-t", str(duration),
+            path,
+        ]
+        return _run(cmd)
+
+
+def _wrap_with_title_cards(film_path, output_width, output_height, output_fps,
+                            video_codec="libx264", audio_codec="aac", pix_fmt="yuv420p"):
+    """Prepends a fixed opening title card and appends a fixed closing
+    credits card around film_path, re-encoding the three parts together
+    into a single file at the same path. Returns True on success; leaves
+    film_path untouched if either card fails to render.
+
+    Uses the concat *filter* (decoded-frame level), not the concat
+    *demuxer* (container-level splicing) — the demuxer approach, even
+    when re-encoding, can leave a small audio/video timestamp
+    discontinuity at each splice point that plays back as a sliver of the
+    previous segment's audio bleeding into the next. The filter graph
+    guarantees continuous, monotonic timestamps across the join instead.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        open_path = os.path.join(tmpdir, "open_card.mp4")
+        close_path = os.path.join(tmpdir, "close_card.mp4")
+
+        ok = _make_text_card(open_path, OPENING_CARD_LINES, OPENING_CARD_SECONDS,
+                              output_width, output_height, output_fps)
+        ok = ok and _make_text_card(close_path, CLOSING_CARD_LINES, CLOSING_CARD_SECONDS,
+                                     output_width, output_height, output_fps)
+        if not ok:
+            return False
+
+        tmp_out = film_path + ".withcards.mp4"
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", open_path,
+            "-i", os.path.abspath(film_path),
+            "-i", close_path,
+            "-filter_complex",
+            "[0:v:0][0:a:0][1:v:0][1:a:0][2:v:0][2:a:0]concat=n=3:v=1:a=1[outv][outa]",
+            "-map", "[outv]", "-map", "[outa]",
+            "-c:v", video_codec, "-c:a", audio_codec, "-pix_fmt", pix_fmt,
+            "-r", str(output_fps),
+            "-movflags", "+faststart", tmp_out,
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        except (subprocess.SubprocessError, OSError):
+            if os.path.isfile(tmp_out):
+                os.remove(tmp_out)
+            return False
+
+        if proc.returncode != 0 or not os.path.isfile(tmp_out):
+            if os.path.isfile(tmp_out):
+                os.remove(tmp_out)
+            return False
+
+        os.replace(tmp_out, film_path)
+        return True
+
+
+# ----------------------------------------------------------------------
 # High-level entry point
 # ----------------------------------------------------------------------
 
@@ -537,6 +797,7 @@ def generate_and_render(
     diversity_mode=False,
     juxtaposition_pool_size=None,
     exact_duration=False,
+    title_cards=True,
 ):
     """Runs the real engine end to end and returns a JSON-serializable summary.
 
@@ -557,6 +818,15 @@ def generate_and_render(
         instant, mid-shot or mid-sound. Only takes effect if a
         target_duration is given and the collection has enough footage to
         reach it in the first place.
+
+    title_cards (bool): Wraps the rendered film with a fixed opening title
+        card and closing credits card (see OPENING_CARD_LINES /
+        CLOSING_CARD_LINES) — per Dr. Campbell's request, every screening
+        opens and closes on the same static slate regardless of what the
+        randomized sequence in between looks like. Defaults on for real
+        screenings; the CLI/tests can turn it off to skip the extra
+        render time. Doesn't affect target_duration accounting — the
+        cards sit outside the dynamic sequence entirely.
 
     Returns:
         dict: JSON-serializable summary — collection info, the ordered
@@ -642,10 +912,30 @@ def generate_and_render(
     )
     film_path = assembler.render(sequence)
 
+    # Title cards sit outside the dynamic sequence, but "exact duration"
+    # should still mean the whole file matches target_duration — so the
+    # trim target is the requested length minus however long the fixed
+    # cards will add, not the full requested length.
+    title_card_seconds = (OPENING_CARD_SECONDS + CLOSING_CARD_SECONDS) if title_cards else 0
+
     trimmed = False
     if exact_duration and target_duration is not None:
-        trimmed = _trim_film_to_duration(
-            film_path, target_duration,
+        dynamic_target = target_duration - title_card_seconds
+        if dynamic_target > 0:
+            trimmed = _trim_film_to_duration(
+                film_path, dynamic_target,
+                video_codec=assembler.video_codec,
+                audio_codec=assembler.audio_codec,
+                pix_fmt=assembler.pix_fmt,
+            )
+
+    cards_added = False
+    if title_cards:
+        cards_added = _wrap_with_title_cards(
+            film_path,
+            output_width=assembler.output_width,
+            output_height=assembler.output_height,
+            output_fps=assembler.output_fps,
             video_codec=assembler.video_codec,
             audio_codec=assembler.audio_codec,
             pix_fmt=assembler.pix_fmt,
@@ -656,15 +946,13 @@ def generate_and_render(
         usage_counts = merge_usage_counts(usage_counts, sequencer.generated_usage)
         usage_stats = save_usage_counts(films_path, usage_counts)
 
-    # Summing slot durations gives the true screen time, matching the
-    # actual rendered film length for both standalone A-roll and paired
-    # B-roll/X-roll slots — unless the render was just trimmed, in which
-    # case the slot sum reflects the pre-trim sequence and the real
-    # duration has to be read back off the actual file.
-    if trimmed:
-        actual_duration = _probe_duration(film_path) or target_duration
-    else:
-        actual_duration = sum(s["duration_seconds"] for s in slots)
+    # Always read the real duration back off the final file — it reflects
+    # whatever combination of trimming and title cards actually happened,
+    # rather than trying to reconstruct it from slot durations (which only
+    # ever describe the pre-trim, pre-cards dynamic sequence).
+    actual_duration = _probe_duration(film_path)
+    if actual_duration is None:
+        actual_duration = sum(s["duration_seconds"] for s in slots) + title_card_seconds
 
     result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -685,6 +973,7 @@ def generate_and_render(
         "library_sync": library_sync,
         "exact_duration": exact_duration,
         "trimmed": trimmed,
+        "title_cards": cards_added,
     }
 
     manifest_path = os.path.splitext(film_path)[0] + ".json"

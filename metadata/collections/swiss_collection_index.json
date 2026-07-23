@@ -1,0 +1,21 @@
+{
+  "collection_id": "swiss",
+  "collection_name": "Swiss",
+  "description": "Footage and audio documenting Switzerland, for use in generative documentary film generation.",
+  "version": "1.0.0",
+  "created_at": "2026-07-23T00:00:00Z",
+  "updated_at": "2026-07-23T00:00:00Z",
+  "runtime_rules": {
+    "min_duration_seconds": 35,
+    "max_duration_seconds": 1800,
+    "allow_repeat_artifacts": false,
+    "save_generated_films": true
+  },
+  "artifact_counts": {
+    "total": 0,
+    "a_roll": 0,
+    "b_roll": 0,
+    "x_roll": 0
+  },
+  "artifacts": []
+}

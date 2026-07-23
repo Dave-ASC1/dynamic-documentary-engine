@@ -1,31 +1,34 @@
 # Local Media Workspace
 
-Use this folder for real video and audio files that live on this computer.
-
-- `raw/` — original downloads or recordings before cleanup.
-- `assets/` — engine-ready files referenced by metadata, separated by roll type.
-- `films/` — rendered test films generated from local media.
-
-The files in these folders are ignored by Git so large media does not get pushed
-to GitHub. Keep filenames in `assets/` matched to the collection metadata, or
-update the metadata to match the files you place here.
-
-Example:
+Each **film topic** (World War II, Swiss, ...) gets its own self-contained
+folder here — pick any name, the engine auto-discovers it:
 
 ```text
-assets/a-roll/val_av_003.mp4
-assets/b-roll/val_bv_001.mp4
-assets/x-roll/val_xa_001.wav
+local-media/
+  <Topic Name>/
+    assets/
+      a-roll/
+      b-roll/
+      x-roll/
+    artifacts/        <- rendered films land here
 ```
 
-When using subfolders, include the subfolder in the metadata filename:
+Drop real video/audio files into the right `assets/<roll-type>/` subfolder —
+the engine auto-detects them on the next generate (auto-inferred title,
+duration, dominant color, pacing). Deleting a file retires its entry the
+same way. No manual JSON editing, no restart needed.
 
-```json
-"filename": "a-roll/val_av_003.mp4"
-```
+A brand-new topic folder just needs the `assets/` and `artifacts/`
+subfolders to exist (even empty) — the engine creates a matching
+metadata index automatically at
+`metadata/collections/<topic>_collection_index.json` the first time it's
+seen.
 
-To run the command-line validation with this folder:
+The files in these folders are ignored by Git so large media does not get
+pushed to GitHub.
+
+To run the command-line validation against a topic's footage:
 
 ```bash
-python3 scripts/run_first_film.py --assets-path local-media/assets --films-path local-media/films
+python3 scripts/run_first_film.py --assets-path "local-media/Validation/assets" --films-path "local-media/Validation/artifacts"
 ```

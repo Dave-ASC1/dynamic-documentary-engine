@@ -1,4 +1,6 @@
 const generateBtn = document.getElementById("generate-btn");
+const collectionSelect = document.getElementById("collection-select");
+const collectionHint = document.getElementById("collection-hint");
 const durationInput = document.getElementById("duration");
 const diversityToggle = document.getElementById("diversity-toggle");
 const exactDurationToggle = document.getElementById("exact-duration-toggle");
@@ -174,6 +176,9 @@ function renderMeta(result) {
   if (result.exact_duration) {
     metaEl.appendChild(chip("Length", result.trimmed ? "Exact (trimmed)" : "Exact (no trim needed)"));
   }
+  if (result.title_cards) {
+    metaEl.appendChild(chip("Intro/outro", "Included (+~10s, not counted above)"));
+  }
 }
 
 function renderHistoryItem(entry) {
@@ -193,7 +198,10 @@ function renderHistoryItem(entry) {
 async function deleteFilm(filename) {
   if (!confirm(`Delete ${filename}? This can't be undone.`)) return;
   try {
-    const res = await fetch(`/api/films/${encodeURIComponent(filename)}`, { method: "DELETE" });
+    const res = await fetch(
+      `/api/films/${encodeURIComponent(collectionSelect.value)}/${encodeURIComponent(filename)}`,
+      { method: "DELETE" }
+    );
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || `Server returned ${res.status}`);
     if (player.src && player.src.endsWith(filename)) {
@@ -208,8 +216,9 @@ async function deleteFilm(filename) {
 }
 
 async function loadHistory() {
+  if (!collectionSelect.value) return;
   try {
-    const res = await fetch("/api/films");
+    const res = await fetch(`/api/films?collection=${encodeURIComponent(collectionSelect.value)}`);
     const films = await res.json();
     historyList.innerHTML = "";
     if (!films.length) {
@@ -228,6 +237,53 @@ async function loadHistory() {
   }
 }
 
+function updateCollectionGate(collections) {
+  const selected = collections.find((c) => c.id === collectionSelect.value);
+  const empty = !selected || (selected.artifact_counts.total || 0) === 0;
+  generateBtn.disabled = empty;
+  if (empty && selected) {
+    collectionHint.textContent =
+      `'${selected.name}' has no footage yet — add clips to local-media/${selected.folder}/assets/ first.`;
+    collectionHint.classList.remove("hidden");
+  } else {
+    collectionHint.classList.add("hidden");
+  }
+}
+
+async function loadCollections() {
+  try {
+    const res = await fetch("/api/collections");
+    const collections = await res.json();
+    collectionSelect.innerHTML = "";
+
+    for (const c of collections) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      const count = c.artifact_counts.total || 0;
+      opt.textContent = `${c.name} (${count} clip${count === 1 ? "" : "s"})`;
+      collectionSelect.appendChild(opt);
+    }
+
+    // Default to the first topic that actually has footage, so a new
+    // empty topic (just created, waiting on real media) doesn't become
+    // the default and immediately block Generate.
+    const populated = collections.find((c) => (c.artifact_counts.total || 0) > 0);
+    if (populated) collectionSelect.value = populated.id;
+
+    updateCollectionGate(collections);
+    collectionSelect.addEventListener("change", () => {
+      updateCollectionGate(collections);
+      playerSection.classList.add("hidden");
+      traceSection.classList.add("hidden");
+      loadHistory();
+    });
+
+    await loadHistory();
+  } catch (e) {
+    console.warn("Could not load film topics:", e);
+  }
+}
+
 async function generateFilm() {
   const target = parseInt(durationInput.value, 10) || 90;
   generateBtn.disabled = true;
@@ -239,6 +295,7 @@ async function generateFilm() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        collection: collectionSelect.value,
         target_duration: target,
         diversity_mode: diversityToggle.checked,
         exact_duration: exactDurationToggle.checked,
@@ -265,4 +322,4 @@ async function generateFilm() {
 }
 
 generateBtn.addEventListener("click", generateFilm);
-loadHistory();
+loadCollections();
