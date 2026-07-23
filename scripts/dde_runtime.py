@@ -24,8 +24,10 @@ Version: 1.0.0
 
 import json
 import os
+import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -305,6 +307,224 @@ def ensure_assets(loader, assets_path):
 
 
 # ----------------------------------------------------------------------
+# Media library auto-sync — real collection only (not the demo/ bootstrap)
+# ----------------------------------------------------------------------
+#
+# The engine only ever selects from artifacts listed in the collection
+# index; it never scans local-media/assets/ on its own. This reconciles
+# the two: any real file dropped into a-roll/ b-roll/ x-roll/ that isn't
+# indexed yet gets an entry with auto-inferred metadata (duration via
+# ffprobe, dominant color via ffmpeg frame sampling, a pacing heuristic
+# from clip length). Any indexed entry whose backing file has been
+# deleted is dropped from the index rather than silently replaced by a
+# placeholder — deleting a file is enough to retire it, symmetric with
+# adding one, and this is what keeps a missing file from ever being
+# regenerated as a green-screen stand-in again.
+
+_ROLL_SUBDIRS = {"A-roll": "a-roll", "B-roll": "b-roll", "X-roll": "x-roll"}
+
+_MEDIA_EXTENSIONS = {
+    "A-roll": (".mov", ".mp4", ".m4v"),
+    "B-roll": (".mov", ".mp4", ".m4v"),
+    "X-roll": (".wav", ".mp3", ".m4a", ".aac"),
+}
+
+# Coarse named-color palette for auto-tagging video dominant color —
+# not exhaustive, just enough to give auto-discovered clips *some*
+# scoreable contrast signal without hand-authored tags.
+_COLOR_PALETTE = {
+    "red": (200, 40, 40), "orange": (220, 120, 40), "yellow": (210, 200, 60),
+    "green": (60, 150, 70), "cyan": (60, 170, 190), "blue": (50, 90, 190),
+    "purple": (120, 70, 170), "pink": (210, 110, 160), "brown": (110, 80, 50),
+    "gray": (130, 130, 130), "black": (25, 25, 25), "white": (230, 230, 230),
+}
+
+
+def _probe_duration(path):
+    """Media duration in seconds via ffprobe, or None if it can't be read."""
+    try:
+        proc = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True, timeout=15,
+        )
+        return round(float(proc.stdout.strip()), 3)
+    except (subprocess.SubprocessError, ValueError, OSError):
+        return None
+
+
+def _nearest_color_name(rgb):
+    r, g, b = rgb
+    best, best_dist = "gray", float("inf")
+    for name, (cr, cg, cb) in _COLOR_PALETTE.items():
+        dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2
+        if dist < best_dist:
+            best, best_dist = name, dist
+    return best
+
+
+def _probe_dominant_color(path):
+    """Best-effort average frame color: ffmpeg scales the frame to a
+    single pixel (the resize filter averages as it downsamples), then we
+    map that RGB triple to the nearest named color."""
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-v", "error", "-ss", "1", "-i", path,
+             "-frames:v", "1", "-vf", "scale=1:1", "-f", "rawvideo",
+             "-pix_fmt", "rgb24", "-"],
+            capture_output=True, timeout=15,
+        )
+        px = proc.stdout[:3]
+        if len(px) != 3:
+            return None
+        return _nearest_color_name(tuple(px))
+    except (subprocess.SubprocessError, OSError):
+        return None
+
+
+def _infer_pacing(duration):
+    """Coarse pacing heuristic from clip length — best-effort only; it
+    has no idea what's actually happening in the shot."""
+    if duration is None:
+        return None
+    if duration <= 6:
+        return "fast"
+    if duration <= 15:
+        return "medium"
+    return "slow"
+
+
+def _humanize_title(filename):
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    stem = stem.replace("_", " ").replace("-", " ")
+    return " ".join(w if not w.islower() else w.capitalize() for w in stem.split())
+
+
+def _mint_artifact_id(prefix, filename, taken):
+    stem = os.path.splitext(os.path.basename(filename))[0].lower()
+    stem = re.sub(r"[^a-z0-9]+", "_", stem).strip("_") or "clip"
+    candidate = f"auto_{prefix}_{stem}"
+    n = 2
+    while candidate in taken:
+        candidate = f"auto_{prefix}_{stem}_{n}"
+        n += 1
+    return candidate
+
+
+def sync_media_library(index_path, assets_path):
+    """Reconciles the collection index against what's actually on disk.
+
+    Returns {"added": [artifact_id, ...], "removed": [artifact_id, ...]}.
+    Rewrites index_path only if something actually changed.
+    """
+    with open(index_path) as f:
+        data = json.load(f)
+
+    artifacts = data.get("artifacts", [])
+    existing_ids = {a["artifact_id"] for a in artifacts}
+
+    kept = []
+    removed = []
+    for a in artifacts:
+        fname = a.get("filename")
+        full = os.path.join(assets_path, fname) if fname else None
+        if full and os.path.isfile(full):
+            kept.append(a)
+        else:
+            removed.append(a["artifact_id"])
+
+    indexed_filenames = {a["filename"] for a in kept if a.get("filename")}
+    id_prefix = {"A-roll": "a", "B-roll": "b", "X-roll": "x"}
+    added = []
+
+    for artifact_type, subdir in _ROLL_SUBDIRS.items():
+        dirpath = os.path.join(assets_path, subdir)
+        if not os.path.isdir(dirpath):
+            continue
+        for fname in sorted(os.listdir(dirpath)):
+            if fname.startswith("."):
+                continue
+            if not fname.lower().endswith(_MEDIA_EXTENSIONS[artifact_type]):
+                continue
+            rel = f"{subdir}/{fname}"
+            if rel in indexed_filenames:
+                continue
+
+            full = os.path.join(dirpath, fname)
+            duration = _probe_duration(full)
+            entry = {
+                "artifact_id": _mint_artifact_id(id_prefix[artifact_type], fname, existing_ids),
+                "artifact_type": artifact_type,
+                "role": "body",
+                "filename": rel,
+                "duration_seconds": duration if duration is not None else 8.0,
+                "title": _humanize_title(fname),
+                "weight": 0.5,
+                "can_repeat": False,
+                "must_not_follow": [],
+            }
+            pacing = _infer_pacing(duration)
+            if pacing:
+                entry["pacing"] = pacing
+            if artifact_type in ("A-roll", "B-roll"):
+                color = _probe_dominant_color(full)
+                if color:
+                    entry["tags"] = [f"color-{color}"]
+
+            existing_ids.add(entry["artifact_id"])
+            kept.append(entry)
+            added.append(entry["artifact_id"])
+
+    if added or removed:
+        counts = Counter(a["artifact_type"] for a in kept)
+        data["artifacts"] = kept
+        data["artifact_counts"] = {
+            "total": len(kept),
+            "a_roll": counts.get("A-roll", 0),
+            "b_roll": counts.get("B-roll", 0),
+            "x_roll": counts.get("X-roll", 0),
+        }
+        data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        with open(index_path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    return {"added": added, "removed": removed}
+
+
+def _trim_film_to_duration(film_path, target_duration, video_codec="libx264",
+                            audio_codec="aac", pix_fmt="yuv420p"):
+    """Re-encodes film_path in place, cutting it to exactly target_duration
+    seconds if it currently runs longer. Re-encoding rather than stream
+    copy is what lets the cut land on an exact second instead of snapping
+    to the nearest keyframe. Returns True if a trim was actually applied.
+    """
+    current = _probe_duration(film_path)
+    if current is None or current <= target_duration:
+        return False
+
+    tmp_path = film_path + ".trim.mp4"
+    cmd = [
+        "ffmpeg", "-y", "-i", film_path, "-t", str(target_duration),
+        "-c:v", video_codec, "-c:a", audio_codec, "-pix_fmt", pix_fmt,
+        "-movflags", "+faststart", tmp_path,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    except (subprocess.SubprocessError, OSError):
+        if os.path.isfile(tmp_path):
+            os.remove(tmp_path)
+        return False
+
+    if proc.returncode != 0 or not os.path.isfile(tmp_path):
+        if os.path.isfile(tmp_path):
+            os.remove(tmp_path)
+        return False
+
+    os.replace(tmp_path, film_path)
+    return True
+
+
+# ----------------------------------------------------------------------
 # High-level entry point
 # ----------------------------------------------------------------------
 
@@ -316,6 +536,7 @@ def generate_and_render(
     metadata_path=METADATA_PATH,
     diversity_mode=False,
     juxtaposition_pool_size=None,
+    exact_duration=False,
 ):
     """Runs the real engine end to end and returns a JSON-serializable summary.
 
@@ -326,10 +547,32 @@ def generate_and_render(
     reviewable later (generated films are saved as analytical artifacts,
     not just playback output).
 
+    exact_duration (bool): By default the film is assembled from whole,
+        untrimmed clips and lands at or under target_duration — real
+        footage is never cut, but a lumpy combination of clip lengths can
+        undershoot by a few seconds. Set True to instead let the sequence
+        run past target_duration using whole clips, then trim the final
+        rendered file down to exactly target_duration — this guarantees
+        the exact length but does cut off whatever was playing at that
+        instant, mid-shot or mid-sound. Only takes effect if a
+        target_duration is given and the collection has enough footage to
+        reach it in the first place.
+
     Returns:
         dict: JSON-serializable summary — collection info, the ordered
               slots, the selection trace, and the rendered film's path.
     """
+    # The demo/ path is a disposable bootstrap workspace whose index entries
+    # are *meant* to have no real file yet — ensure_assets() below fills
+    # them in with placeholders. Real media libraries (local-media/assets/
+    # or any other real path) get the opposite treatment: sync new real
+    # files in, and drop any index entry whose file has gone missing,
+    # rather than ever placeholder-generating a stand-in for it.
+    is_demo_mode = os.path.abspath(assets_path) == os.path.abspath(DEFAULT_ASSETS)
+    library_sync = None
+    if not is_demo_mode and os.path.isdir(assets_path):
+        library_sync = sync_media_library(index_path, assets_path)
+
     usage_counts = load_usage_counts(films_path) if diversity_mode else {}
     sequencer = Sequencer(
         index_path,
@@ -343,7 +586,9 @@ def generate_and_render(
     tracer = SelectionTracer(sequencer.selector)
     instrument_pairing(sequencer.selector, tracer)
 
-    sequence = sequencer.generate(target_duration=target_duration)
+    sequence = sequencer.generate(
+        target_duration=target_duration, allow_overshoot=exact_duration
+    )
 
     slots = []
     for entry in sequence:
@@ -387,7 +632,8 @@ def generate_and_render(
             "contrast": dims(ev["prev"], chosen),
         })
 
-    ensure_assets(loader, assets_path)
+    if is_demo_mode:
+        ensure_assets(loader, assets_path)
     assembler = Assembler(
         loader=loader,
         assets_path=assets_path,
@@ -396,6 +642,15 @@ def generate_and_render(
     )
     film_path = assembler.render(sequence)
 
+    trimmed = False
+    if exact_duration and target_duration is not None:
+        trimmed = _trim_film_to_duration(
+            film_path, target_duration,
+            video_codec=assembler.video_codec,
+            audio_codec=assembler.audio_codec,
+            pix_fmt=assembler.pix_fmt,
+        )
+
     usage_stats = None
     if diversity_mode:
         usage_counts = merge_usage_counts(usage_counts, sequencer.generated_usage)
@@ -403,8 +658,13 @@ def generate_and_render(
 
     # Summing slot durations gives the true screen time, matching the
     # actual rendered film length for both standalone A-roll and paired
-    # B-roll/X-roll slots.
-    actual_duration = sum(s["duration_seconds"] for s in slots)
+    # B-roll/X-roll slots — unless the render was just trimmed, in which
+    # case the slot sum reflects the pre-trim sequence and the real
+    # duration has to be read back off the actual file.
+    if trimmed:
+        actual_duration = _probe_duration(film_path) or target_duration
+    else:
+        actual_duration = sum(s["duration_seconds"] for s in slots)
 
     result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -422,6 +682,9 @@ def generate_and_render(
         "film_filename": os.path.basename(film_path),
         "diversity_mode": diversity_mode,
         "usage_stats_path": usage_stats,
+        "library_sync": library_sync,
+        "exact_duration": exact_duration,
+        "trimmed": trimmed,
     }
 
     manifest_path = os.path.splitext(film_path)[0] + ".json"

@@ -49,6 +49,7 @@ from dde_runtime import (  # noqa: E402
     INDEX_PATH, METADATA_PATH, DEFAULT_ASSETS, DEFAULT_FILMS,
     art_map, label, dims, SelectionTracer, instrument_pairing, ensure_assets,
     load_usage_counts, merge_usage_counts, save_usage_counts,
+    sync_media_library,
 )
 from engine import Sequencer, Assembler  # noqa: E402
 
@@ -159,6 +160,16 @@ def main():
 
     print(f"{BAR}\nDYNAMIC DOCUMENTARY ENGINE — end-to-end validation run\n{BAR}")
 
+    # Real media libraries get auto-synced against the index (new files
+    # added, deleted files' entries dropped); the demo/ bootstrap path is
+    # left alone since ensure_assets() below is what populates it.
+    is_demo_mode = os.path.abspath(args.assets_path) == os.path.abspath(DEFAULT_ASSETS)
+    if not is_demo_mode and os.path.isdir(args.assets_path):
+        sync = sync_media_library(INDEX_PATH, args.assets_path)
+        if sync["added"] or sync["removed"]:
+            print(f"library sync : +{len(sync['added'])} added, "
+                  f"-{len(sync['removed'])} removed (missing file)")
+
     usage_counts = load_usage_counts(args.films_path) if args.diversity else {}
     sequencer = Sequencer(
         INDEX_PATH,
@@ -205,10 +216,11 @@ def main():
         print(f"\n{BAR}\nRENDER SKIPPED (--no-render)\n{BAR}")
         return 0
 
-    print(f"\n{BAR}\nRENDER — placeholder media -> film\n{BAR}")
-    stats = ensure_assets(loader, args.assets_path)
-    print(f"  placeholder assets: {stats['created']} created, "
-          f"{stats['existing']} already present")
+    print(f"\n{BAR}\nRENDER — {'placeholder media' if is_demo_mode else 'real media'} -> film\n{BAR}")
+    if is_demo_mode:
+        stats = ensure_assets(loader, args.assets_path)
+        print(f"  placeholder assets: {stats['created']} created, "
+              f"{stats['existing']} already present")
 
     assembler = Assembler(
         loader=loader,

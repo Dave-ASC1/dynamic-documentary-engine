@@ -110,7 +110,7 @@ class Sequencer:
             juxtaposition_pool_size=juxtaposition_pool_size,
         )
 
-    def generate(self, target_duration=None):
+    def generate(self, target_duration=None, allow_overshoot=False):
         """
         Generates a unique ordered film sequence from the loaded collection.
 
@@ -128,6 +128,19 @@ class Sequencer:
                                              Supports short-form and feature-length films.
                                              If not provided, uses the collection's
                                              max_duration_seconds runtime rule.
+            allow_overshoot (bool, optional): By default the closing B-roll's
+                                             duration is reserved in the
+                                             budget before body selection, so
+                                             whole clips alone never exceed
+                                             target_duration. Set True to skip
+                                             that reservation and let the
+                                             total land at or slightly past
+                                             target_duration instead — for
+                                             callers that will trim the
+                                             rendered film down to an exact
+                                             length afterward, where having
+                                             real footage past the target to
+                                             cut is the point.
 
         Returns:
             list: An ordered list of artifact ID strings and paired tuples.
@@ -199,6 +212,20 @@ class Sequencer:
 
         reserved_closing_ids = {a.get("artifact_id") for a in closing_pair}
 
+        # Reserve the closing B-roll's screen time in the duration budget so
+        # the body loop leaves room for it. Without this, the loop only
+        # budgets against the requested max, the close gets appended after
+        # the loop with no budget check of its own, and the film reliably
+        # overshoots target_duration by however long the closing clip is.
+        # Skipped entirely in allow_overshoot mode, where landing at or
+        # past target_duration using whole clips is the intended behavior.
+        closing_broll, _closing_xroll_for_budget = closing_pair
+        requested_max = self.rules.runtime_rules.get("max_duration_seconds", float("inf"))
+        if not allow_overshoot:
+            self.rules.runtime_rules["max_duration_seconds"] = max(
+                0, requested_max - closing_broll.get("duration_seconds", 0)
+            )
+
         # Step 2 — Select body artifacts until target duration is reached.
         standalone_candidates = [
             a for a in body_artifacts
@@ -249,6 +276,11 @@ class Sequencer:
                 self._record_generated_usage(selected)
 
             current_mood = selected.get("mood")
+
+        # Restore the true requested max now that the reserved room has done
+        # its job — register_selection() below doesn't consult the budget,
+        # this is just so runtime_rules reflects the real target afterward.
+        self.rules.runtime_rules["max_duration_seconds"] = requested_max
 
         # Step 3 — Close with the reserved generated B-roll + X-roll pair.
         closing_broll, closing_xroll = closing_pair

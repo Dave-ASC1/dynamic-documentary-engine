@@ -26,6 +26,7 @@ Endpoints:
     GET  /films/<filename>   Serves a rendered film file for playback.
     GET  /api/films          Lists previously generated films (saved as
                               analytical artifacts) for review.
+    DELETE /api/films/<filename>  Deletes a generated film and its manifest.
 
 Run:
     python3 web/backend/app.py
@@ -109,11 +110,16 @@ def generate():
         except (TypeError, ValueError):
             return jsonify({"error": "target_duration must be an integer"}), 400
 
+    diversity_mode = bool(body.get("diversity_mode"))
+    exact_duration = bool(body.get("exact_duration"))
+
     try:
         result = dde_runtime.generate_and_render(
             target_duration=target,
             assets_path=ASSETS_PATH,
             films_path=FILMS_PATH,
+            diversity_mode=diversity_mode,
+            exact_duration=exact_duration,
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -125,6 +131,27 @@ def generate():
 @app.route("/films/<path:filename>")
 def films(filename):
     return send_from_directory(FILMS_PATH, filename)
+
+
+@app.route("/api/films/<path:filename>", methods=["DELETE"])
+def delete_film(filename):
+    # Strip any path components the client sent so this can only ever touch
+    # a file directly inside FILMS_PATH, never traverse elsewhere.
+    safe_name = os.path.basename(filename)
+    if not safe_name.endswith(".mp4"):
+        return jsonify({"error": "Only generated .mp4 films can be deleted"}), 400
+
+    film_path = os.path.join(FILMS_PATH, safe_name)
+    if not os.path.isfile(film_path):
+        return jsonify({"error": "Film not found"}), 404
+
+    os.remove(film_path)
+
+    manifest_path = os.path.splitext(film_path)[0] + ".json"
+    if os.path.isfile(manifest_path):
+        os.remove(manifest_path)
+
+    return jsonify({"deleted": safe_name})
 
 
 @app.route("/api/films")
