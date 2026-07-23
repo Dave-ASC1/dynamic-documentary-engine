@@ -5,36 +5,93 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dynamic Documentary Engine</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // Applied before first paint so the page never flashes the wrong theme.
+    (function () {
+      var saved = localStorage.getItem("dde-theme");
+      if (saved === "dark" || saved === "light") {
+        document.documentElement.setAttribute("data-theme", saved);
+      }
+    })();
+  </script>
 </head>
 <body>
-  <header>
-    <h1>Dynamic Documentary Engine</h1>
-    <p class="tagline">Every screening assembles a unique film — maximum juxtaposition, not emotional continuity.</p>
+  <header class="hero">
+    <div class="sprockets" aria-hidden="true"></div>
+    <a class="brand-logo" href="https://ist.psu.edu/" target="_blank" rel="noopener">
+      <img src="psu-logo.svg" alt="Pennsylvania State University" />
+    </a>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">
+      <span class="theme-toggle-icon" aria-hidden="true"></span>
+    </button>
+    <div class="hero-inner">
+      <p class="eyebrow">Pennsylvania State University<br />College of Information Sciences and Technology</p>
+      <h1>Dynamic Documentary<br />Engine</h1>
+      <p class="tagline">Every screening assembles a unique film — maximum juxtaposition, not emotional continuity.</p>
+    </div>
+    <div class="sprockets" aria-hidden="true"></div>
   </header>
 
   <main>
-    <section class="controls">
-      <label for="duration">Target length (seconds)</label>
-      <input type="number" id="duration" min="1" max="9999" value="90" />
-      <button id="generate-btn">Generate Film</button>
-      <span id="status"></span>
+    <section class="controls-card" aria-label="Film generation controls">
+      <div class="field field-centered">
+        <label for="duration">Target length</label>
+        <div class="field-input">
+          <input type="number" id="duration" min="1" max="9999" value="90" />
+          <span class="unit">seconds</span>
+        </div>
+      </div>
+
+      <button id="generate-btn" type="button">
+        <span class="btn-icon">&#9654;</span>
+        <span class="btn-label">Generate Film</span>
+      </button>
+
+      <div class="toggle-row">
+        <label class="toggle-field has-tooltip" for="diversity-toggle">
+          <input type="checkbox" id="diversity-toggle" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Diversity mode</span>
+          <span class="tooltip" role="tooltip">Diversity mode boosts underused clips across runs to prevent oversaturation of high-contrast favorites.</span>
+        </label>
+        <label class="toggle-field has-tooltip" for="exact-duration-toggle">
+          <input type="checkbox" id="exact-duration-toggle" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Exact duration</span>
+          <span class="tooltip" role="tooltip">Exact duration trims the final clip so the film matches your target length precisely — off by default, since it never cuts real footage and may land a few seconds short instead.</span>
+        </label>
+      </div>
+
+      <div id="status" class="status" role="status">
+        <span class="status-dot"></span>
+        <span class="status-text"></span>
+      </div>
+      <div id="sync-notice" class="sync-notice hidden"></div>
     </section>
 
-    <section id="player-section" class="hidden">
-      <video id="player" controls></video>
-      <div id="meta"></div>
+    <section id="player-section" class="screening hidden">
+      <div class="screen-frame">
+        <video id="player" controls></video>
+      </div>
+      <div id="meta" class="meta-chips"></div>
     </section>
 
-    <section id="trace-section" class="hidden">
-      <h2>Why this cut — the sequence &amp; its contrast reasoning</h2>
-      <ol id="trace-list"></ol>
+    <section id="trace-section" class="trace hidden">
+      <h2>Why this cut</h2>
+      <p class="section-sub">The sequence and the contrast reasoning behind every transition.</p>
+      <ol id="trace-list" class="timeline"></ol>
     </section>
 
-    <section id="history-section">
+    <section id="history-section" class="history">
       <h2>Previously generated films</h2>
-      <ul id="history-list"><li class="empty">No films generated yet this session.</li></ul>
+      <p class="section-sub">Every screening is saved for the run — revisit any past cut.</p>
+      <ul id="history-list" class="history-grid"><li class="empty">No films generated yet this session.</li></ul>
     </section>
   </main>
+
+  <footer class="foot">
+    <p>No two screenings are alike — rule-based sequencing driven entirely by contrast.</p>
+  </footer>
 
   <script src="app.js"></script>
 </body>
