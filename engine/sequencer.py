@@ -73,25 +73,42 @@ class Sequencer:
     MIN_DURATION = 1
     MAX_DURATION = 9999
 
-    def __init__(self, collection_path):
+    def __init__(
+        self,
+        collection_path,
+        diversity_mode=False,
+        usage_counts=None,
+        juxtaposition_pool_size=None,
+    ):
         """
         Initializes the Sequencer with a path to a collection index.
 
         Args:
             collection_path (str): Path to the collection index JSON file.
+            diversity_mode (bool): If True, underused artifacts receive a
+                selection-weight boost while contrast ordering is preserved.
+            usage_counts (dict): Cross-run artifact usage counts for diversity mode.
+            juxtaposition_pool_size (int): Optional number of top contrast
+                candidates eligible for weighted selection.
 
         Raises:
             FileNotFoundError: If the collection index file does not exist.
             ValueError: If the collection index is missing required fields.
         """
         self.collection_path = collection_path
+        self.generated_usage = {}
 
         self.loader = CollectionLoader(collection_path)
         self.collection = self.loader.load()
 
         runtime_rules = self.loader.get_runtime_rules()
         self.rules = SequencingRules(runtime_rules)
-        self.selector = ArtifactSelector(self.rules)
+        self.selector = ArtifactSelector(
+            self.rules,
+            diversity_mode=diversity_mode,
+            usage_counts=usage_counts,
+            juxtaposition_pool_size=juxtaposition_pool_size,
+        )
 
     def generate(self, target_duration=None):
         """
@@ -130,6 +147,7 @@ class Sequencer:
             self.rules.runtime_rules["max_duration_seconds"] = target_duration
 
         self.rules.reset()
+        self.generated_usage = {}
         sequence = []
 
         body_artifacts = self.loader.get_body_artifacts()
@@ -166,6 +184,8 @@ class Sequencer:
         ))
         self.rules.register_selection(opening_broll)
         self.rules.register_pairing_selection(opening_xroll)
+        self._record_generated_usage(opening_broll)
+        self._record_generated_usage(opening_xroll)
         self.selector.set_previous_artifact(opening_broll)
 
         # Reserve the closing pair before body selection so the body cannot
@@ -220,10 +240,13 @@ class Sequencer:
                         selected.get("artifact_id"),
                         x_roll.get("artifact_id"),
                     ))
+                    self._record_generated_usage(selected)
+                    self._record_generated_usage(x_roll)
                 else:
                     continue
             else:
                 sequence.append(selected.get("artifact_id"))
+                self._record_generated_usage(selected)
 
             current_mood = selected.get("mood")
 
@@ -235,8 +258,23 @@ class Sequencer:
         ))
         self.rules.register_selection(closing_broll)
         self.rules.register_pairing_selection(closing_xroll)
+        self._record_generated_usage(closing_broll)
+        self._record_generated_usage(closing_xroll)
 
         return sequence
+
+    def _record_generated_usage(self, artifact):
+        """
+        Records that an artifact appeared in the generated film.
+
+        Args:
+            artifact (dict): Artifact summary dictionary.
+        """
+        artifact_id = artifact.get("artifact_id")
+        if artifact_id:
+            self.generated_usage[artifact_id] = (
+                self.generated_usage.get(artifact_id, 0) + 1
+            )
 
     def _select_random_broll_xroll_pair(self, b_roll_artifacts, x_roll_artifacts):
         """
