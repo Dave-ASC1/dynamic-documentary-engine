@@ -41,6 +41,7 @@ INDEX_PATH = os.path.join(
 METADATA_PATH = os.path.join(REPO_ROOT, "metadata", "validation")
 DEFAULT_ASSETS = os.path.join(REPO_ROOT, "demo", "assets")
 DEFAULT_FILMS = os.path.join(REPO_ROOT, "demo", "films")
+DEFAULT_USAGE_STATS = "usage_stats.json"
 
 
 # ----------------------------------------------------------------------
@@ -67,6 +68,42 @@ def slot_label(slot):
     if slot["kind"] == "broll_xroll":
         return f"{slot['broll_title']} + {slot['xroll_title']} [B-roll+X-roll]"
     return f"{slot['title']} [{slot.get('artifact_type')}]"
+
+
+def usage_stats_path(films_path):
+    """Returns the per-output-folder artifact usage stats path."""
+    return os.path.join(films_path, DEFAULT_USAGE_STATS)
+
+
+def load_usage_counts(films_path):
+    """Loads cross-run artifact usage counts for diversity mode."""
+    path = usage_stats_path(films_path)
+    if not os.path.exists(path):
+        return {}
+    with open(path, "r") as f:
+        data = json.load(f)
+    return data.get("artifact_usage", {})
+
+
+def save_usage_counts(films_path, usage_counts):
+    """Saves cross-run artifact usage counts for diversity mode."""
+    os.makedirs(films_path, exist_ok=True)
+    path = usage_stats_path(films_path)
+    payload = {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "artifact_usage": usage_counts,
+    }
+    with open(path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return path
+
+
+def merge_usage_counts(existing, generated):
+    """Adds one generated film's usage counts into persisted usage counts."""
+    merged = dict(existing)
+    for artifact_id, count in generated.items():
+        merged[artifact_id] = merged.get(artifact_id, 0) + count
+    return merged
 
 
 def dims(prev, cand):
@@ -277,6 +314,8 @@ def generate_and_render(
     films_path=DEFAULT_FILMS,
     index_path=INDEX_PATH,
     metadata_path=METADATA_PATH,
+    diversity_mode=False,
+    juxtaposition_pool_size=None,
 ):
     """Runs the real engine end to end and returns a JSON-serializable summary.
 
@@ -291,7 +330,13 @@ def generate_and_render(
         dict: JSON-serializable summary — collection info, the ordered
               slots, the selection trace, and the rendered film's path.
     """
-    sequencer = Sequencer(index_path)
+    usage_counts = load_usage_counts(films_path) if diversity_mode else {}
+    sequencer = Sequencer(
+        index_path,
+        diversity_mode=diversity_mode,
+        usage_counts=usage_counts,
+        juxtaposition_pool_size=juxtaposition_pool_size,
+    )
     loader = sequencer.loader
     amap = art_map(loader)
 
@@ -351,6 +396,11 @@ def generate_and_render(
     )
     film_path = assembler.render(sequence)
 
+    usage_stats = None
+    if diversity_mode:
+        usage_counts = merge_usage_counts(usage_counts, sequencer.generated_usage)
+        usage_stats = save_usage_counts(films_path, usage_counts)
+
     # Summing slot durations gives the true screen time, matching the
     # actual rendered film length for both standalone A-roll and paired
     # B-roll/X-roll slots.
@@ -370,6 +420,8 @@ def generate_and_render(
         "trace": trace,
         "film_path": film_path,
         "film_filename": os.path.basename(film_path),
+        "diversity_mode": diversity_mode,
+        "usage_stats_path": usage_stats,
     }
 
     manifest_path = os.path.splitext(film_path)[0] + ".json"

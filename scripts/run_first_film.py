@@ -48,6 +48,7 @@ if HERE not in sys.path:
 from dde_runtime import (  # noqa: E402
     INDEX_PATH, METADATA_PATH, DEFAULT_ASSETS, DEFAULT_FILMS,
     art_map, label, dims, SelectionTracer, instrument_pairing, ensure_assets,
+    load_usage_counts, merge_usage_counts, save_usage_counts,
 )
 from engine import Sequencer, Assembler  # noqa: E402
 
@@ -145,6 +146,10 @@ def main():
                     help="How many extra generations for the uniqueness check.")
     ap.add_argument("--no-render", action="store_true",
                     help="Skip the FFmpeg render (trace only).")
+    ap.add_argument("--diversity", action="store_true",
+                    help="Boost underused artifacts across rendered runs.")
+    ap.add_argument("--pool-size", type=int, default=None,
+                    help="Optional override for top-contrast candidate pool size.")
     ap.add_argument("--assets-path", default=DEFAULT_ASSETS)
     ap.add_argument("--films-path", default=DEFAULT_FILMS)
     args = ap.parse_args()
@@ -154,7 +159,13 @@ def main():
 
     print(f"{BAR}\nDYNAMIC DOCUMENTARY ENGINE — end-to-end validation run\n{BAR}")
 
-    sequencer = Sequencer(INDEX_PATH)
+    usage_counts = load_usage_counts(args.films_path) if args.diversity else {}
+    sequencer = Sequencer(
+        INDEX_PATH,
+        diversity_mode=args.diversity,
+        usage_counts=usage_counts,
+        juxtaposition_pool_size=args.pool_size,
+    )
     loader = sequencer.loader
     amap = art_map(loader)
     coll = loader.collection
@@ -165,6 +176,15 @@ def main():
           f"{counts.get('a_roll')} A-roll, {counts.get('b_roll')} B-roll, "
           f"{counts.get('x_roll')} X-roll")
     print("bookends   : generated per run from B-roll + X-roll body artifacts")
+    print("diversity  : " + (
+        "on — underused clips get a weight boost"
+        if args.diversity else
+        "off — strongest contrast candidates dominate"
+    ))
+    if args.pool_size:
+        print(f"pool size  : top {args.pool_size} contrast candidates")
+    elif args.diversity:
+        print("pool size  : automatic — scales with available candidates")
     print(f"target     : {args.target}s"
           + (f"   (seed {args.seed})" if args.seed is not None else "   (unseeded)"))
 
@@ -203,6 +223,10 @@ def main():
         return 1
 
     print(f"\nFilm rendered -> {film_path}")
+    if args.diversity:
+        updated = merge_usage_counts(usage_counts, sequencer.generated_usage)
+        usage_path = save_usage_counts(args.films_path, updated)
+        print(f"Diversity usage stats -> {usage_path}")
     print(f"Play it with:  open \"{film_path}\"")
     return 0
 

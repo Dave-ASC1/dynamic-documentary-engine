@@ -59,22 +59,37 @@ class ArtifactSelector:
                                  dissimilarity scoring.
     """
 
-    # Number of top candidates (by dissimilarity score) passed to weighted
-    # random selection. A value of 1 would always pick the single most
-    # dissimilar artifact; higher values introduce controlled randomness
-    # while still ensuring strong juxtaposition.
-    # Set to 3: always choose from the top-3 most dissimilar candidates.
+    # Normal mode keeps a tight top-3 pool so cuts stay highly contrastive.
+    # Diversity mode widens that pool proportionally to the available
+    # candidates so larger collections get broader exploration.
     _JUXTAPOSITION_POOL_SIZE = 3
+    _DIVERSITY_POOL_RATIO = 0.6
+    _DIVERSITY_POOL_MIN = 12
 
-    def __init__(self, rules):
+    def __init__(
+        self,
+        rules,
+        diversity_mode=False,
+        usage_counts=None,
+        juxtaposition_pool_size=None,
+    ):
         """
         Initializes the ArtifactSelector with an active rule engine.
 
         Args:
             rules (SequencingRules): The active sequencing rules for this session.
+            diversity_mode (bool): If True, underused artifacts receive a
+                selection-weight boost while contrast ordering is preserved.
+            usage_counts (dict): Cross-run artifact usage counts.
+            juxtaposition_pool_size (int): Optional override for how many
+                top contrast candidates are eligible for weighted selection.
+                If omitted, diversity mode uses a proportional pool.
         """
         self.rules = rules
         self._last_selected = None
+        self.diversity_mode = diversity_mode
+        self.usage_counts = usage_counts or {}
+        self.juxtaposition_pool_size = juxtaposition_pool_size
 
     def set_previous_artifact(self, artifact):
         """
@@ -98,7 +113,7 @@ class ArtifactSelector:
             1. Filter candidates through the rule engine for structural eligibility.
             2. If a previous artifact exists, score all eligible candidates by
                dissimilarity and sort descending (most different first).
-            3. Take the top _JUXTAPOSITION_POOL_SIZE candidates.
+            3. Take a contrast-ranked candidate pool.
             4. Apply weighted random selection within that pool.
             5. Register the selection and update internal state.
 
@@ -129,9 +144,9 @@ class ArtifactSelector:
             # Score and sort by dissimilarity — most different first
             eligible = self._apply_juxtaposition_filter(eligible)
 
-        # Take top candidates to maintain strong juxtaposition while
-        # allowing weighted randomness within that tier
-        top_candidates = eligible[:self._JUXTAPOSITION_POOL_SIZE]
+        # Take a contrast-ranked pool to preserve juxtaposition while allowing
+        # weighted randomness and, in diversity mode, broader exploration.
+        top_candidates = self._candidate_pool(eligible)
 
         selected = self._weighted_random_select(top_candidates)
 
@@ -171,7 +186,7 @@ class ArtifactSelector:
         if self._last_selected is not None:
             eligible = self._apply_juxtaposition_filter(eligible)
 
-        top_candidates = eligible[:self._JUXTAPOSITION_POOL_SIZE]
+        top_candidates = self._candidate_pool(eligible)
         selected = self._weighted_random_select(top_candidates)
 
         if selected:
@@ -315,6 +330,36 @@ class ArtifactSelector:
             reverse=True,   # Descending: most dissimilar first
         )
 
+    def _candidate_pool(self, candidates: list) -> list:
+        """
+        Returns the contrast-ranked pool eligible for weighted selection.
+
+        Normal mode keeps the historical top-3 behavior. Diversity mode uses
+        a proportional pool by default, so larger collections are explored
+        more broadly while still discarding the least contrastive tail.
+
+        Args:
+            candidates: Eligible candidates, already contrast-sorted when
+                a previous artifact exists.
+
+        Returns:
+            list: Candidate pool for weighted-random selection.
+        """
+        if not candidates:
+            return []
+
+        if self.juxtaposition_pool_size:
+            size = self.juxtaposition_pool_size
+        elif self.diversity_mode:
+            size = max(
+                self._DIVERSITY_POOL_MIN,
+                int(round(len(candidates) * self._DIVERSITY_POOL_RATIO)),
+            )
+        else:
+            size = self._JUXTAPOSITION_POOL_SIZE
+
+        return candidates[:max(1, min(size, len(candidates)))]
+
     # ------------------------------------------------------------------
     # Weighted Random Selection
     # ------------------------------------------------------------------
@@ -340,7 +385,7 @@ class ArtifactSelector:
         if not candidates:
             return None
 
-        weights = [a.get("weight", 0.5) for a in candidates]
+        weights = [self._selection_weight(a) for a in candidates]
         return random.choices(candidates, weights=weights, k=1)[0]
 
     def weighted_random_choice(self, candidates: list) -> dict:
@@ -360,5 +405,29 @@ class ArtifactSelector:
         if not candidates:
             return None
 
-        weights = [a.get("weight", 0.5) for a in candidates]
+        weights = [self._selection_weight(a) for a in candidates]
         return random.choices(candidates, weights=weights, k=1)[0]
+
+    def _selection_weight(self, artifact):
+        """
+        Computes the final weighted-random selection weight for an artifact.
+
+        Normal mode uses the artifact's metadata weight only. Diversity mode
+        preserves the contrast-ranked candidate pool, then boosts artifacts
+        that have appeared less often across previous generated films.
+
+        Args:
+            artifact (dict): Artifact summary dictionary.
+
+        Returns:
+            float: Weight used by random.choices().
+        """
+        base = artifact.get("weight", 0.5)
+        if not self.diversity_mode:
+            return base
+
+        artifact_id = artifact.get("artifact_id")
+        usage = self.usage_counts.get(artifact_id, 0)
+        max_usage = max(self.usage_counts.values(), default=0)
+        diversity_gap = max_usage - usage
+        return base * (1 + diversity_gap)
