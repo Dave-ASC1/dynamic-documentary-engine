@@ -23,43 +23,57 @@ Current generation behavior:
 - X-roll: strictly paired with B-roll; never selected as standalone.
 - Selection criterion: maximum dissimilarity (contrast) from the previous visual artifact.
 - Diversity mode: boosts underused clips via cross-run usage tracking to prevent oversaturation of high-contrast favorites.
+- **Fixed opening title card and closing credits card** wrap every film (see below) — separate from the randomized B+X bookends above, which is *within* the dynamic sequence, not the fixed cards around it.
 
 ## What Changed (2026-07-23)
 
-Latest verified updates:
+This was a large working session — engine fixes, a full frontend rebuild, and a real architecture change requested live by Dr. Campbell. In order:
 
-- **Web UI is production-ready**: Flask backend running, frontend serving at `http://127.0.0.1:5000`.
-- **Real media collection complete**: 13 clips recovered and organized (5 A-roll, 4 B-roll, 4 X-roll).
-- **Simple film naming**: Switched from `film_validation_YYYYMMDD_HHMMSS_xxxx.mp4` to sequential `film_test_1.mp4`, `film_test_2.mp4`, etc.
-- **X-roll standalone bug fixed**: X-roll artifacts (audio-only) can no longer be selected as primary picks, eliminating green-screen-with-beep artifacts.
-- **Web UI tested end-to-end**: Generated films play in browser with full contrast reasoning trace and history.
-- **Media recovery**: All 13 media files salvaged from system Trash and restored to `local-media/assets/`.
+**Engine / duration handling**
+- **Fixed a real overshoot bug**: the closing B+X bookend's duration wasn't checked against the target budget at all, so films reliably ran ~5–10s over the requested length. Now the closing clip's duration is reserved in the budget before body selection runs, so whole-clip sequences never exceed `target_duration`.
+- **Added "exact duration" mode** (opt-in): lets the sequence run past target using whole clips, then trims the final render down to the exact requested length. Off by default (never cuts real footage; may land a few seconds short). Verified frame-accurate via re-encoding, not stream-copy.
+- **Auto-sync media library**: the engine now scans each collection's `assets/` folders on every generate call. Drop a file in → it's auto-tagged (duration, dominant color, pacing heuristic) and enters rotation. Delete a file → its index entry is retired automatically instead of ever regenerating a placeholder for it. This is what fixed the earlier green-screen-placeholder (`SF_Zoo.MOV`) bug for good.
+
+**Fixed opening/closing cards (per Dr. Campbell)**
+- Every generated film now opens on a **title card** ("Welcome to the Dynamic Documentary Engine" + Faculty Supervisor: Dr. Betsy Campbell / Created by: Oluwafemisola David Ademoye / Collaborator: Omotola Ajibike Ajao) and closes on an **end card** ("The End" / "Thanks for watching"). Rendered via Pillow (the installed ffmpeg build has no `drawtext` filter) using the site's own Georgia serif typography, then concatenated around the render. Not counted toward `target_duration` — exact-duration mode accounts for the ~10s the cards add so the *whole file* still lands on target.
+
+**Multi-topic collections (architecture change)**
+- Per Dr. Campbell's direction from the 2026-07-23 planning meeting: each film topic (World War II, Swiss, ...) now gets its own self-contained folder instead of one shared pool — see **Media Collection** below.
+- The engine auto-discovers any `local-media/<Name>/` folder shaped like `assets/` + `artifacts/` and auto-creates a schema-valid metadata index for it the first time it's seen — no code changes needed to add a new topic.
+- Web UI now has a **Film Topic** selector; generating from an empty topic is blocked with a clear message instead of erroring.
+
+**Frontend rebuild**
+- Full cinematic redesign: hero section, framed video player, color-coded contrast timeline, card-grid film history (replacing the original plain layout).
+- **Penn State branding**: official colors (Nittany Navy `#001E44`, Beaver Blue `#1e407c`), official PSU logo (top-left, links to ist.psu.edu), institutional wording.
+- **Light/dark theme toggle** (moon/sun icon, top-right), persisted via `localStorage`. Light = PSU white/navy; dark = original cinematic near-black theme. Both fully maintained, not one replacing the other.
+- Decorative header bars restyled as solid black filmstrip perforation strips (not theme-dependent, like the video screen frame).
+- **Diversity mode** and **exact duration** toggles added to the UI with hover-tooltip explanations, centered layout.
+- **Delete button** on film history entries (`DELETE /api/films/<collection>/<filename>`).
+- Backend now binds to `0.0.0.0` (not just `127.0.0.1`) so it's reachable over the local network / a tunnel, not just from the same machine — this is what let Dr. Campbell test it remotely via a Cloudflare tunnel during the planning meeting.
+
+**Verified in a live meeting**: Dr. Campbell generated and reviewed films herself (45s target, diversity + exact duration both on) over a Cloudflare tunnel during a working session on 2026-07-23. She confirmed satisfaction with progress.
 
 ## Current Media Collection
 
-Validated and tested with real footage:
+**New structure as of 2026-07-23** — each film topic is self-contained:
 
 ```
-local-media/assets/
-├── a-roll/          (5 files, 99M)
-│   ├── First_skate.mov
-│   ├── chick_stir_fry.mov
-│   ├── gallery_monkey.mov
-│   ├── robotic_arm.mov
-│   └── skate_boarding.mov
-├── b-roll/          (4 files, 52M)
-│   ├── colorful_ballerina.mp4
-│   ├── plane_drop.mp4
-│   ├── warship_cruising.mp4
-│   └── waves_sunset.mp4
-└── x-roll/          (4 files, 9.8M)
-    ├── birds_call.wav
-    ├── piano_sound.wav
-    ├── war_bong.wav
-    └── water_stream.wav
+local-media/
+├── Validation/                          (13 real clips — original test/demo set)
+│   ├── assets/
+│   │   ├── a-roll/   (5 files: First_skate, chick_stir_fry, gallery_monkey, robotic_arm, skate_boarding)
+│   │   ├── b-roll/   (4 files: colorful_ballerina, plane_drop, warship_cruising, waves_sunset)
+│   │   └── x-roll/   (4 files: birds_call, piano_sound, war_bong, water_stream)
+│   └── artifacts/    (rendered films + manifests + usage_stats.json)
+├── WWII/                                (empty — waiting on Betsy's footage)
+│   ├── assets/{a-roll,b-roll,x-roll}/
+│   └── artifacts/
+└── SWISS/                               (empty — waiting on footage)
+    ├── assets/{a-roll,b-roll,x-roll}/
+    └── artifacts/
 ```
 
-Total: **13 clips, 160M**, wired to validation metadata.
+Each topic has its own metadata index at `metadata/collections/<topic>_collection_index.json` (auto-created for new topics). **To add a topic**: create `local-media/<Name>/assets/{a-roll,b-roll,x-roll}/` and `local-media/<Name>/artifacts/` — the engine and web UI pick it up automatically, no code or settings needed. **To add footage to an existing topic**: drop files into the right `assets/<roll-type>/` subfolder — auto-detected on next generate.
 
 ## Recommended Commands
 
@@ -68,94 +82,121 @@ Web UI (local testing):
 ```bash
 cd "/Users/kingdavid/documentary engine/dynamic-documentary-engine"
 python3 web/backend/app.py
-# Open http://127.0.0.1:5000 in browser
+# Open http://127.0.0.1:5000 in browser (or http://<machine-ip>:5000 from another device on the same network)
 ```
 
-CLI with diversity (when not using web UI):
+CLI, against a specific topic's footage (bypasses the web UI's topic selector):
 
 ```bash
 python3 scripts/run_first_film.py --target 60 --runs 0 --diversity \
-  --assets-path local-media/assets --films-path local-media/films
+  --assets-path "local-media/Validation/assets" --films-path "local-media/Validation/artifacts"
 ```
 
 ## Web UI Features
 
-- **Generate button**: Triggers film generation with target duration input.
-- **Video player**: Plays rendered film directly in the browser.
-- **Sequence trace**: Shows all cuts with dissimilarity scoring and contrast reasoning for each transition.
-- **Film history**: Lists all previously generated films with links to play.
-- **Status messages**: Reports generation progress ("Done.").
+- **Film topic selector**: choose which collection (World War II, Swiss, Validation, ...) to generate from; disabled with a clear message if the topic has no footage yet.
+- **Generate button**: triggers film generation with target duration input.
+- **Diversity mode toggle**: boosts underused clips across runs.
+- **Exact duration toggle**: trims the final render to match the target length precisely.
+- **Light/dark theme toggle**: PSU-branded light theme or cinematic dark theme, remembered across visits.
+- **Video player**: plays the rendered film (with fixed intro/outro cards) directly in the browser.
+- **Sequence trace**: shows all cuts with dissimilarity scoring and contrast reasoning for each transition.
+- **Film history**: lists previously generated films per topic, with delete buttons.
+- **Sync notice**: banner when the media library auto-detects new or retired clips.
+- **Status messages**: reports generation progress ("Done.").
 
 ## Exhibit Deployment (Next Phase)
 
-Planned for local-network kiosk mode:
+Discussed with Dr. Campbell on 2026-07-23: leaning toward an **old loaner laptop from Penn State IT** rather than buying new hardware, running behind the scenes with output on a wall-mounted screen. Open question still to resolve with her: whether gallery staff start longer films manually, or visitors trigger shorter films via a simple button interface.
 
-1. **Hardware**: Mac Mini or Raspberry Pi at the exhibit.
-2. **Network**: Flask runs on the machine; Dr. Campbell accesses via `http://[machine-ip]:5000` from any browser.
-3. **Media**: OneDrive Desktop Sync will sync `media-file/` folder to the exhibit machine's local storage.
-4. **Workflow**: Dr. Campbell clicks "Generate" → film renders in ~30 seconds → plays automatically.
+1. **Hardware**: Penn State IT loaner laptop (per Betsy's suggestion) — David to follow up with Penn State IT.
+2. **Network**: Flask now binds to `0.0.0.0`, so it's already reachable via `http://[machine-ip]:5000` from any device on the same network — no further backend change needed for this.
+3. **Media**: still planned to sync footage via OneDrive to the exhibit machine's local storage; not yet tested end-to-end.
+4. **Workflow**: click "Generate" → film renders (title card + dynamic sequence + end card) → plays automatically.
+5. **Hosting for remote testing**: currently using a temporary Cloudflare quick tunnel for remote demos (e.g., the 2026-07-23 meeting with Dr. Campbell) — not meant to be permanent. Next step is connecting with Penn State IT about a safer, Penn State-managed way to host (e.g., something OneDrive-adjacent) instead of relying on Cloudflare long-term.
 
 ### Still TODO
 
-- [ ] Add diversity mode toggle to web UI (checkbox).
-- [ ] Test web UI with diversity enabled.
-- [ ] Configure OneDrive Desktop Sync on exhibit machine.
-- [ ] Set Flask to auto-start on boot.
-- [ ] Test local network access (`http://[machine-ip]:5000`).
-- [ ] Create quick-start guide for Dr. Campbell (no Terminal, no code).
+- [ ] **Connect with Penn State IT** — both for a loaner exhibit laptop and for guidance on the safest way to host the engine on Penn State infrastructure instead of Cloudflare.
+- [ ] **Get real WWII footage from Dr. Campbell** and load it into `local-media/WWII/assets/` (she committed to sending clips; David to add them to the new folder structure once received — Swiss and any other topics likewise).
+- [ ] **Document how the engine works** — the design decisions and structure, for future reference and potential publications (Dr. Campbell explicitly requested this on 2026-07-23; not yet written up beyond this handoff doc and inline code comments).
+- [ ] **Research live webcam feed integration** — floated as a future enhancement in the 2026-07-23 meeting; no design work started yet.
+- [ ] **Minutes-based duration input** — nice-to-have per Dr. Campbell, not essential; currently seconds-only in the UI.
+- [ ] Configure OneDrive Desktop Sync on the eventual exhibit machine.
+- [ ] Set Flask to auto-start on boot for that machine.
+- [ ] Decide and build the visitor-facing interaction model (staff-started vs. button-triggered).
+- [ ] Create a quick-start guide for Dr. Campbell / gallery staff (no Terminal, no code).
+
+### Key dates
+
+- **Museum exhibition: December 2026** — confirmed success date for the project regardless of festival timing.
+- **Centre County Film Festival**: Dr. Campbell said the August 8 deadline will likely be missed due to scheduling; a later October call may be a fallback submission target.
+- **Internship extension**: David needs to respond to an email about required internship hours; Dr. Campbell confirmed flexibility on hours is fine as long as the project keeps progressing — response pending, possibly CC'ing Dr. Campbell.
 
 ## Latest Verified Test
 
-**Test date**: 2026-07-23  
-**Command**: Web UI generate button (default 90s target)  
+**Test date**: 2026-07-23
+**Setup**: Web UI, Validation topic, real browser end-to-end test after the multi-topic migration
 **Result**: ✅ PASS
 
-- Film generated: `film_test_1.mp4` (97s)
-- Media used: Real clips (Plane drop, Robotic arm, Chicken stir fry, Waves sunset, First skate, Warship, San Francisco zoo, Gallery monkey, Skate boarding, Colorful ballerina).
-- Video player: ✅ Plays in browser
-- Sequence trace: ✅ Full contrast reasoning displayed
-- X-roll: ✅ No standalone selections (only paired with B-roll)
+- Topic selector correctly listed all three collections with live clip counts (Validation: 13, WWII: 0, SWISS: 0).
+- Selecting an empty topic (WWII) correctly disabled Generate with an explanatory message; no crash.
+- Generated a real film from Validation through the actual browser UI — correct collection metadata, title card played correctly at the start, video/audio intact.
+- Confirmed (via a scare mid-session, fully recovered) that the 13 clips' hand-authored metadata — moods, weights, tags — survived the migration intact after a background dev-server race briefly corrupted it; recovered from git history and re-verified.
+
+Earlier baseline test (pre-restructure, still representative of core engine behavior): 90s target film played correctly in-browser with full contrast trace and no X-roll-standalone artifacts.
 
 ## Architecture Overview
 
 ```
 Web UI (browser)
     ↓
-Flask Backend (app.py)
-    ↓
+Flask Backend (app.py)              →  GET /api/collections (list topics)
+    ↓                                  POST /api/generate {collection, target_duration, ...}
 dde_runtime.py (shared generation logic)
     ↓
-Sequencer (generate)  →  loads collection, builds contrast-ranked sequence
+list_collections() / get_collection()  →  resolves paths for the selected topic
     ↓
-Assembler (render)    →  pairs B+X, normalizes media, renders MP4
+sync_media_library()   →  reconciles that topic's assets/ folder against its metadata index
     ↓
-FFmpeg                →  H.264 video, AAC stereo, 1280x720, 30fps
+Sequencer (generate)   →  loads collection, builds contrast-ranked sequence
     ↓
-local-media/films/    →  film_test_1.mp4, film_test_2.mp4, etc.
+Assembler (render)     →  pairs B+X, normalizes media, renders MP4
+    ↓
+_trim_film_to_duration()    →  (if exact_duration) trims to target minus card time
+    ↓
+_wrap_with_title_cards()    →  prepends/appends fixed intro + outro cards
+    ↓
+FFmpeg                 →  H.264 video, AAC stereo, 1280x720, 30fps
+    ↓
+local-media/<Topic>/artifacts/   →  film_test_1.mp4, film_test_2.mp4, etc.
 ```
 
 ## Important Files
 
-- **Backend**: `web/backend/app.py` — Flask API
-- **Frontend**: `web/frontend/index.html`, `app.js`, `style.css`
-- **Engine**: `engine/sequencer.py`, `engine/artifact_selector.py`, `engine/rules.py`, `engine/assembler.py`
-- **Metadata**: `metadata/validation/validation_collection_index.json`, `metadata/validation/val_*.json`
-- **Media**: `local-media/assets/a-roll/`, `local-media/assets/b-roll/`, `local-media/assets/x-roll/`
-- **Output**: `local-media/films/` (generated MP4s and manifests)
+- **Backend**: `web/backend/app.py` — Flask API, multi-collection aware
+- **Frontend**: `web/frontend/index.html`, `app.js`, `style.css`, `psu-logo.svg`
+- **Shared runtime**: `scripts/dde_runtime.py` — collection registry, sync, trim, title cards, `generate_and_render()`
+- **Engine**: `engine/sequencer.py`, `engine/artifact_selector.py`, `engine/rules.py`, `engine/assembler.py` (all collection-path-agnostic — no changes needed for multi-topic support)
+- **Metadata**: `metadata/collections/<topic>_collection_index.json` (one per topic; auto-created for new ones)
+- **Media**: `local-media/<Topic>/assets/{a-roll,b-roll,x-roll}/`
+- **Output**: `local-media/<Topic>/artifacts/` (generated MP4s and manifests, per topic)
 
 ## Key Design Decisions
 
 1. **No emotional continuity**: Juxtaposition and contrast drive all sequencing decisions. Mood and pacing metadata are scored dimensions, not enforcement rules.
-2. **Diversity mode is optional**: Normal mode keeps a tight top-3 contrast pool (strongest cuts). Diversity mode widens the pool and boosts underused clips for broader collection exploration.
+2. **Diversity mode is optional**: Normal mode keeps a tight top-contrast pool (strongest cuts). Diversity mode widens the pool and boosts underused clips for broader collection exploration.
 3. **X-roll paired, never standalone**: Audio-only clips are always paired with B-roll video; they cannot be selected independently.
-4. **Sequential naming for exhibits**: Films are named `film_test_1.mp4`, `film_test_2.mp4`, etc., for easy reference in a kiosk setting.
-5. **Local-network architecture**: No cloud dependencies; media stays on the exhibit machine or OneDrive-synced local storage.
+4. **Whole clips only by default**: The engine never cuts into real footage unless "exact duration" is explicitly enabled — undershooting the target is preferred over trimming a clip.
+5. **Fixed cards frame the film, don't compete with it**: The intro/outro cards are a wrapper around the dynamic sequence, not part of the contrast-scored body — they're identical every time on purpose, contrasting with the "different every time" sequence in between.
+6. **Topics are self-contained and auto-discovered**: No central registry file to hand-maintain — a topic is just a correctly-shaped folder. This mirrors the existing "drop a file in, the engine adapts" philosophy already established for individual clips.
+7. **Local-network architecture**: No cloud dependencies at runtime; media stays on the exhibit machine or OneDrive-synced local storage. (Remote *testing* currently uses a temporary Cloudflare tunnel — not part of the permanent architecture.)
 
 ## Conversation & Talking Points
 
 **For Dr. Campbell (non-technical)**:
 
-> "The engine generates a different film every time you click 'Generate'. It picks clips from your media collection and arranges them so consecutive clips contrast as much as possible — different moods, different locations, different subjects. It's designed to surprise and engage viewers, not comfort them. You can click as many times as you want; each film is unique."
+> "The engine generates a different film every time you click 'Generate.' It picks clips from your media collection and arranges them so consecutive clips contrast as much as possible — different moods, different locations, different subjects. It's designed to surprise and engage viewers, not comfort them. Every film opens and closes on the same title and credit cards, but everything in between is unique each time. You can click as many times as you want."
 
 **For academic/technical audiences**:
 
@@ -163,20 +204,24 @@ local-media/films/    →  film_test_1.mp4, film_test_2.mp4, etc.
 - What happens if the same clips appear in multiple generated films? (Diversity mode prevents oversaturation; usage counts persist across runs.)
 - Why B-roll + X-roll pairing? (B-roll is visual-only; X-roll provides layered audio without adding screen time.)
 - How does it ensure variety in a small collection? (Dissimilarity scoring + diversity mode + weighted randomness within contrast pool.)
+- How does it scale to multiple documentary topics? (Each topic is an independently-scored, independently-stored collection — no cross-topic mixing, but zero code changes needed to add one.)
 
 ## Next Steps
 
-1. Finish web UI (add diversity toggle).
-2. Test exhibit setup (local network access on Mac Mini).
-3. Integrate OneDrive (media management from the cloud folder).
-4. Deploy and validate with Dr. Campbell.
-5. Document for unattended operation.
+1. **Get WWII (and other) footage from Dr. Campbell** and load it into the new per-topic folders.
+2. **Follow up with Penn State IT** — a loaner exhibit laptop, and safer hosting than the current Cloudflare tunnel.
+3. **Write up how the engine works** for Dr. Campbell's documentation/publication request.
+4. **Decide the exhibit interaction model** (staff-started vs. visitor button) and build it.
+5. **Test the exhibit setup** on real hardware once IT provides it — local network access, OneDrive sync, auto-start on boot.
+6. Lower priority / nice-to-have: minutes-based duration input, live webcam feed research.
 
 ## Recommended Test Flow
 
-1. Generate 5–10 films via web UI.
-2. Review sequence traces for contrast reasoning.
-3. Check that no clip repeats (or follows expected repeat rules).
-4. Verify audio sync and video quality.
-5. Test diversity mode (if implemented) for visible clip variety.
-6. Simulate exhibit kiosk mode (browser fullscreen, single button to generate).
+1. Pick a topic in the web UI (start with Validation, since it has real footage).
+2. Generate 5–10 films.
+3. Review sequence traces for contrast reasoning.
+4. Check that no clip repeats within a film.
+5. Verify audio sync and video quality, including the fixed intro/outro cards.
+6. Test diversity mode and exact duration together for a few runs.
+7. Switch to an empty topic (WWII/SWISS) and confirm Generate is correctly blocked with a clear message.
+8. Once real WWII/Swiss footage lands, repeat this whole flow for those topics.
