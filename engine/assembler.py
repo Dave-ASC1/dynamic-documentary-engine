@@ -62,6 +62,7 @@ Version: 1.0.0
 import json
 import logging
 import os
+import random
 import subprocess
 import tempfile
 from typing import Optional
@@ -314,6 +315,13 @@ class Assembler:
         the audio if shorter than the video and truncating at the B-roll's
         duration.
 
+        When the X-roll's own duration is longer than the B-roll clip it's
+        paired with, only a slice of it will ever be heard. To avoid always
+        playing the same opening slice of a long audio file, a random start
+        offset within the X-roll is picked each render (see
+        _pick_xroll_start_offset), so different pairings surface different
+        parts of the same file.
+
         B-roll is never rendered without audio — this is a core structural
         rule of the engine. If the X-roll source cannot be resolved, this
         method raises rather than producing a silent video segment.
@@ -339,12 +347,49 @@ class Assembler:
 
         duration = broll.get("duration_seconds")
 
+        xroll_start_offset = self._pick_xroll_start_offset(
+            xroll, duration, xroll_is_stream
+        )
+
         cmd = self._build_broll_xroll_command(
             broll_source, xroll_source, output_path,
             duration, broll_is_stream, xroll_is_stream,
+            xroll_start_offset,
         )
         self._run_ffmpeg(cmd, label=f"B-roll {broll_id} + X-roll {xroll_id}")
         return True
+
+    def _pick_xroll_start_offset(
+        self,
+        xroll: dict,
+        broll_duration: Optional[float],
+        xroll_is_stream: bool,
+    ) -> float:
+        """
+        Picks a random start offset into an X-roll's audio.
+
+        If the X-roll's own duration is longer than the B-roll clip it's
+        being paired with, a fully random offset in
+        [0, xroll_duration - broll_duration] is chosen so the audio doesn't
+        always start from 0:00. Live audio streams are never seekable, so
+        they always get an offset of 0.
+
+        Args:
+            xroll (dict):           The X-roll artifact summary dictionary.
+            broll_duration (float): The paired B-roll's duration in seconds.
+            xroll_is_stream (bool): True if the X-roll source is a live stream.
+
+        Returns:
+            float: A random start offset in seconds (0 if not applicable).
+        """
+        if xroll_is_stream or not broll_duration:
+            return 0.0
+
+        xroll_duration = xroll.get("duration_seconds")
+        if not xroll_duration or xroll_duration <= broll_duration:
+            return 0.0
+
+        return random.uniform(0.0, xroll_duration - broll_duration)
 
     # ------------------------------------------------------------------
     # Artifact Lookup and Source Resolution
@@ -534,6 +579,7 @@ class Assembler:
         duration: Optional[float],
         video_is_stream: bool,
         audio_is_stream: bool,
+        audio_start_offset: float = 0.0,
     ) -> list:
         """
         Builds the FFmpeg command to layer X-roll audio over B-roll video.
@@ -542,19 +588,26 @@ class Assembler:
         command takes both as inputs and combines them:
             - Video track: taken from input 0 (B-roll), via -map 0:v
             - Audio track: taken from input 1 (X-roll), via -map 1:a
-            - -stream_loop -1: loops the X-roll audio indefinitely so it
-              always covers the full B-roll duration regardless of length.
+            - -ss (before the audio -i): seeks into the X-roll to a random
+              start offset, so a long audio file doesn't always play from
+              0:00 — see _pick_xroll_start_offset.
+            - -stream_loop -1: loops the X-roll audio (from the seeked
+              offset) indefinitely so it always covers the full B-roll
+              duration regardless of length.
             - -shortest: stops encoding at whichever input ends first —
               in practice this is always the B-roll video, ensuring the
               output duration exactly matches the B-roll clip length.
 
         Args:
-            video_source:     FFmpeg input string for the B-roll video.
-            audio_source:     FFmpeg input string for the X-roll audio.
-            output_path:      Path for the rendered output segment file.
-            duration:         Duration in seconds (applied to B-roll length).
-            video_is_stream:  True if video source is a live stream.
-            audio_is_stream:  True if audio source is a live stream.
+            video_source:        FFmpeg input string for the B-roll video.
+            audio_source:        FFmpeg input string for the X-roll audio.
+            output_path:         Path for the rendered output segment file.
+            duration:            Duration in seconds (applied to B-roll length).
+            video_is_stream:     True if video source is a live stream.
+            audio_is_stream:     True if audio source is a live stream.
+            audio_start_offset:  Seconds to seek into the X-roll audio before
+                                  looping/trimming. 0 for streams or when the
+                                  X-roll isn't longer than the B-roll clip.
 
         Returns:
             list: FFmpeg command as a list of argument strings.
@@ -567,9 +620,12 @@ class Assembler:
             cmd += ["-t", str(capture)]
         cmd += ["-i", video_source]
 
-        # X-roll audio input — loop indefinitely so it always covers the video
+        # X-roll audio input — seek to a random offset, then loop indefinitely
+        # so it always covers the video
         if audio_is_stream:
             cmd += ["-t", str(duration if duration else self.DEFAULT_STREAM_CAPTURE_SECONDS)]
+        elif audio_start_offset:
+            cmd += ["-ss", str(audio_start_offset)]
         cmd += ["-stream_loop", "-1", "-i", audio_source]
 
         # Trim to B-roll duration for local video (stream already limited above)
