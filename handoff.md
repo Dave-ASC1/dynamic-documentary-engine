@@ -208,6 +208,31 @@ Files: `web/frontend/exhibit.html`, `exhibit.css`, `exhibit.js`. Progress
 reporting runs through the existing job_id, with a new
 `GET /api/generate/progress`.
 
+**6. Setup guide and double-click launchers** — for handing the engine to
+Dr. Campbell to run on her own machine.
+
+`SETUP-GUIDE.md` at the repo root is written for someone who has never run
+code: install Python and FFmpeg once (Mac and Windows both covered), put the
+project somewhere, add the clips, then double-click to start. The README
+links to it near the top.
+
+`Start Engine (Mac).command` and `Start Engine (Windows).bat` check that
+Python, FFmpeg and the Python packages are present, explain in plain
+language what to install if any are missing, start the server, and open the
+browser. Nothing is ever typed into the window they open.
+
+Supporting changes in `app.py`: it now picks the next free port if the
+default is taken (rather than dying with "Address already in use" in front
+of someone who can't diagnose it), opens the browser itself, and runs with
+debug off unless `DDE_DEBUG=1`.
+
+**The footage still has to travel separately.** `.gitignore` excludes
+`*.mp4`, `*.mov`, `*.wav` and `*.mp3`, so a clone or a zip of the repo
+arrives with empty asset folders — the engine starts fine and reports that
+every topic has no footage. Step 4 of the setup guide covers where the clips
+go, but getting them onto her machine (OneDrive, a USB drive, copied on the
+day) is a separate act.
+
 Also: the web server's default port moved from 5000 to **5001**, because
 macOS runs AirPlay Receiver on 5000 and silently takes the port. Set the
 `PORT` environment variable to override.
@@ -320,7 +345,7 @@ Discussed with Dr. Campbell on 2026-07-23: leaning toward an **old loaner laptop
 - [ ] Configure OneDrive Desktop Sync on the eventual exhibit machine.
 - [ ] Set Flask to auto-start on boot for that machine.
 - [ ] Decide and build the visitor-facing interaction model (staff-started vs. button-triggered).
-- [ ] Create a quick-start guide for Dr. Campbell / gallery staff (no Terminal, no code).
+- [x] Create a quick-start guide for Dr. Campbell / gallery staff (no Terminal, no code) — `SETUP-GUIDE.md`, plus double-click launchers for Mac and Windows.
 
 ### Key dates
 

@@ -12,6 +12,14 @@ An AI-powered generative documentary engine that dynamically assembles films fro
 
 ---
 
+### ▶ Running this on your own computer?
+
+**Start here: [SETUP-GUIDE.md](SETUP-GUIDE.md)** — a step-by-step guide that
+assumes no coding experience. Install two free programs once, then start the
+engine by double-clicking a file.
+
+---
+
 ## Overview
 
 Inspired by the *Eno* documentary (2024) and its Brain One engine built by Brendan Dawes, this engine uses AI as a director by pulling from a curated collection of modular media artifacts and dynamically assembling them into a unique film on every run. No human curation happens at runtime. The engine decides.

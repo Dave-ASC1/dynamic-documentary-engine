@@ -44,8 +44,10 @@ Version: 1.2.0
 
 import json
 import os
+import socket
 import sys
 import threading
+import webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -328,12 +330,32 @@ def list_films():
     return jsonify(items)
 
 
+def _find_free_port(preferred):
+    """Returns the first free port at or above `preferred`.
+
+    The engine is started by double-clicking a launcher, by someone who
+    has no way to diagnose "Address already in use" — most often caused by
+    a copy of the engine still running in another window. Stepping to the
+    next free port keeps that from being a dead end.
+
+    5001 rather than 5000 to begin with: macOS runs AirPlay Receiver on
+    5000, which silently takes the port on any modern Mac.
+    """
+    for candidate in range(preferred, preferred + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                probe.bind(("0.0.0.0", candidate))
+                return candidate
+            except OSError:
+                continue
+    return preferred
+
+
 if __name__ == "__main__":
-    # 5001, not 5000: macOS ships AirPlay Receiver listening on 5000, so
-    # the old default silently lost the port on any modern Mac (including
-    # the exhibit/PSU laptops this has to run on turnkey). Override with
-    # the PORT env var if 5001 is taken too.
-    port = int(os.environ.get("PORT", 5001))
+    requested = int(os.environ.get("PORT", 5001))
+    port = _find_free_port(requested)
+
     for c in dde_runtime.list_collections():
         os.makedirs(c["films_path"], exist_ok=True)
         os.makedirs(c["assets_path"], exist_ok=True)
@@ -342,4 +364,22 @@ if __name__ == "__main__":
         dde_runtime.ensure_titles_folders(c["titles_path"])
         print(f" * Collection '{c['id']}' ({c['name']}) — "
               f"{c['artifact_counts'].get('total', 0)} artifacts")
-    app.run(host="0.0.0.0", debug=True, port=port)
+
+    url = f"http://127.0.0.1:{port}"
+    print("\n" + "=" * 58)
+    print("  The Dynamic Documentary Engine is running.")
+    print(f"  Open this in your browser:  {url}")
+    print("  To stop it, close this window.")
+    print("=" * 58 + "\n")
+
+    # Debug mode is off unless asked for. It restarts the server whenever a
+    # file changes, which is useful while developing and confusing on a
+    # machine that is only ever running the engine.
+    debug = os.environ.get("DDE_DEBUG") == "1"
+
+    # Open the browser for whoever launched it. Skipped in debug mode,
+    # where the reloader would otherwise open a second window on restart.
+    if not debug and os.environ.get("DDE_NO_BROWSER") != "1":
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+
+    app.run(host="0.0.0.0", debug=debug, port=port)
