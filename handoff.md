@@ -115,6 +115,32 @@ it; it was present the whole time and is now gone in all cases.
 Side effect: assembly now re-encodes rather than copies, so rendering is
 somewhat slower. A 45-second film takes about 12 seconds to render.
 
+### Can it make a feature-length film?
+
+Two separate limits, worth knowing before promising a long piece.
+
+**1. Footage is the hard ceiling.** The no-repeat rule means each clip is
+used at most once per film, so a film can never be longer than the
+collection's total A-roll + B-roll footage (X-roll doesn't add screen time,
+it sits under B-roll). The Validation set has 105 seconds of visible
+footage, so asking for 90 minutes returns a 1.8-minute film — it isn't an
+error, it just runs out of material and stops. **A 90-minute film needs 90
+minutes of footage.** If a long piece is ever wanted from a small amount of
+material, clips would have to be allowed to repeat, which is a deliberate
+design decision for Dr. Campbell rather than a code change.
+
+**2. Assembly is batched so length isn't a code limit.** The concat filter
+opens every segment at once and starts failing past roughly 200 inputs, and
+a feature-length film is several hundred clips. Segments are therefore
+joined in batches of 100 and the batches joined in turn. Verified at 900
+segments. Films of a normal length take the single-pass route and are
+unchanged.
+
+**Render time** scales with film length, at roughly 0.3x — measured 10.5s
+for a 40s film, 15.2s for 54s, 31.2s for 94s. So a feature-length film is
+on the order of half an hour of rendering, and long ones are re-encoded once
+more than short ones because of the batching.
+
 **2. Cancel button** — the web UI can now stop a render in progress. Because
 generation time is almost entirely FFmpeg, cancelling also kills the FFmpeg
 process actually running, so it stops within a second or two instead of

@@ -278,10 +278,7 @@ class Assembler:
                 )
 
             # Concatenate all segments into the final film
-            self._run_ffmpeg(
-                self._build_concat_command(segment_paths, film_path),
-                label="final concat",
-            )
+            self._concat_segments(segment_paths, film_path, tmpdir)
 
         # tmpdir and all segments are automatically cleaned up here
         logger.info("Film rendered successfully → %s", film_path)
@@ -823,6 +820,68 @@ class Assembler:
                 current = out
 
         return ";".join(parts)
+
+    # Segments joined per FFmpeg call. The concat filter opens every input
+    # at once and binds them into one graph, which starts failing somewhere
+    # past 200 inputs ("Error binding filtergraph inputs/outputs"). A
+    # feature-length film is far more clips than that, so long films are
+    # joined in batches and the batches joined together. 100 leaves
+    # comfortable headroom below the observed limit.
+    CONCAT_BATCH_SIZE = 100
+
+    def _concat_segments(
+        self, segment_paths: list, output_path: str, tmpdir: str, _depth: int = 0
+    ) -> None:
+        """
+        Joins rendered segments into a single file, batching if there are
+        too many for one FFmpeg filter graph.
+
+        Up to CONCAT_BATCH_SIZE segments are joined in one call. Beyond
+        that, segments are joined in batches to intermediate files and
+        those are joined in turn, recursing until one file remains. Every
+        join uses the concat filter, so no batch boundary reintroduces the
+        audio bleed that _build_concat_command exists to avoid.
+
+        A film long enough to need batching is re-encoded once more than a
+        short one, which costs some time and a generation of quality. Films
+        of a normal length take the single-pass path and are unaffected.
+
+        Args:
+            segment_paths: Ordered list of segment file paths.
+            output_path:   Path for the joined output.
+            tmpdir:        Directory for intermediate batch files.
+            _depth:        Recursion depth, used to name intermediates.
+        """
+        if len(segment_paths) <= self.CONCAT_BATCH_SIZE:
+            self._run_ffmpeg(
+                self._build_concat_command(segment_paths, output_path),
+                label=f"concat {len(segment_paths)} segments",
+            )
+            return
+
+        batches = [
+            segment_paths[i:i + self.CONCAT_BATCH_SIZE]
+            for i in range(0, len(segment_paths), self.CONCAT_BATCH_SIZE)
+        ]
+        logger.info(
+            "Joining %d segments in %d batches (depth %d)",
+            len(segment_paths), len(batches), _depth,
+        )
+
+        batch_outputs = []
+        for i, batch in enumerate(batches):
+            if self.cancel_token is not None:
+                self.cancel_token.raise_if_cancelled()
+            batch_path = os.path.join(
+                tmpdir, f"batch_{_depth}_{i:04d}.{self.output_format}"
+            )
+            self._run_ffmpeg(
+                self._build_concat_command(batch, batch_path),
+                label=f"batch {i + 1}/{len(batches)}",
+            )
+            batch_outputs.append(batch_path)
+
+        self._concat_segments(batch_outputs, output_path, tmpdir, _depth + 1)
 
     def _build_concat_command(self, segment_paths: list, output_path: str) -> list:
         """
