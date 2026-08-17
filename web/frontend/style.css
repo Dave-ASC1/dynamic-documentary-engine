@@ -328,7 +328,11 @@ h2 {
   white-space: nowrap;
 }
 
-.field-input:has(select) {
+/* Widened for the film-topic dropdown, whose collection names are long.
+   The unit selector next to the target length is excluded — it's a couple
+   of words, and stretching that field to 340px left most of the box empty
+   to the right of the number. */
+.field-input:has(select:not(.unit-select)) {
   width: 100%;
   max-width: 340px;
   box-sizing: border-box;
