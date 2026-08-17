@@ -27,7 +27,8 @@ Current generation behavior:
 
 ## What Changed (2026-08-17)
 
-Three items from the 2026-08-17 meeting with Dr. Campbell.
+Three items from the 2026-08-17 meeting with Dr. Campbell, plus an audio
+bleed found and fixed afterwards.
 
 **1. Why audio and video sometimes cut together and sometimes don't (investigation — no fix applied)**
 
@@ -65,6 +66,38 @@ Left as-is per Dr. Campbell's "understand it, don't need to fix it". If a
 fix is wanted later, the options are: only pair X-rolls at least as long as
 the B-roll, fade the audio out instead of looping, or accept the loop and
 crossfade the restart.
+
+**1b. Audio bleeding across cuts — separate cause, and this one IS fixed**
+
+A second, unrelated defect, found after David reported hearing sound bleed
+across cuts. This one was not about clip lengths at all.
+
+The final film was assembled with FFmpeg's concat *demuxer* using `-c copy`,
+which splices the already-encoded segments at the container level without
+re-encoding. An AAC audio frame is 1024 samples, so each segment's final
+frame is padded and each carries its own priming samples. Stream-copying
+leaves all of that in place at every join, so roughly **the last 50ms of each
+clip's audio kept playing at full volume over the start of the next clip**.
+
+Measured on a test where a tone clip is followed by a digitally silent one:
+the silent clip's first 20ms came back at **-24 dBFS** — the tone's full
+level — instead of silence.
+
+Fixed by assembling with the concat *filter* instead, which decodes every
+segment and re-encodes one continuous stream so timestamps stay monotonic
+across each join. Same measurement after the fix: **-71 dBFS**, i.e.
+inaudible. This is the identical approach the title-card wrap already used,
+and for the same reason — the main assembly had just never been switched
+over.
+
+Worth being precise about one thing: this bleed happened on **every** film,
+with the "exact duration" toggle on or off. Re-encoding during the trim does
+*not* clean it up — once the bleed is spliced into the audio, re-encoding
+faithfully reproduces it (verified). So the toggle was never what controlled
+it; it was present the whole time and is now gone in all cases.
+
+Side effect: assembly now re-encodes rather than copies, so rendering is
+somewhat slower. A 45-second film takes about 12 seconds to render.
 
 **2. Cancel button** — the web UI can now stop a render in progress. Because
 generation time is almost entirely FFmpeg, cancelling also kills the FFmpeg

@@ -277,10 +277,8 @@ class Assembler:
                 )
 
             # Concatenate all segments into the final film
-            concat_list_path = os.path.join(tmpdir, "concat_list.txt")
-            self._write_concat_list(segment_paths, concat_list_path)
             self._run_ffmpeg(
-                self._build_concat_command(concat_list_path, film_path),
+                self._build_concat_command(segment_paths, film_path),
                 label="final concat",
             )
 
@@ -315,9 +313,32 @@ class Assembler:
         source, is_stream = self._resolve_source(artifact)
         duration = artifact.get("duration_seconds")
 
-        cmd = self._build_aroll_command(source, output_path, duration, is_stream)
+        # Every segment must carry an audio stream for the concat filter's
+        # graph to be valid. An A-roll whose file happens to have no audio
+        # gets a silent one rather than being left without.
+        has_audio = is_stream or self._has_audio_stream(source)
+
+        cmd = self._build_aroll_command(
+            source, output_path, duration, is_stream, has_audio
+        )
         self._run_ffmpeg(cmd, label=f"A-roll {artifact_id}")
         return True
+
+    def _has_audio_stream(self, source: str) -> bool:
+        """True if the media file carries at least one audio stream."""
+        try:
+            probe = run_subprocess(
+                ["ffprobe", "-v", "error", "-select_streams", "a",
+                 "-show_entries", "stream=index", "-of", "csv=p=0", source],
+                self.cancel_token, capture_output=True, text=True, timeout=30,
+            )
+        except GenerationCancelled:
+            raise
+        except (subprocess.SubprocessError, OSError):
+            # Can't tell — assume none and let the silent track be added,
+            # which is safe either way.
+            return False
+        return bool(probe.stdout.strip())
 
     def _render_broll_xroll_slot(
         self,
@@ -540,6 +561,7 @@ class Assembler:
         output_path: str,
         duration: Optional[float],
         is_stream: bool,
+        has_audio: bool = True,
     ) -> list:
         """
         Builds the FFmpeg command to render an A-roll clip to a segment file.
@@ -568,15 +590,27 @@ class Assembler:
 
         cmd += ["-i", source]
 
+        # Silent bed for a clip that carries no audio of its own, so the
+        # segment still has an audio stream to concat against.
+        if not has_audio:
+            cmd += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
+
         # For local files, -t after -i trims the clip to the specified duration
         if duration and not is_stream:
             cmd += ["-t", str(duration)]
 
         cmd += [
             "-map", "0:v:0",
-            "-map", "0:a:0?",
+            "-map", ("0:a:0" if has_audio else "1:a:0"),
             "-vf", self._build_normalize_video_filter(),
             "-r", str(self.output_fps),
+        ]
+
+        # anullsrc never ends on its own — stop with the video.
+        if not has_audio:
+            cmd += ["-shortest"]
+
+        cmd += [
             "-vcodec", self.video_codec,
             "-preset", self.video_preset,
             "-acodec", self.audio_codec,
@@ -668,33 +702,58 @@ class Assembler:
 
         return cmd
 
-    def _build_concat_command(
-        self, concat_list_path: str, output_path: str
-    ) -> list:
+    def _build_concat_command(self, segment_paths: list, output_path: str) -> list:
         """
-        Builds the FFmpeg command to concatenate all segment files into the
-        final film using the concat demuxer.
+        Builds the FFmpeg command that joins the rendered segments into the
+        final film, using the concat *filter*.
 
-        The concat demuxer (-f concat) joins segment files in the order listed
-        in the concat list file. Re-encoding is applied to ensure consistent
-        codec output across all segments regardless of source variation.
+        Not the concat demuxer with -c copy, which is what this used to do.
+        Stream-copying AAC segments splices them at the container level, and
+        because an AAC frame is 1024 samples the encoder pads each segment's
+        final frame and carries its own priming samples. Copying leaves that
+        padding in place at every join, so roughly the last 50ms of each
+        clip's audio keeps playing at full volume over the start of the next
+        clip — audible as sound bleeding across a cut. Measured at -24 dBFS
+        of carry-over with the demuxer versus -71 dBFS (inaudible) here.
+
+        The filter graph decodes every segment and re-encodes one continuous
+        stream instead, so timestamps stay monotonic across each join and
+        nothing survives past its own clip. This is the same approach
+        _wrap_with_title_cards already uses for exactly this reason.
+
+        The cost is re-encoding the assembled film rather than copying it.
+        Every segment must carry both a video and an audio stream for the
+        graph to be valid, which _render_aroll_slot guarantees.
 
         Args:
-            concat_list_path: Path to the FFmpeg concat list text file.
-            output_path:      Path for the final film output file.
+            segment_paths: Ordered list of paths to the rendered segments.
+            output_path:   Path for the final film output file.
 
         Returns:
             list: FFmpeg command as a list of argument strings.
         """
-        return [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",       # Allow absolute paths in the concat list
-            "-i", concat_list_path,
-            "-c", "copy",
+        cmd = ["ffmpeg", "-y"]
+        for path in segment_paths:
+            cmd += ["-i", os.path.abspath(path)]
+
+        # [0:v][0:a][1:v][1:a]...concat=n=<count>:v=1:a=1[outv][outa]
+        streams = "".join(f"[{i}:v][{i}:a]" for i in range(len(segment_paths)))
+        cmd += [
+            "-filter_complex",
+            f"{streams}concat=n={len(segment_paths)}:v=1:a=1[outv][outa]",
+            "-map", "[outv]",
+            "-map", "[outa]",
+            "-c:v", self.video_codec,
+            "-preset", self.video_preset,
+            "-c:a", self.audio_codec,
+            "-ar", "48000",
+            "-ac", "2",
+            "-pix_fmt", self.pix_fmt,
+            "-r", str(self.output_fps),
             "-movflags", "+faststart",
             output_path,
         ]
+        return cmd
 
     def _build_normalize_video_filter(self) -> str:
         """
@@ -719,31 +778,6 @@ class Assembler:
     # ------------------------------------------------------------------
     # Concat List Writer
     # ------------------------------------------------------------------
-
-    def _write_concat_list(self, segment_paths: list, output_path: str) -> None:
-        """
-        Writes an FFmpeg concat demuxer list file from a list of segment paths.
-
-        Format:
-            file '/absolute/path/to/segment_0000.mp4'
-            file '/absolute/path/to/segment_0001.mp4'
-            ...
-
-        Absolute paths are used so the concat command works regardless of
-        the working directory at render time.
-
-        Args:
-            segment_paths: Ordered list of absolute paths to segment files.
-            output_path:   Path to write the concat list file.
-        """
-        with open(output_path, "w") as f:
-            for path in segment_paths:
-                f.write(f"file '{os.path.abspath(path)}'\n")
-
-        logger.debug(
-            "Wrote concat list with %d segments → %s",
-            len(segment_paths), output_path,
-        )
 
     # ------------------------------------------------------------------
     # FFmpeg Runner
