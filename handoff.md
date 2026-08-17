@@ -1,6 +1,6 @@
 # Handoff — Dynamic Documentary Engine
 
-Last updated: 2026-07-23
+Last updated: 2026-08-17
 
 ## Current Summary
 
@@ -24,6 +24,66 @@ Current generation behavior:
 - Selection criterion: maximum dissimilarity (contrast) from the previous visual artifact.
 - Diversity mode: boosts underused clips via cross-run usage tracking to prevent oversaturation of high-contrast favorites.
 - **Fixed opening title card and closing credits card** wrap every film (see below) — separate from the randomized B+X bookends above, which is *within* the dynamic sequence, not the fixed cards around it.
+
+## What Changed (2026-08-17)
+
+Three items from the 2026-08-17 meeting with Dr. Campbell.
+
+**1. Why audio and video sometimes cut together and sometimes don't (investigation — no fix applied)**
+
+Dr. Campbell noticed the sound sometimes changes at the same moment the
+picture does, and sometimes seems to change on its own. The controlling
+factor is **the X-roll's length versus the B-roll it's paired with** —
+nothing to do with the toggles, which only change it indirectly.
+
+In a B+X slot the video comes from the B-roll and the audio from the
+X-roll, and FFmpeg is told to loop the audio (`-stream_loop -1`) and cut at
+the video's end (`-shortest`). So:
+
+- **X-roll longer than the B-roll** → one unbroken slice of audio runs under
+  the clip and ends with it. Sound and picture change **together**.
+- **X-roll shorter than the B-roll** → the audio runs out mid-clip and
+  restarts from the beginning while the picture keeps going. That restart
+  is heard as the sound "changing" on its own, with no cut on screen.
+
+Confirmed by rendering `war_bong.wav` (6.6s) under `warship_cruising.mp4`
+(10.09s) and hashing the result: the audio at 6.616s is byte-for-byte
+identical to the audio at 0s — it is provably the same audio starting over.
+
+In the current Validation set this affects `war_bong.wav` (6.6s) under
+almost every B-roll, and `piano_sound.wav` (10.105s) under
+`drawn_animation.MOV` (10.548s). The two long MP3s (194s and 141s) never
+loop, which is why clips using them always look in sync.
+
+Why it seemed tied to the "exact duration" toggle: that toggle changes how
+the sequence is composed (the closing clip's runtime is only reserved from
+the budget when it's off) and trims the tail when it's on. Either shifts
+which clips land where, changing the odds of hitting a short-X-roll/long-
+B-roll pairing — but it isn't the cause.
+
+Left as-is per Dr. Campbell's "understand it, don't need to fix it". If a
+fix is wanted later, the options are: only pair X-rolls at least as long as
+the B-roll, fade the audio out instead of looping, or accept the loop and
+crossfade the restart.
+
+**2. Cancel button** — the web UI can now stop a render in progress. Because
+generation time is almost entirely FFmpeg, cancelling also kills the FFmpeg
+process actually running, so it stops within a second or two instead of
+after the current clip finishes. A cancelled run reports "Generation
+cancelled", not an error.
+
+**3. Per-genre opening/closing pieces** — these are no longer hard-coded.
+Every topic folder now has `titles/opening/` and `titles/closing/`. Drop a
+video into either and it becomes that topic's opening or closing piece, at
+whatever length it is (a WWII opener can run minutes; a Swiss one can be
+seconds). Leave a folder empty and the standard generated text card is used
+instead. Files of any resolution, frame rate, or codec are accepted, with or
+without their own audio — the engine letterboxes and re-times them to match
+the film. Each folder has a README.txt explaining this in plain language.
+
+Also: the web server's default port moved from 5000 to **5001**, because
+macOS runs AirPlay Receiver on 5000 and silently takes the port. Set the
+`PORT` environment variable to override.
 
 ## What Changed (2026-07-23)
 
@@ -64,14 +124,23 @@ local-media/
 │   │   ├── a-roll/   (5 files: First_skate, chick_stir_fry, gallery_monkey, robotic_arm, skate_boarding)
 │   │   ├── b-roll/   (4 files: colorful_ballerina, plane_drop, warship_cruising, waves_sunset)
 │   │   └── x-roll/   (4 files: birds_call, piano_sound, war_bong, water_stream)
+│   ├── titles/
+│   │   ├── opening/  (drop a video here → this topic's opening piece)
+│   │   └── closing/  (drop a video here → this topic's closing piece)
 │   └── artifacts/    (rendered films + manifests + usage_stats.json)
 ├── WWII/                                (empty — waiting on Betsy's footage)
 │   ├── assets/{a-roll,b-roll,x-roll}/
+│   ├── titles/{opening,closing}/
 │   └── artifacts/
 └── SWISS/                               (empty — waiting on footage)
     ├── assets/{a-roll,b-roll,x-roll}/
+    ├── titles/{opening,closing}/
     └── artifacts/
 ```
+
+**To give a topic its own opening/closing:** put one video file in
+`local-media/<Topic>/titles/opening/` (and/or `closing/`). Any length,
+any format. An empty folder falls back to the standard generated text card.
 
 Each topic has its own metadata index at `metadata/collections/<topic>_collection_index.json` (auto-created for new topics). **To add a topic**: create `local-media/<Name>/assets/{a-roll,b-roll,x-roll}/` and `local-media/<Name>/artifacts/` — the engine and web UI pick it up automatically, no code or settings needed. **To add footage to an existing topic**: drop files into the right `assets/<roll-type>/` subfolder — auto-detected on next generate.
 
@@ -82,7 +151,7 @@ Web UI (local testing):
 ```bash
 cd "/Users/kingdavid/documentary engine/dynamic-documentary-engine"
 python3 web/backend/app.py
-# Open http://127.0.0.1:5000 in browser (or http://<machine-ip>:5000 from another device on the same network)
+# Open http://127.0.0.1:5001 in browser (or http://<machine-ip>:5001 from another device on the same network)
 ```
 
 CLI, against a specific topic's footage (bypasses the web UI's topic selector):
@@ -110,7 +179,7 @@ python3 scripts/run_first_film.py --target 60 --runs 0 --diversity \
 Discussed with Dr. Campbell on 2026-07-23: leaning toward an **old loaner laptop from Penn State IT** rather than buying new hardware, running behind the scenes with output on a wall-mounted screen. Open question still to resolve with her: whether gallery staff start longer films manually, or visitors trigger shorter films via a simple button interface.
 
 1. **Hardware**: Penn State IT loaner laptop (per Betsy's suggestion) — David to follow up with Penn State IT.
-2. **Network**: Flask now binds to `0.0.0.0`, so it's already reachable via `http://[machine-ip]:5000` from any device on the same network — no further backend change needed for this.
+2. **Network**: Flask now binds to `0.0.0.0`, so it's already reachable via `http://[machine-ip]:5001` from any device on the same network — no further backend change needed for this.
 3. **Media**: still planned to sync footage via OneDrive to the exhibit machine's local storage; not yet tested end-to-end.
 4. **Workflow**: click "Generate" → film renders (title card + dynamic sequence + end card) → plays automatically.
 5. **Hosting for remote testing**: currently using a temporary Cloudflare quick tunnel for remote demos (e.g., the 2026-07-23 meeting with Dr. Campbell) — not meant to be permanent. Next step is connecting with Penn State IT about a safer, Penn State-managed way to host (e.g., something OneDrive-adjacent) instead of relying on Cloudflare long-term.
