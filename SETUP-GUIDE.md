@@ -160,8 +160,15 @@ local-media/
 
 Copy your clips into the right `a-roll`, `b-roll`, or `x-roll` folder for
 the topic they belong to. That's all — the engine notices new files by
-itself the next time you generate a film. Nothing to register, no settings
-to change.
+itself. Reload the page in your browser and the new count appears beside
+the topic name. Nothing to register, no settings to change.
+
+**How many sound files do I need?** Every silent `b-roll` clip is paired
+with its own `x-roll` sound file, and no file is used twice in the same
+film. So a topic with 16 video clips but only 2 sound files can only ever
+make a 2-shot film. As a rule of thumb, aim for **about as many `x-roll`
+sound files as you have `b-roll` clips**. Clips in `a-roll` already carry
+their own sound and don't need a partner.
 
 **Which folder does a clip go in?**
 

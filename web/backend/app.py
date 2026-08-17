@@ -162,9 +162,35 @@ def frontend_assets(filename):
     return send_from_directory(FRONTEND_DIR, filename)
 
 
+def _synced_collection(collection):
+    """Reconciles a topic's index against what's actually in its folders and
+    returns it with fresh artifact counts.
+
+    Media is added by dropping files into a topic's assets folders in
+    Finder, so the index is only ever a cache of what's on disk. Syncing on
+    request is what makes "drop a file in and it appears" true. It costs
+    nothing in the steady state — only files not already indexed are
+    probed, so a repeat sync with nothing new takes about a millisecond.
+
+    A sync failure is swallowed: a topic that can't be reconciled should
+    still be listed and usable with whatever was already indexed, rather
+    than taking the whole page down.
+    """
+    try:
+        dde_runtime.sync_media_library(
+            collection["index_path"], collection["assets_path"]
+        )
+    except Exception:
+        app.logger.exception("Could not sync collection %s", collection.get("id"))
+        return collection
+    return dde_runtime.get_collection(collection["id"]) or collection
+
+
 @app.route("/api/collections")
 def collections():
-    return jsonify(dde_runtime.list_collections())
+    # Synced here so the topic list and its clip counts reflect the folders
+    # as they are right now, without needing a film to be generated first.
+    return jsonify([_synced_collection(c) for c in dde_runtime.list_collections()])
 
 
 @app.route("/api/generate", methods=["POST"])
@@ -181,6 +207,14 @@ def generate():
             "error": f"Unknown film topic '{collection_id}'.",
             "available": [c["id"] for c in dde_runtime.list_collections()],
         }), 404
+
+    # Sync before the empty check, not after. Media detection used to happen
+    # only inside generate_and_render, which the check below returns ahead
+    # of — so a topic that started empty could never pick up its first
+    # clips: refused for being empty, and never synced because it was
+    # refused. Exactly the case that matters, since every new topic starts
+    # empty and has footage added later.
+    collection = _synced_collection(collection)
 
     if collection["artifact_counts"].get("total", 0) == 0:
         return jsonify({

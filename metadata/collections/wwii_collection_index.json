@@ -1,10 +1,10 @@
 {
   "collection_id": "wwii",
   "collection_name": "World War II",
-  "description": "Archival footage and audio documenting World War II, for use in generative documentary film generation.",
+  "description": "World War II film collection.",
   "version": "1.0.0",
-  "created_at": "2026-07-23T00:00:00Z",
-  "updated_at": "2026-07-23T00:00:00Z",
+  "created_at": "2026-08-17T15:18:47.658450+00:00",
+  "updated_at": "2026-08-17T15:19:02.933058+00:00",
   "runtime_rules": {
     "min_duration_seconds": 35,
     "max_duration_seconds": 1800,
@@ -12,10 +12,275 @@
     "save_generated_films": true
   },
   "artifact_counts": {
-    "total": 0,
+    "total": 18,
     "a_roll": 0,
-    "b_roll": 0,
-    "x_roll": 0
+    "b_roll": 16,
+    "x_roll": 2
   },
-  "artifacts": []
+  "artifacts": [
+    {
+      "artifact_id": "auto_b_test_ww2_1252nd_group",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 1252nd group.mp4",
+      "duration_seconds": 12.0,
+      "title": "Test WW2 1252nd Group",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_braubach_ve_day",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 Braubach VE day.mp4",
+      "duration_seconds": 8.067,
+      "title": "Test WW2 Braubach VE Day",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_gm_2_soldiers",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 GM + 2 soldiers.mp4",
+      "duration_seconds": 12.0,
+      "title": "Test WW2 GM + 2 Soldiers",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-brown"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_gm_in_hat_2020",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 GM in hat 2020.mp4",
+      "duration_seconds": 4.0,
+      "title": "Test WW2 GM In Hat 2020",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "fast",
+      "tags": [
+        "color-black"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_camp_swift_buildlings",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 camp swift buildlings.mp4",
+      "duration_seconds": 8.0,
+      "title": "Test WW2 Camp Swift Buildlings",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_camp_swift_on_map",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 camp swift on map.mp4",
+      "duration_seconds": 4.0,
+      "title": "Test WW2 Camp Swift On Map",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "fast",
+      "tags": [
+        "color-white"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_euro_map_1",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 euro map 1.mp4",
+      "duration_seconds": 6.067,
+      "title": "Test WW2 Euro Map 1",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-brown"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_foxhole",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 foxhole.mp4",
+      "duration_seconds": 12.0,
+      "title": "Test WW2 Foxhole",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_group_with_flag_on_steps",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 group with flag on steps.mp4",
+      "duration_seconds": 8.0,
+      "title": "Test WW2 Group With Flag On Steps",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_jeep",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 jeep.mp4",
+      "duration_seconds": 8.0,
+      "title": "Test WW2 Jeep",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_newspaper_cc_camp",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 newspaper cc camp.mp4",
+      "duration_seconds": 12.0,
+      "title": "Test WW2 Newspaper Cc Camp",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-brown"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_small_group",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 small group.mp4",
+      "duration_seconds": 8.0,
+      "title": "Test WW2 Small Group",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_truck_2_soldiers",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 truck + 2 soldiers.mp4",
+      "duration_seconds": 6.067,
+      "title": "Test WW2 Truck + 2 Soldiers",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-black"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_test_ww2_worksite",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/Test WW2 worksite.mp4",
+      "duration_seconds": 8.0,
+      "title": "Test WW2 Worksite",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-brown"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_plane_drop",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/plane_drop.mp4",
+      "duration_seconds": 8.133,
+      "title": "Plane Drop",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-brown"
+      ]
+    },
+    {
+      "artifact_id": "auto_b_warship_cruising",
+      "artifact_type": "B-roll",
+      "role": "body",
+      "filename": "b-roll/warship_cruising.mp4",
+      "duration_seconds": 10.09,
+      "title": "Warship Cruising",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium",
+      "tags": [
+        "color-gray"
+      ]
+    },
+    {
+      "artifact_id": "auto_x_anxietylow",
+      "artifact_type": "X-roll",
+      "role": "body",
+      "filename": "x-roll/ANXIETYLOW.mp3",
+      "duration_seconds": 194.12,
+      "title": "ANXIETYLOW",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "slow"
+    },
+    {
+      "artifact_id": "auto_x_sadness",
+      "artifact_type": "X-roll",
+      "role": "body",
+      "filename": "x-roll/Sadness.mp3",
+      "duration_seconds": 141.04,
+      "title": "Sadness",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "slow"
+    }
+  ]
 }
