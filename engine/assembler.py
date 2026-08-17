@@ -136,6 +136,7 @@ class Assembler:
         output_fps: int = DEFAULT_OUTPUT_FPS,
         video_preset: str = DEFAULT_VIDEO_PRESET,
         cancel_token=None,
+        progress_callback=None,
     ):
         """
         Initializes the Assembler.
@@ -161,6 +162,11 @@ class Assembler:
                                  the render loop stops between slots if
                                  cancelled and the running FFmpeg process is
                                  terminated. None means not cancellable.
+            progress_callback:   Optional callable(stage, current, total).
+                                 Called as each slot finishes so a caller
+                                 can report progress — a feature-length
+                                 film takes tens of minutes, and a bare
+                                 spinner tells the viewer nothing.
         """
         self.loader        = loader
         self.assets_path   = os.path.normpath(assets_path)
@@ -175,6 +181,7 @@ class Assembler:
         self.output_fps    = output_fps
         self.video_preset  = video_preset
         self.cancel_token  = cancel_token
+        self.progress_callback = progress_callback
 
     # ------------------------------------------------------------------
     # Public Interface
@@ -259,6 +266,7 @@ class Assembler:
                             i + 1, len(sequence),
                             os.path.basename(segment_path),
                         )
+                        self._report_progress("clips", i + 1, len(sequence))
 
                 except GenerationCancelled:
                     # A deliberate stop, not a bad slot — must escape the
@@ -278,7 +286,9 @@ class Assembler:
                 )
 
             # Concatenate all segments into the final film
+            self._report_progress("joining", 0, 1)
             self._concat_segments(segment_paths, film_path, tmpdir)
+            self._report_progress("joining", 1, 1)
 
         # tmpdir and all segments are automatically cleaned up here
         logger.info("Film rendered successfully → %s", film_path)
@@ -321,6 +331,20 @@ class Assembler:
         )
         self._run_ffmpeg(cmd, label=f"A-roll {artifact_id}")
         return True
+
+    def _report_progress(self, stage: str, current: int, total: int) -> None:
+        """
+        Passes progress to the caller's callback, if one was supplied.
+
+        Never lets a reporting failure break a render — progress is
+        cosmetic, the film is not.
+        """
+        if self.progress_callback is None:
+            return
+        try:
+            self.progress_callback(stage, current, total)
+        except Exception:
+            logger.debug("Progress callback raised; ignoring.", exc_info=True)
 
     def _has_audio_stream(self, source: str) -> bool:
         """True if the media file carries at least one audio stream."""

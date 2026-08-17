@@ -87,7 +87,10 @@ def _register_job(job_id):
     """Creates and registers a CancellationToken for job_id."""
     token = CancellationToken()
     with _active_jobs_lock:
-        _active_jobs[job_id] = token
+        _active_jobs[job_id] = {
+            "token": token,
+            "progress": {"stage": "starting", "current": 0, "total": 1},
+        }
     return token
 
 
@@ -97,9 +100,55 @@ def _release_job(job_id):
         _active_jobs.pop(job_id, None)
 
 
+def _job_progress_recorder(job_id):
+    """Returns a progress callback that stores the latest stage for job_id.
+
+    The exhibit view polls this while a film renders. A feature-length film
+    takes tens of minutes, so "still working" is not enough to tell a
+    viewer — it needs to say which clip it's on.
+    """
+    def record(stage, current, total):
+        with _active_jobs_lock:
+            job = _active_jobs.get(job_id)
+            if job is not None:
+                job["progress"] = {
+                    "stage": stage, "current": current, "total": total,
+                }
+    return record
+
+
+@app.route("/api/generate/progress")
+def generate_progress():
+    """Reports how far along an in-flight generation is."""
+    job_id = request.args.get("job_id")
+    if not job_id:
+        return jsonify({"error": "job_id query param is required"}), 400
+
+    with _active_jobs_lock:
+        job = _active_jobs.get(job_id)
+        progress = dict(job["progress"]) if job else None
+
+    if progress is None:
+        # Finished, cancelled, or never started — all "not running" here.
+        return jsonify({"running": False})
+    return jsonify({"running": True, **progress})
+
+
 @app.route("/")
 def index():
     return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/exhibit")
+def exhibit():
+    """Gallery/kiosk view — see web/frontend/exhibit.html.
+
+    Deliberately a separate page rather than a mode of the main one: the
+    console is a researcher's instrument (topic and length pickers, the
+    contrast trace, the film history), while this is a single button in
+    front of the public.
+    """
+    return send_from_directory(FRONTEND_DIR, "exhibit.html")
 
 
 @app.route("/<path:filename>")
@@ -165,6 +214,7 @@ def generate():
             diversity_mode=diversity_mode,
             exact_duration=exact_duration,
             cancel_token=token,
+            progress_callback=_job_progress_recorder(job_id) if job_id else None,
         )
     except GenerationCancelled:
         # A deliberate stop, not a failure — 409 so the frontend can tell
@@ -196,7 +246,8 @@ def cancel_generate():
         return jsonify({"error": "job_id is required"}), 400
 
     with _active_jobs_lock:
-        token = _active_jobs.get(job_id)
+        job = _active_jobs.get(job_id)
+        token = job["token"] if job else None
 
     if token is None:
         # Already finished, already cancelled, or never existed — all the

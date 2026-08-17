@@ -165,6 +165,41 @@ what the entry works out to ("= 1h 30m (5400 seconds)"). Durations shown
 elsewhere in the UI are now formatted the same way rather than as a raw
 second count.
 
+**5. Exhibit mode — a separate gallery view at `/exhibit`** — the console
+at `/` is unchanged. It is a researcher's instrument (topic and length
+pickers, the contrast trace, the film history); the exhibit view is a
+single button in front of the public, so it's a separate page rather than a
+mode of the same one.
+
+How it works:
+
+1. **Setup screen** (staff, once before opening): pick the topic, the length
+   of each film, and how films start. Won't let you start on a topic with no
+   footage, so an error can never end up on the gallery wall. Settings are
+   remembered, so a power cut doesn't need staff.
+2. **Two ways to run**, since this was still open with Dr. Campbell:
+   *a visitor presses the button* (screen waits showing one large button —
+   best for shorter films), or *runs by itself all day* (starts on its own
+   and makes a new film each time one finishes — best for longer films).
+3. **While rendering**, a progress bar and plain-language stage
+   ("Assembling the shots — 4 of 9"). This matters now that feature-length
+   is possible: a bare spinner for half an hour tells a viewer nothing.
+4. **The film plays automatically** when ready, full screen. If the browser
+   blocks sound before any interaction, it falls back to muted playback
+   rather than leaving a still frame on the wall.
+5. **Failures never leave a blank screen** — an apologetic panel with a
+   "Try again" button, and in unattended mode it retries by itself after
+   twelve seconds.
+
+To get back to the setup screen: press **Esc**, or tap the **top-left corner
+three times** (three, so one stray touch doesn't expose settings to a
+visitor). Diversity mode is on and exact-duration off in this view, baked in
+rather than exposed — whole clips are kinder than a hard cut mid-shot.
+
+Files: `web/frontend/exhibit.html`, `exhibit.css`, `exhibit.js`. Progress
+reporting runs through the existing job_id, with a new
+`GET /api/generate/progress`.
+
 Also: the web server's default port moved from 5000 to **5001**, because
 macOS runs AirPlay Receiver on 5000 and silently takes the port. Set the
 `PORT` environment variable to override.

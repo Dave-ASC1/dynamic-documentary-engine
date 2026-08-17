@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Dynamic Documentary Engine — Exhibit</title>
+  <link rel="stylesheet" href="exhibit.css" />
+</head>
+<body>
+
+  <!-- ================================================================
+       SETUP — staff only. Choose the topic and length once, then start.
+       Never seen again until someone deliberately exits the exhibit.
+       ================================================================ -->
+  <section id="setup" class="setup">
+    <div class="setup-card">
+      <img class="setup-logo" src="psu-logo.svg" alt="Pennsylvania State University" />
+      <h1>Exhibit setup</h1>
+      <p class="setup-sub">
+        Set this up once before the gallery opens. Visitors only ever see a
+        single button.
+      </p>
+
+      <label class="setup-field">
+        <span class="setup-label">Film topic</span>
+        <select id="setup-collection"></select>
+      </label>
+      <p id="setup-collection-hint" class="setup-hint hidden"></p>
+
+      <label class="setup-field">
+        <span class="setup-label">Length of each film</span>
+        <span class="setup-duration">
+          <input type="number" id="setup-duration" min="1" max="36000" step="1" value="90" />
+          <select id="setup-unit">
+            <option value="seconds">seconds</option>
+            <option value="minutes">minutes</option>
+          </select>
+        </span>
+      </label>
+      <p id="setup-duration-hint" class="setup-hint muted"></p>
+
+      <fieldset class="setup-field setup-modes">
+        <legend class="setup-label">How films start</legend>
+
+        <label class="mode-option">
+          <input type="radio" name="exhibit-mode" value="visitor" checked />
+          <span class="mode-body">
+            <span class="mode-name">A visitor presses the button</span>
+            <span class="mode-desc">
+              The screen waits, showing one large button. Each press makes a
+              new film and plays it. Best for shorter films.
+            </span>
+          </span>
+        </label>
+
+        <label class="mode-option">
+          <input type="radio" name="exhibit-mode" value="continuous" />
+          <span class="mode-body">
+            <span class="mode-name">Runs by itself, all day</span>
+            <span class="mode-desc">
+              Starts on its own and makes a new film each time one finishes.
+              Nobody needs to touch it. Best for longer films.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+
+      <button id="setup-start" type="button" class="setup-start">Start exhibit</button>
+
+      <p class="setup-foot">
+        To come back here later, press <kbd>Esc</kbd> or tap the top-left
+        corner of the screen three times.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       EXHIBIT — what the public sees. One state visible at a time.
+       ================================================================ -->
+  <main id="stage" class="stage hidden">
+
+    <!-- Waiting for a visitor. -->
+    <section id="attract" class="panel attract hidden">
+      <div class="attract-inner">
+        <p class="attract-eyebrow">Pennsylvania State University · College of IST</p>
+        <h1 class="attract-title">Dynamic Documentary Engine</h1>
+        <p class="attract-tagline">
+          No two films are the same. Press the button and one will be made
+          for you, right now.
+        </p>
+        <button id="make-btn" type="button" class="make-btn">
+          <span class="make-btn-label">Make my film</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Building the film. -->
+    <section id="working" class="panel working hidden">
+      <div class="working-inner">
+        <h2 class="working-title">Making your film…</h2>
+        <p id="working-detail" class="working-detail">Choosing the shots</p>
+        <div class="progress-track" role="progressbar" aria-labelledby="working-detail"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <p class="working-note">Every film is assembled from scratch. This takes a moment.</p>
+        <button id="working-cancel" type="button" class="ghost-btn">Stop</button>
+      </div>
+    </section>
+
+    <!-- Playing. Video fills the screen. -->
+    <section id="screening" class="panel screening hidden">
+      <video id="exhibit-player" playsinline></video>
+      <div id="screening-overlay" class="screening-overlay">
+        <button id="replay-btn" type="button" class="ghost-btn">Play again</button>
+        <button id="another-btn" type="button" class="ghost-btn">Make another</button>
+      </div>
+    </section>
+
+    <!-- Something went wrong. Never leaves the wall blank. -->
+    <section id="failure" class="panel failure hidden">
+      <div class="failure-inner">
+        <h2>That film didn't finish</h2>
+        <p id="failure-detail" class="failure-detail"></p>
+        <button id="retry-btn" type="button" class="make-btn">Try again</button>
+      </div>
+    </section>
+
+    <!-- Invisible corner target: three taps returns to setup. -->
+    <button id="escape-hatch" class="escape-hatch" type="button"
+            aria-label="Exhibit settings"></button>
+  </main>
+
+  <script src="exhibit.js"></script>
+</body>
+</html>

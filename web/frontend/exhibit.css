@@ -1,0 +1,357 @@
+/* ==========================================================================
+   exhibit.css — gallery/kiosk view
+   --------------------------------------------------------------------------
+   Deliberately not a variant of style.css. The console is read at desk
+   distance by someone who knows the system; this is read across a room by
+   someone who has never seen it. Everything here is bigger, darker, and
+   carries far less on screen at once.
+
+   Dark only, on purpose: a bright screen in a dim gallery is a lamp, and
+   the film itself should be the brightest thing in the room.
+   ========================================================================== */
+
+:root {
+  --bg: #06090f;
+  --surface: #12161f;
+  --border: #232b3a;
+  --text: #f2f3f6;
+  --muted: #9aa1b1;
+  --accent: #1e407c;
+  --accent-bright: #3d6cc0;
+  --danger: #e03e44;
+
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+  /* Comfortably above the 44px accessible minimum — this is a touchscreen
+     that strangers use once, standing up. */
+  --touch-min: 64px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body { overflow: hidden; }          /* a kiosk never scrolls */
+
+.hidden { display: none !important; }
+
+/* ==========================================================================
+   Setup — staff-facing, so it can look like an ordinary form
+   ========================================================================== */
+
+.setup {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.setup-card {
+  width: 100%;
+  max-width: 540px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 2.25rem 2rem 2rem;
+}
+
+.setup-logo { width: 46px; height: auto; display: block; margin-bottom: 1.25rem; }
+
+.setup h1 {
+  font-family: var(--serif);
+  font-size: 1.9rem;
+  margin: 0 0 0.4rem;
+}
+
+.setup-sub { color: var(--muted); margin: 0 0 1.75rem; line-height: 1.5; }
+
+.setup-field { display: block; margin-bottom: 1.4rem; }
+
+.setup-label {
+  display: block;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.setup select,
+.setup input[type="number"] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1rem;
+  padding: 0.75rem 0.85rem;
+  width: 100%;
+  font-family: inherit;
+}
+
+.setup select:focus,
+.setup input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-bright);
+}
+
+.setup-duration { display: flex; gap: 0.6rem; }
+.setup-duration input[type="number"] { flex: 1 1 40%; }
+.setup-duration select { flex: 1 1 60%; }
+
+.setup-hint { font-size: 0.83rem; margin: -0.9rem 0 1.4rem; color: var(--danger); }
+.setup-hint.muted { color: var(--muted); }
+
+.setup-modes { border: none; padding: 0; margin: 0 0 1.5rem; }
+.setup-modes legend { padding: 0; }
+
+.mode-option {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.mode-option:hover { border-color: var(--accent-bright); }
+.mode-option:has(input:checked) { border-color: var(--accent-bright); background: rgba(61, 108, 192, 0.1); }
+.mode-option input { margin-top: 0.25rem; flex: none; }
+.mode-body { display: flex; flex-direction: column; gap: 0.2rem; }
+.mode-name { font-weight: 600; }
+.mode-desc { color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+
+.setup-start {
+  width: 100%;
+  min-height: var(--touch-min);
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.setup-start:hover { filter: brightness(1.08); }
+.setup-start:disabled { opacity: 0.5; cursor: default; filter: none; }
+
+.setup-foot { color: var(--muted); font-size: 0.8rem; margin: 1.25rem 0 0; text-align: center; }
+
+kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.1rem 0.35rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+
+/* ==========================================================================
+   Stage — the public view. One panel visible at a time, each filling
+   the screen so there is never a question of where to look.
+   ========================================================================== */
+
+.stage { position: relative; height: 100%; }
+
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vmin;
+  text-align: center;
+}
+
+/* --- Attract ------------------------------------------------------------ */
+
+.attract-inner { max-width: 30ch; }
+
+.attract-eyebrow {
+  font-size: clamp(0.7rem, 1.4vmin, 0.95rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 2vmin;
+}
+
+.attract-title {
+  font-family: var(--serif);
+  /* Scales with the display so it reads the same on a laptop and a
+     wall-mounted screen without hand-tuned breakpoints. */
+  font-size: clamp(2rem, 7vmin, 5.5rem);
+  line-height: 1.05;
+  margin: 0 0 2.5vmin;
+}
+
+.attract-tagline {
+  font-size: clamp(1rem, 2.3vmin, 1.6rem);
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 0 6vmin;
+}
+
+.make-btn {
+  min-height: max(var(--touch-min), 11vmin);
+  padding: 0 clamp(2rem, 5vmin, 4.5rem);
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: clamp(1.05rem, 2.6vmin, 2rem);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1.5vmin 4vmin -1.5vmin rgba(61, 108, 192, 0.75);
+  /* Slow, calm pulse — an invitation across a room, not an alarm. */
+  animation: breathe 3.4s ease-in-out infinite;
+}
+
+.make-btn:hover { filter: brightness(1.1); }
+.make-btn:active { transform: scale(0.98); }
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.035); }
+}
+
+/* Respect a reduced-motion preference — the pulse is decoration. */
+@media (prefers-reduced-motion: reduce) {
+  .make-btn { animation: none; }
+}
+
+/* --- Working ------------------------------------------------------------ */
+
+.working-inner { max-width: 34ch; width: 100%; }
+
+.working-title {
+  font-family: var(--serif);
+  font-size: clamp(1.6rem, 5vmin, 3.4rem);
+  margin: 0 0 1.5vmin;
+}
+
+.working-detail {
+  font-size: clamp(0.95rem, 2.1vmin, 1.4rem);
+  color: var(--muted);
+  margin: 0 0 4vmin;
+  min-height: 1.5em;              /* no reflow as the text changes */
+}
+
+.progress-track {
+  height: 0.9vmin;
+  min-height: 6px;
+  background: var(--surface);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 3vmin;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.working-note {
+  color: var(--muted);
+  font-size: clamp(0.8rem, 1.6vmin, 1rem);
+  margin: 0 0 4vmin;
+}
+
+.ghost-btn {
+  min-height: var(--touch-min);
+  padding: 0 2rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: clamp(0.9rem, 1.8vmin, 1.1rem);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.ghost-btn:hover { color: var(--text); border-color: var(--muted); }
+
+/* --- Screening ---------------------------------------------------------- */
+
+.screening { padding: 0; background: #000; }
+
+#exhibit-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;            /* never crop the film to fill the frame */
+  background: #000;
+}
+
+/* Controls sit over the film and fade out, so the piece plays clean but a
+   visitor can still act without hunting for anything. */
+.screening-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  padding: 3vmin;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.75));
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.screening-overlay.visible { opacity: 1; pointer-events: auto; }
+.screening-overlay .ghost-btn { border-color: rgba(255, 255, 255, 0.35); color: #fff; }
+
+/* --- Failure ------------------------------------------------------------ */
+
+.failure-inner { max-width: 32ch; }
+.failure-inner h2 {
+  font-family: var(--serif);
+  font-size: clamp(1.5rem, 4.5vmin, 3rem);
+  margin: 0 0 1.5vmin;
+}
+.failure-detail {
+  color: var(--muted);
+  font-size: clamp(0.95rem, 2vmin, 1.3rem);
+  line-height: 1.5;
+  margin: 0 0 5vmin;
+}
+
+/* --- Escape hatch ------------------------------------------------------- */
+
+/* Invisible, but a real button so it's reachable by keyboard too. Three
+   taps to leave — one stray touch shouldn't drop a visitor into settings. */
+.escape-hatch {
+  position: absolute;
+  top: 0; left: 0;
+  width: 12vmin;
+  height: 12vmin;
+  min-width: 64px;
+  min-height: 64px;
+  background: transparent;
+  border: none;
+  cursor: default;
+  opacity: 0;
+}
+
+.escape-hatch:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent-bright);
+}

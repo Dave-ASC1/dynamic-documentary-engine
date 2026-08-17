@@ -976,6 +976,7 @@ def generate_and_render(
     title_cards=True,
     titles_path=None,
     cancel_token=None,
+    progress_callback=None,
 ):
     """Runs the real engine end to end and returns a JSON-serializable summary.
 
@@ -1014,6 +1015,12 @@ def generate_and_render(
         between pipeline stages and kills the in-flight FFmpeg process if
         cancelled, raising GenerationCancelled instead of returning.
 
+    progress_callback: Optional callable(stage, current, total) reporting
+        how far along the render is. Stages, in order: "sequencing",
+        "clips" (current/total per clip), "joining", "trimming",
+        "titles", "done". A feature-length film takes tens of minutes, so
+        the exhibit view needs something better than a spinner.
+
     Returns:
         dict: JSON-serializable summary — collection info, the ordered
               slots, the selection trace, and the rendered film's path.
@@ -1029,6 +1036,16 @@ def generate_and_render(
     if not is_demo_mode and os.path.isdir(assets_path):
         library_sync = sync_media_library(index_path, assets_path)
 
+    def report(stage, current=0, total=1):
+        """Forwards a pipeline stage to the caller's progress callback."""
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(stage, current, total)
+        except Exception:
+            pass
+
+    report("sequencing")
     usage_counts = load_usage_counts(films_path) if diversity_mode else {}
     sequencer = Sequencer(
         index_path,
@@ -1096,6 +1113,7 @@ def generate_and_render(
         films_path=films_path,
         metadata_path=metadata_path,
         cancel_token=cancel_token,
+        progress_callback=progress_callback,
     )
     film_path = assembler.render(sequence)
 
@@ -1123,6 +1141,7 @@ def generate_and_render(
     if exact_duration and target_duration is not None:
         if cancel_token is not None:
             cancel_token.raise_if_cancelled()
+        report("trimming")
         dynamic_target = target_duration - title_card_seconds
         if dynamic_target > 0:
             trimmed = _trim_film_to_duration(
@@ -1136,6 +1155,7 @@ def generate_and_render(
     if title_cards:
         if cancel_token is not None:
             cancel_token.raise_if_cancelled()
+        report("titles")
         cards_added = _wrap_with_title_cards(
             film_path,
             output_width=assembler.output_width,
@@ -1200,4 +1220,5 @@ def generate_and_render(
         json.dump(result, f, indent=2)
     result["manifest_path"] = manifest_path
 
+    report("done", 1, 1)
     return result
