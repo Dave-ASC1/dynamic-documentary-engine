@@ -24,7 +24,7 @@ engine by double-clicking a file.
 
 Inspired by the *Eno* documentary (2024) and its Brain One engine built by Brendan Dawes, this engine uses AI as a director by pulling from a curated collection of modular media artifacts and dynamically assembling them into a unique film on every run. No human curation happens at runtime. The engine decides.
 
-All sequencing logic is creative code — and selection decisions are driven entirely by metadata rules, pacing arc, mood transition logic, and weighted random selection. With no external AI engines utilized.
+All sequencing logic is creative code — selection decisions are driven entirely by metadata rules, dissimilarity (contrast) scoring between artifacts, artifact weights, and weighted random selection. No external AI services are used at runtime.
 
 The project also explores whether modern AI tooling can replicate and extend the generative documentary approach — making it accessible, extensible, and applicable to new collections beyond a single film.
 
@@ -35,12 +35,28 @@ The project also explores whether modern AI tooling can replicate and extend the
 Each time the engine runs, it:
 
 1. Reads a **collection** of tagged media **artifacts** (A-roll, B-roll, X-roll)
-2. Accepts a target runtime in seconds (1–9999) to control film length
-3. Uses rule-based sequencing logic to select and order artifacts based on metadata
-4. Always opens and closes with designated opening/closing A/V artifacts
-5. Pairs B-roll artifacts with X-roll artifacts to ensure every video clip has audio
+2. Accepts a target runtime, entered in seconds or minutes, to control film length
+3. Selects and orders artifacts by **maximum dissimilarity** from the previous clip — contrast, not continuity
+4. Opens and closes with a randomly generated B-roll + X-roll pair, so the bookends differ every run
+5. Pairs B-roll artifacts with X-roll artifacts so every silent clip carries sound
 6. Assembles the sequence into a rendered **film** via FFmpeg
-7. Saves the generated film for analytical review
+7. Wraps the result in an opening and closing title piece
+8. Saves the generated film, plus a manifest of every decision, for analytical review
+
+### Selection criteria
+
+Selection is driven by **contrast**, not emotional arc. The engine deliberately
+applies no pacing-arc or mood-progression logic: each pick is the artifact most
+dissimilar from what preceded it, across media type, colour, pacing, tags,
+themes and geography. Cross-category collision is the intended effect.
+
+Two optional modes adjust this:
+
+- **Diversity mode** — boosts underused clips across runs, so high-contrast
+  favourites don't dominate every film.
+- **Exact duration** — trims the final render to match the requested length
+  precisely. Off by default: whole clips are preserved at the cost of landing
+  a few seconds short.
 
 ---
 
@@ -65,11 +81,18 @@ All artifacts are tagged with structured JSON metadata that drives the sequencin
 ---
 ## Runtime Control
 
-The engine accepts a `target_duration` parameter in seconds to control the total length of every generated film:
+The engine accepts a `target_duration` in seconds; the web interface lets you
+enter it in **seconds or minutes**, so a feature-length film can be requested
+as "90 minutes" rather than "5400 seconds".
 
-- Supports values from **1 to 9999 seconds**
-- Supports both short-form clips and full-length feature documentaries
-- The sequencing engine uses the target duration to shape pacing arc decisions throughout the film
+- Supports values from **1 second to 10 hours**
+- Assembly is batched, so film length is not limited by the number of clips
+- Rendering takes roughly **0.3× the film's own length** — a 90-second film in
+  about 30 seconds, a feature-length film in about half an hour
+
+**The real ceiling on length is footage, not code.** No artifact repeats within
+a film, so a film can never run longer than the collection's total A-roll +
+B-roll. A 90-minute film needs 90 minutes of source material.
 
 ---
 
@@ -81,16 +104,32 @@ B-roll artifacts will carry video but no audio. Whenever the engine selects a B-
 
 ## Collection Structure
 
-Each collection follows a class-based hierarchy:
+Each film topic is a **self-contained folder** under `local-media/`. The engine
+discovers any folder shaped this way automatically — adding a topic needs no
+code changes and no settings:
 
 ```
-Collection (e.g. "WW2")
-├── CL-AV  →  A-roll artifacts (synchronized audio + video)
-├── CL-V   →  B-roll artifacts (visual only — paired with X-roll)
-└── CL-A   →  X-roll artifacts (audio only - layered over B-roll)
+local-media/
+└── WWII/                      ← one film topic
+    ├── assets/
+    │   ├── a-roll/            ← synchronized audio + video
+    │   ├── b-roll/            ← visual only, paired with X-roll
+    │   └── x-roll/            ← audio only, layered under B-roll
+    ├── titles/
+    │   ├── opening/           ← this topic's own opening piece (optional)
+    │   └── closing/           ← this topic's own closing piece (optional)
+    └── artifacts/             ← rendered films + their manifests
 ```
 
-Every collection includes designated **opening** and **closing** A/V artifacts that will bookend every generated film regardless of what the engine selects in between.
+Dropping a file into an `assets` subfolder is enough — it's auto-tagged
+(duration, dominant colour, pacing) and enters rotation on the next run.
+Deleting one retires it.
+
+Every film is wrapped in an **opening and closing title piece**. Drop a video
+into a topic's `titles/opening/` or `titles/closing/` and it becomes that
+topic's own, at any length; leave the folder empty and a generated text card is
+used. This is separate from the randomized B-roll + X-roll bookends *inside*
+the sequence, which differ every run.
 
 ---
 
@@ -98,23 +137,61 @@ Every collection includes designated **opening** and **closing** A/V artifacts t
 
 ```
 dynamic-documentary-engine/
-├── assets/                   # Media artifact library (organized by collection)
-├── metadata/                 # JSON metadata schema and tagged artifact index
-├── engine/                   # Python sequencing engine (creative code only)
-│   ├── __init__.py           # Package entry point
-│   ├── sequencer.py          # Main sequencing coordinator
-│   ├── rules.py              # Pacing arc, no-repeat, and runtime rules
-│   ├── artifact_selector.py  # Weighted selection and mood transition logic
-│   └── collection_loader.py  # Collection index loader and validator
-├── pipeline/                 # FFmpeg rendering pipeline
-│   └── assembler.py          # Clip concatenation and audio mixing
-├── web/                      # React/Flask web interface
-│   ├── frontend/             # React director's console
-│   └── backend/              # Flask API server
-├── films/                    # Generated film outputs (analytical review only)
-├── docs/                     # Technical documentation and research report
+├── engine/                        # Python sequencing engine (creative code only)
+│   ├── __init__.py                # Package entry point
+│   ├── sequencer.py               # Main sequencing coordinator
+│   ├── rules.py                   # No-repeat, duration budget, pairing rules
+│   ├── artifact_selector.py       # Dissimilarity scoring and weighted selection
+│   ├── collection_loader.py       # Collection index loader and validator
+│   ├── assembler.py               # FFmpeg rendering — clip and audio assembly
+│   └── cancellation.py            # Cooperative cancellation of a running render
+├── scripts/
+│   ├── dde_runtime.py             # Shared pipeline used by both the CLI and web
+│   ├── run_first_film.py          # Command-line film generation
+│   └── build_validation_collection.py
+├── web/
+│   ├── backend/app.py             # Flask API server
+│   └── frontend/                  # Browser interface (plain HTML/CSS/JS)
+│       ├── index.html/.css/.js    #   director's console
+│       └── exhibit.html/.css/.js  #   gallery/kiosk view
+├── local-media/<topic>/           # Per-topic footage, title pieces, rendered films
+├── metadata/
+│   ├── collections/               # Per-topic collection indexes
+│   └── collection_index_schema.json
+├── docs/                          # Research writing and design sketches
+├── Start Engine (Mac).command     # Double-click launcher
+├── Start Engine (Windows).bat     # Double-click launcher
+├── SETUP-GUIDE.md                 # Beginner setup guide
 └── README.md
 ```
+
+---
+
+## The Interface
+
+Two views onto the same engine, for two different people.
+
+### Director's console (`/`)
+
+The working instrument. Choose a topic and target length, generate, and watch
+the result with the reasoning exposed:
+
+- **Sequence trace** — every cut, with the dissimilarity score and the
+  dimensions that made the chosen clip the most contrasting option. This is
+  the research artifact: it makes an otherwise invisible decision legible.
+- **Film history** — every film generated, replayable and deletable.
+- Diversity mode and exact duration toggles, a cancel button for a render in
+  progress, and a light/dark theme.
+
+### Exhibit view (`/exhibit`)
+
+The gallery installation. Staff set the topic and length once; visitors see a
+single button. Films play full screen and automatically, with a plain-language
+progress readout while one is being built. Two modes: a visitor presses the
+button, or it runs unattended all day, making a new film each time one
+finishes.
+
+Running it is a double-click — see **[SETUP-GUIDE.md](SETUP-GUIDE.md)**.
 
 ---
 
@@ -124,13 +201,15 @@ dynamic-documentary-engine/
 - [x] GitHub repository setup
 - [x] Metadata schema (JSON) for A-roll, B-roll, and X-roll artifacts
 - [x] Python sequencing engine — rule-based creative code
-- [ ] Sample collection (10–20 artifacts, self-recorded + public domain)
-- [ ] FFmpeg rendering pipeline
-- [ ] React/Flask web interface
+- [x] Sample collection (17 artifacts, self-recorded + public domain)
+- [x] FFmpeg rendering pipeline
+- [x] Web interface — director's console and gallery/exhibit view
+- [x] Generated film artifacts saved for analytical review
+- [x] Multi-topic collections, auto-discovered from the folder structure
+- [x] Turnkey setup for a non-technical operator (guide + double-click launchers)
+- [ ] Real WWII and Swiss footage loaded into their collections
+- [ ] Exhibit hardware and installation at the gallery
 - [ ] Technical documentation report targeting academic publication
-- [ ] Generated film artifacts saved for analytical review
-
-**Target completion: To be Decided**
 
 ---
 
@@ -138,8 +217,12 @@ dynamic-documentary-engine/
 
 - **Python** — sequencing engine and pipeline logic
 - **FFmpeg** — video and audio assembly and rendering
-- **React** — frontend director's console
 - **Flask** — backend API
+- **HTML / CSS / JavaScript** — frontend, with no framework and no build step
+
+The frontend is deliberately dependency-free: the engine has to be handed to a
+non-technical operator and run on a gallery machine, so there is nothing to
+compile, install, or keep up to date beyond Python and FFmpeg.
 
 ---
 
@@ -171,7 +254,13 @@ Early hand-drawn sketches documenting the system architecture and design thinkin
 
 ## Notes
 
-- Generated films are saved as analytical artifacts for research and critical analysis of the selection process — not for public distribution.
-- Hour tracking will be maintained via Google Sheets.
-- Bi-weekly check-ins will be completed with Dr. Campbell starting June 2025.
-- Potential gallery submission targeting a September deadline (technology and art focused).
+- Generated films are saved as analytical artifacts — each with a JSON manifest
+  recording the full sequence and the contrast reasoning behind every cut — for
+  research and critical analysis of the selection process, not for public
+  distribution.
+- Source footage is **not** stored in this repository (`.gitignore` excludes
+  video and audio). A clone provides the engine and the folder structure; the
+  media is supplied separately.
+- Hour tracking is maintained via Google Sheets.
+- Regular check-ins are held with Dr. Campbell.
+- Gallery submission planned, technology and art focused.
