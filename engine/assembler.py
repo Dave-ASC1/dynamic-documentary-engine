@@ -61,6 +61,7 @@ Version: 1.0.0
 
 import json
 import logging
+import math
 import os
 import random
 import subprocess
@@ -386,49 +387,109 @@ class Assembler:
 
         duration = broll.get("duration_seconds")
 
-        xroll_start_offset = self._pick_xroll_start_offset(
-            xroll, duration, xroll_is_stream
+        excerpts, crossfade = self._plan_xroll_excerpts(
+            xroll.get("duration_seconds"), duration, xroll_is_stream
         )
 
         cmd = self._build_broll_xroll_command(
             broll_source, xroll_source, output_path,
             duration, broll_is_stream, xroll_is_stream,
-            xroll_start_offset,
+            excerpts, crossfade,
         )
         self._run_ffmpeg(cmd, label=f"B-roll {broll_id} + X-roll {xroll_id}")
         return True
 
-    def _pick_xroll_start_offset(
+    # Crossfade applied where one excerpt hands over to the next. Long
+    # enough to hide the seam, short enough not to audibly dip the level.
+    MAX_EXCERPT_CROSSFADE_SECONDS = 0.4
+
+    # Fraction of a short audio file used per excerpt. Below 1.0 so there
+    # is room left over for the start offset to actually vary — at 1.0
+    # every excerpt would be forced to start at 0 and be identical.
+    EXCERPT_COVERAGE = 0.8
+
+    # Ceiling on excerpts per slot, so a very short audio file under a long
+    # clip can't build an unreasonable filter graph.
+    MAX_EXCERPTS = 24
+
+    # Extra audio built beyond the clip length. acrossfade consumes a little
+    # more than the nominal overlap, so planning for exactly the clip length
+    # leaves the bed fractionally short — and since -shortest ends the
+    # segment at whichever stream runs out first, that would cut the video
+    # early. The surplus is discarded by -shortest as intended.
+    EXCERPT_SURPLUS_SECONDS = 1.0
+
+    def _plan_xroll_excerpts(
         self,
-        xroll: dict,
+        xroll_duration: Optional[float],
         broll_duration: Optional[float],
         xroll_is_stream: bool,
-    ) -> float:
+    ):
         """
-        Picks a random start offset into an X-roll's audio.
+        Plans which parts of an X-roll are heard under a B-roll clip.
 
-        If the X-roll's own duration is longer than the B-roll clip it's
-        being paired with, a fully random offset in
-        [0, xroll_duration - broll_duration] is chosen so the audio doesn't
-        always start from 0:00. Live audio streams are never seekable, so
-        they always get an offset of 0.
+        Audio files are never required to match clip lengths. What happens
+        depends on how the two compare:
+
+        - **Audio at least as long as the clip** — one continuous excerpt
+          from a random start offset. A two-minute file under a ten-second
+          clip surfaces a different ten seconds every time it's used,
+          rather than always its opening seconds.
+
+        - **Audio shorter than the clip** — several excerpts, each from its
+          own random offset, handed over with a short crossfade. Previously
+          this looped the file from the same point, and the restart was
+          audible as the sound changing with no cut on screen. Jumping to a
+          different excerpt instead keeps the bed continuous, never repeats
+          within the slot, and needs no restriction on which audio can pair
+          with which clip.
 
         Args:
-            xroll (dict):           The X-roll artifact summary dictionary.
-            broll_duration (float): The paired B-roll's duration in seconds.
-            xroll_is_stream (bool): True if the X-roll source is a live stream.
+            xroll_duration (float): The X-roll's own length in seconds.
+            broll_duration (float): The paired B-roll's length in seconds.
+            xroll_is_stream (bool): True if the X-roll is a live stream.
 
         Returns:
-            float: A random start offset in seconds (0 if not applicable).
+            tuple: (excerpts, crossfade_seconds), where excerpts is a list
+                   of (start_offset, length) pairs in seconds. An empty list
+                   means "fall back to plain looping" (or, for a live
+                   stream, to playing the source as it arrives).
         """
-        if xroll_is_stream or not broll_duration:
-            return 0.0
+        # Live streams aren't seekable and unmeasured files can't be planned.
+        if xroll_is_stream or not broll_duration or not xroll_duration:
+            return [], 0.0
 
-        xroll_duration = xroll.get("duration_seconds")
-        if not xroll_duration or xroll_duration <= broll_duration:
-            return 0.0
+        # Audio covers the clip on its own — one excerpt, random position.
+        if xroll_duration >= broll_duration:
+            offset = random.uniform(0.0, xroll_duration - broll_duration)
+            return [(offset, broll_duration)], 0.0
 
-        return random.uniform(0.0, xroll_duration - broll_duration)
+        # Audio is shorter than the clip: chain random excerpts.
+        excerpt_len = xroll_duration * self.EXCERPT_COVERAGE
+        crossfade = min(self.MAX_EXCERPT_CROSSFADE_SECONDS, excerpt_len / 4)
+
+        # n excerpts joined by n-1 crossfades run for
+        # n*excerpt_len - (n-1)*crossfade, which must cover the clip.
+        span = excerpt_len - crossfade
+        if span <= 0:
+            return [], 0.0
+        needed = broll_duration + self.EXCERPT_SURPLUS_SECONDS
+        count = math.ceil((needed - crossfade) / span)
+
+        # Far too many excerpts to chain — a very short sound under a very
+        # long clip. Fall back to plain looping, which is repetitive but at
+        # least covers the whole clip; truncating the chain here would leave
+        # the rest of the clip silent, and B-roll is never silent.
+        if count > self.MAX_EXCERPTS:
+            return [], 0.0
+        count = max(2, count)
+
+        max_offset = xroll_duration - excerpt_len
+        excerpts = [
+            (random.uniform(0.0, max_offset), excerpt_len)
+            for _ in range(count)
+        ]
+        return excerpts, crossfade
 
     # ------------------------------------------------------------------
     # Artifact Lookup and Source Resolution
@@ -631,35 +692,41 @@ class Assembler:
         duration: Optional[float],
         video_is_stream: bool,
         audio_is_stream: bool,
-        audio_start_offset: float = 0.0,
+        excerpts: Optional[list] = None,
+        crossfade: float = 0.0,
     ) -> list:
         """
         Builds the FFmpeg command to layer X-roll audio over B-roll video.
 
-        B-roll is video-only (no audio track). X-roll is audio-only. This
-        command takes both as inputs and combines them:
-            - Video track: taken from input 0 (B-roll), via -map 0:v
-            - Audio track: taken from input 1 (X-roll), via -map 1:a
-            - -ss (before the audio -i): seeks into the X-roll to a random
-              start offset, so a long audio file doesn't always play from
-              0:00 — see _pick_xroll_start_offset.
-            - -stream_loop -1: loops the X-roll audio (from the seeked
-              offset) indefinitely so it always covers the full B-roll
-              duration regardless of length.
-            - -shortest: stops encoding at whichever input ends first —
-              in practice this is always the B-roll video, ensuring the
-              output duration exactly matches the B-roll clip length.
+        B-roll is video-only (no audio track). X-roll is audio-only. Video
+        comes from input 0, audio from input 1.
+
+        The audio bed is assembled from the excerpt plan (see
+        _plan_xroll_excerpts) rather than by looping the file:
+
+            - One excerpt — the audio covers the clip on its own, played
+              from a random offset. atrim selects it.
+            - Several excerpts — the audio is shorter than the clip, so
+              each excerpt is taken from its own random offset and handed to
+              the next with an acrossfade. This replaces `-stream_loop -1`,
+              whose restart was audible as the sound changing with no cut on
+              screen.
+            - No excerpts — a live stream or an unmeasured file; the source
+              plays from the top and is bounded by duration.
+
+        -shortest stops encoding at whichever input ends first, which is
+        always the B-roll video, so the segment matches the clip length.
 
         Args:
-            video_source:        FFmpeg input string for the B-roll video.
-            audio_source:        FFmpeg input string for the X-roll audio.
-            output_path:         Path for the rendered output segment file.
-            duration:            Duration in seconds (applied to B-roll length).
-            video_is_stream:     True if video source is a live stream.
-            audio_is_stream:     True if audio source is a live stream.
-            audio_start_offset:  Seconds to seek into the X-roll audio before
-                                  looping/trimming. 0 for streams or when the
-                                  X-roll isn't longer than the B-roll clip.
+            video_source:    FFmpeg input string for the B-roll video.
+            audio_source:    FFmpeg input string for the X-roll audio.
+            output_path:     Path for the rendered output segment file.
+            duration:        Duration in seconds (applied to B-roll length).
+            video_is_stream: True if video source is a live stream.
+            audio_is_stream: True if audio source is a live stream.
+            excerpts:        List of (start_offset, length) pairs to play in
+                             order; empty/None to play the source as-is.
+            crossfade:       Seconds of overlap between consecutive excerpts.
 
         Returns:
             list: FFmpeg command as a list of argument strings.
@@ -672,21 +739,28 @@ class Assembler:
             cmd += ["-t", str(capture)]
         cmd += ["-i", video_source]
 
-        # X-roll audio input — seek to a random offset, then loop indefinitely
-        # so it always covers the video
+        # X-roll audio input
         if audio_is_stream:
             cmd += ["-t", str(duration if duration else self.DEFAULT_STREAM_CAPTURE_SECONDS)]
-        elif audio_start_offset:
-            cmd += ["-ss", str(audio_start_offset)]
-        cmd += ["-stream_loop", "-1", "-i", audio_source]
+        elif not excerpts:
+            # No excerpt plan for a local file — loop it so the clip is
+            # covered. Repetitive, but B-roll is never left silent.
+            cmd += ["-stream_loop", "-1"]
+        cmd += ["-i", audio_source]
 
         # Trim to B-roll duration for local video (stream already limited above)
         if duration and not video_is_stream:
             cmd += ["-t", str(duration)]
 
+        audio_filter = self._build_excerpt_filter(excerpts, crossfade)
+
+        cmd += ["-map", "0:v"]              # Video from input 0 (B-roll)
+        if audio_filter:
+            cmd += ["-filter_complex", audio_filter, "-map", "[aout]"]
+        else:
+            cmd += ["-map", "1:a"]          # Audio from input 1 (X-roll)
+
         cmd += [
-            "-map", "0:v",      # Video from input 0 (B-roll)
-            "-map", "1:a",      # Audio from input 1 (X-roll)
             "-vf", self._build_normalize_video_filter(),
             "-r", str(self.output_fps),
             "-shortest",         # Stop at end of B-roll video
@@ -701,6 +775,54 @@ class Assembler:
         ]
 
         return cmd
+
+    def _build_excerpt_filter(
+        self, excerpts: Optional[list], crossfade: float
+    ) -> str:
+        """
+        Builds the filter graph that assembles the X-roll excerpts into one
+        continuous audio bed labelled [aout].
+
+        Each excerpt is cut from the same input with atrim, reset to zero
+        with asetpts, and joined to the previous one with acrossfade. The
+        input is asplit into one branch per excerpt so the file is only
+        opened once.
+
+        Args:
+            excerpts:  List of (start_offset, length) pairs, or empty/None.
+            crossfade: Seconds of overlap between consecutive excerpts.
+
+        Returns:
+            str: The filter_complex graph, or "" to map the source directly.
+        """
+        if not excerpts:
+            return ""
+
+        parts = []
+        if len(excerpts) == 1:
+            parts.append("[1:a]asplit=1[s0]")
+        else:
+            labels = "".join(f"[s{i}]" for i in range(len(excerpts)))
+            parts.append(f"[1:a]asplit={len(excerpts)}{labels}")
+
+        for i, (offset, length) in enumerate(excerpts):
+            parts.append(
+                f"[s{i}]atrim=start={offset:.4f}:duration={length:.4f},"
+                f"asetpts=PTS-STARTPTS[a{i}]"
+            )
+
+        if len(excerpts) == 1:
+            parts.append("[a0]anull[aout]")
+        else:
+            current = "a0"
+            for i in range(1, len(excerpts)):
+                out = "aout" if i == len(excerpts) - 1 else f"x{i}"
+                parts.append(
+                    f"[{current}][a{i}]acrossfade=d={crossfade:.4f}[{out}]"
+                )
+                current = out
+
+        return ";".join(parts)
 
     def _build_concat_command(self, segment_paths: list, output_path: str) -> list:
         """

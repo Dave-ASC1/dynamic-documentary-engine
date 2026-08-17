@@ -27,10 +27,10 @@ Current generation behavior:
 
 ## What Changed (2026-08-17)
 
-Three items from the 2026-08-17 meeting with Dr. Campbell, plus an audio
-bleed found and fixed afterwards.
+Three items from the 2026-08-17 meeting with Dr. Campbell, plus two audio
+defects found and fixed afterwards.
 
-**1. Why audio and video sometimes cut together and sometimes don't (investigation — no fix applied)**
+**1. Why audio and video sometimes cut together and sometimes don't — root cause, now fixed**
 
 Dr. Campbell noticed the sound sometimes changes at the same moment the
 picture does, and sometimes seems to change on its own. The controlling
@@ -62,10 +62,26 @@ the budget when it's off) and trims the tail when it's on. Either shifts
 which clips land where, changing the odds of hitting a short-X-roll/long-
 B-roll pairing — but it isn't the cause.
 
-Left as-is per Dr. Campbell's "understand it, don't need to fix it". If a
-fix is wanted later, the options are: only pair X-rolls at least as long as
-the B-roll, fade the audio out instead of looping, or accept the loop and
-crossfade the restart.
+**Fixed**, without putting any restriction on which audio can pair with
+which clip — that mattered, because requiring audio to be at least as long
+as the clip would have undone the random-excerpt behaviour above.
+
+Instead of looping, the audio bed is now built from **several excerpts, each
+taken from its own random point in the file, handed over with a short
+(0.4s) crossfade**. A 6.6-second sound under a 10-second clip now plays two
+different excerpts back to back rather than the same one twice. Nothing
+repeats within a slot, the seam is inaudible, and any audio file still works
+under any clip.
+
+Verified on the original failing case: the audio at 6.616s used to be
+byte-for-byte identical to the audio at 0s; it no longer is, the bed runs
+continuously with no dropout, and segment durations are unchanged from
+before.
+
+One safety net: if a sound is so short relative to the clip that it would
+need more than 24 excerpts (say a 0.3s sound under a minute of video), it
+falls back to plain looping. Repetitive, but it covers the clip — B-roll is
+never left silent.
 
 **1b. Audio bleeding across cuts — separate cause, and this one IS fixed**
 
