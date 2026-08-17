@@ -124,6 +124,39 @@ body {
   display: block;
 }
 
+/* Sits beside the theme toggle rather than in the controls card: this
+   leaves the page entirely, so it belongs with the other page-level chrome
+   and not among the generation settings. Understated on purpose — staff
+   reach for it occasionally, nobody else should. */
+.exhibit-link {
+  position: absolute;
+  top: 1.25rem;
+  right: 4.6rem;                 /* clears the 40px toggle plus its margin */
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 40px;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-solid);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.exhibit-link:hover { color: var(--text); border-color: var(--accent); }
+.exhibit-link-icon { font-size: 0.9rem; line-height: 1; }
+
+/* The label would crowd the header on a phone; the icon still reads. */
+@media (max-width: 560px) {
+  .exhibit-link span:not(.exhibit-link-icon) { display: none; }
+  .exhibit-link { padding: 0 0.75rem; }
+}
+
 .theme-toggle {
   position: absolute;
   top: 1.25rem;

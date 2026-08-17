@@ -71,6 +71,9 @@
         To come back here later, press <kbd>Esc</kbd> or tap the top-left
         corner of the screen three times.
       </p>
+      <p class="setup-foot">
+        <a class="setup-back" href="/">Back to the full controls</a>
+      </p>
     </div>
   </section>
 
@@ -112,7 +115,9 @@
     <section id="screening" class="panel screening hidden">
       <video id="exhibit-player" playsinline></video>
       <div id="screening-overlay" class="screening-overlay">
-        <button id="replay-btn" type="button" class="ghost-btn">Play again</button>
+        <button id="pause-btn" type="button" class="ghost-btn primary-ghost">Pause</button>
+        <span id="time-readout" class="time-readout" aria-live="off"></span>
+        <button id="replay-btn" type="button" class="ghost-btn">Start over</button>
         <button id="another-btn" type="button" class="ghost-btn">Make another</button>
       </div>
     </section>

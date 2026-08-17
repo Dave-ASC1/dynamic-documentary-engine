@@ -151,6 +151,9 @@ body { overflow: hidden; }          /* a kiosk never scrolls */
 .setup-start:disabled { opacity: 0.5; cursor: default; filter: none; }
 
 .setup-foot { color: var(--muted); font-size: 0.8rem; margin: 1.25rem 0 0; text-align: center; }
+.setup-foot + .setup-foot { margin-top: 0.6rem; }
+.setup-back { color: var(--accent-bright); text-decoration: none; }
+.setup-back:hover { text-decoration: underline; }
 
 kbd {
   background: var(--bg);
@@ -318,6 +321,31 @@ kbd {
 
 .screening-overlay.visible { opacity: 1; pointer-events: auto; }
 .screening-overlay .ghost-btn { border-color: rgba(255, 255, 255, 0.35); color: #fff; }
+
+/* Pause is the control someone reaches for first, so it's filled rather
+   than outlined like the two secondary actions beside it. */
+.screening-overlay .primary-ghost {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+  min-width: 9rem;
+}
+
+.screening-overlay .primary-ghost:hover { background: rgba(255, 255, 255, 0.26); }
+
+.time-readout {
+  align-self: center;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: clamp(0.85rem, 1.7vmin, 1.05rem);
+  font-variant-numeric: tabular-nums;   /* no jitter as the digits tick */
+  min-width: 8ch;
+  text-align: center;
+}
+
+/* Paused is a held state, not a passing one — the controls stay up so the
+   way back is always visible, and the film reads as deliberately stopped
+   rather than broken. */
+.screening.is-paused .screening-overlay { opacity: 1; pointer-events: auto; }
 
 /* --- Failure ------------------------------------------------------------ */
 

@@ -37,6 +37,8 @@ const progressFill = document.getElementById("progress-fill");
 const workingCancel = document.getElementById("working-cancel");
 const player = document.getElementById("exhibit-player");
 const screeningOverlay = document.getElementById("screening-overlay");
+const pauseBtn = document.getElementById("pause-btn");
+const timeReadout = document.getElementById("time-readout");
 const replayBtn = document.getElementById("replay-btn");
 const anotherBtn = document.getElementById("another-btn");
 const failureDetail = document.getElementById("failure-detail");
@@ -350,6 +352,8 @@ async function cancelGeneration() {
 
 function play(url) {
   showPanel("screening");
+  // Clear any held pause state left over from the previous film.
+  panels.screening.classList.remove("is-paused");
   player.src = url;
   player.muted = false;
   const attempt = player.play();
@@ -366,7 +370,8 @@ function play(url) {
 }
 
 // The controls appear on arrival and whenever the screen is touched, then
-// fade so the film plays unobstructed.
+// fade so the film plays unobstructed. While paused they stay up — see the
+// .is-paused rule in the stylesheet.
 let overlayTimer = null;
 function revealOverlayBriefly() {
   screeningOverlay.classList.add("visible");
@@ -375,6 +380,57 @@ function revealOverlayBriefly() {
 }
 
 panels.screening.addEventListener("pointerdown", revealOverlayBriefly);
+
+/* --- Pause -----------------------------------------------------------------
+ * The video element has no native controls: a browser's control bar looks
+ * wrong on a gallery wall. But a visitor still needs to be able to stop a
+ * film, especially a long one, so pause lives in the overlay instead.
+ * ------------------------------------------------------------------------ */
+
+function clockTime(seconds) {
+  if (!Number.isFinite(seconds)) return "0:00";
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return h
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function updateTimeReadout() {
+  if (!Number.isFinite(player.duration)) {
+    timeReadout.textContent = "";
+    return;
+  }
+  timeReadout.textContent = `${clockTime(player.currentTime)} / ${clockTime(player.duration)}`;
+}
+
+function syncPauseButton() {
+  const paused = player.paused;
+  pauseBtn.textContent = paused ? "Resume" : "Pause";
+  panels.screening.classList.toggle("is-paused", paused);
+  if (paused) {
+    // Keep the controls up so the way back is always on screen.
+    clearTimeout(overlayTimer);
+    screeningOverlay.classList.add("visible");
+  } else {
+    revealOverlayBriefly();
+  }
+}
+
+pauseBtn.addEventListener("click", () => {
+  if (player.paused) {
+    player.play().catch(() => {});
+  } else {
+    player.pause();
+  }
+});
+
+player.addEventListener("play", syncPauseButton);
+player.addEventListener("pause", syncPauseButton);
+player.addEventListener("timeupdate", updateTimeReadout);
+player.addEventListener("loadedmetadata", updateTimeReadout);
 
 player.addEventListener("ended", () => {
   if (settings && settings.mode === "continuous") {

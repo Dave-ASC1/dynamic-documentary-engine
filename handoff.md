@@ -186,7 +186,11 @@ How it works:
    is possible: a bare spinner for half an hour tells a viewer nothing.
 4. **The film plays automatically** when ready, full screen. If the browser
    blocks sound before any interaction, it falls back to muted playback
-   rather than leaving a still frame on the wall.
+   rather than leaving a still frame on the wall. Touching the screen brings
+   up **Pause**, the elapsed time, **Start over** and **Make another**; the
+   controls fade while playing and stay up while paused. The video's own
+   browser control bar is deliberately not used — it looks wrong on a
+   gallery wall — so pause lives in that overlay instead.
 5. **Failures never leave a blank screen** — an apologetic panel with a
    "Try again" button, and in unattended mode it retries by itself after
    twelve seconds.
@@ -195,6 +199,10 @@ To get back to the setup screen: press **Esc**, or tap the **top-left corner
 three times** (three, so one stray touch doesn't expose settings to a
 visitor). Diversity mode is on and exact-duration off in this view, baked in
 rather than exposed — whole clips are kinder than a hard cut mid-shot.
+
+Reaching it: an **Exhibit mode** link sits in the top-right of the console,
+beside the theme toggle, and the exhibit's setup screen links back. The
+direct address is `/exhibit`.
 
 Files: `web/frontend/exhibit.html`, `exhibit.css`, `exhibit.js`. Progress
 reporting runs through the existing job_id, with a new
