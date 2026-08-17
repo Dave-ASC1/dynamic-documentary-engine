@@ -124,11 +124,22 @@ class SequencingRules:
         Evaluates whether an X-roll artifact is eligible to be paired with
         a B-roll as its audio layer.
 
-        Pairing eligibility skips the duration budget rule. At render time
-        the X-roll's audio is looped underneath the B-roll's video and cut
-        to the B-roll's length (-stream_loop -1, -shortest) — it does not
-        add separate screen time, so it must not consume runtime budget the
-        way a standalone selection does.
+        Pairing eligibility skips two rules that apply to standalone picks.
+
+        The duration budget, because at render time the X-roll's audio sits
+        underneath the B-roll's video and is cut to the B-roll's length — it
+        adds no separate screen time, so it must not consume runtime budget.
+
+        And no-repeat, because an audio bed is a layer rather than a shot.
+        Reusing one is not the same as showing a clip twice: the assembler
+        takes a different randomly-positioned excerpt on every use, so a
+        two-minute recording heard under two clips is two different passages
+        of it. Enforcing no-repeat here made the number of audio files a hard
+        cap on the length of the film — a collection of sixteen silent clips
+        and two recordings could only ever produce a two-shot film, with
+        fourteen clips unusable. Spreading usage is handled by the selector,
+        which prefers the least-used audio (see select_pairing), so extra
+        recordings are still favoured whenever they exist.
 
         Args:
             artifact (dict): The X-roll artifact summary dictionary to evaluate.
@@ -136,11 +147,25 @@ class SequencingRules:
         Returns:
             bool: True if the artifact is eligible for pairing.
         """
-        if not self._passes_no_repeat_rule(artifact):
-            return False
         if not self._passes_must_not_follow_rule(artifact):
             return False
         return True
+
+    def pairing_use_count(self, artifact):
+        """
+        Returns how many times this artifact has already been paired in the
+        current film.
+
+        Lets the selector prefer audio that hasn't been heard yet before
+        reaching for something already used.
+
+        Args:
+            artifact (dict): The artifact summary dictionary to count.
+
+        Returns:
+            int: Number of times it has been registered.
+        """
+        return self.used_artifact_ids.count(artifact.get("artifact_id"))
 
     def get_target_pacing(self):
         """

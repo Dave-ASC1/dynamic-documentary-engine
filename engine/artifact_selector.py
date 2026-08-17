@@ -183,6 +183,21 @@ class ArtifactSelector:
         if not eligible:
             return None
 
+        # Audio may be reused within a film (see is_eligible_for_pairing),
+        # so narrow to whatever has been heard least before contrast decides
+        # among those. This is what makes the behaviour scale with the
+        # collection rather than needing a setting: while unheard audio
+        # remains, every candidate here is unheard and the choice is purely
+        # contrast — identical to never repeating. Only once everything has
+        # been used once does the tier move to twice-used, and so on, so
+        # repeats are spread evenly instead of one recording winning every
+        # matchup on score alone.
+        fewest = min(self.rules.pairing_use_count(a) for a in eligible)
+        eligible = [
+            a for a in eligible
+            if self.rules.pairing_use_count(a) == fewest
+        ]
+
         if self._last_selected is not None:
             eligible = self._apply_juxtaposition_filter(eligible)
 

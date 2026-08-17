@@ -4,7 +4,7 @@
   "description": "World War II film collection.",
   "version": "1.0.0",
   "created_at": "2026-08-17T15:18:47.658450+00:00",
-  "updated_at": "2026-08-17T15:19:02.933058+00:00",
+  "updated_at": "2026-08-17T15:31:37.252984+00:00",
   "runtime_rules": {
     "min_duration_seconds": 35,
     "max_duration_seconds": 1800,
@@ -12,10 +12,10 @@
     "save_generated_films": true
   },
   "artifact_counts": {
-    "total": 18,
+    "total": 19,
     "a_roll": 0,
     "b_roll": 16,
-    "x_roll": 2
+    "x_roll": 3
   },
   "artifacts": [
     {
@@ -281,6 +281,18 @@
       "can_repeat": false,
       "must_not_follow": [],
       "pacing": "slow"
+    },
+    {
+      "artifact_id": "auto_x_piano_sound",
+      "artifact_type": "X-roll",
+      "role": "body",
+      "filename": "x-roll/piano_sound.wav",
+      "duration_seconds": 10.105,
+      "title": "Piano Sound",
+      "weight": 0.5,
+      "can_repeat": false,
+      "must_not_follow": [],
+      "pacing": "medium"
     }
   ]
 }

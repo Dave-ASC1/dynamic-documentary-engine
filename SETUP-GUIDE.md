@@ -164,11 +164,16 @@ itself. Reload the page in your browser and the new count appears beside
 the topic name. Nothing to register, no settings to change.
 
 **How many sound files do I need?** Every silent `b-roll` clip is paired
-with its own `x-roll` sound file, and no file is used twice in the same
-film. So a topic with 16 video clips but only 2 sound files can only ever
-make a 2-shot film. As a rule of thumb, aim for **about as many `x-roll`
-sound files as you have `b-roll` clips**. Clips in `a-roll` already carry
-their own sound and don't need a partner.
+with an `x-roll` sound file. There's no minimum — a topic with sixteen
+video clips and two sound files still uses all sixteen clips, sharing the
+audio between them and playing a different passage of each recording every
+time it's heard.
+
+More recordings simply means less sharing. The engine always reaches for
+whatever has been heard least, so once you have about as many sound files
+as video clips, nothing repeats at all. Anywhere in between works fine.
+
+Clips in `a-roll` already carry their own sound and don't need a partner.
 
 **Which folder does a clip go in?**
 

@@ -253,12 +253,16 @@ class Sequencer:
             artifact_type = selected.get("artifact_type")
 
             if artifact_type == "B-roll":
+                # The closing pair's B-roll is held back so the film has an
+                # ending to reach, but its X-roll is not: audio may be
+                # reused within a film, so reserving it buys nothing and
+                # costs variety. With only two or three recordings in a
+                # collection, excluding one removed a third of the available
+                # audio from every body slot — the reserved track ended up
+                # heard only in the bookends and nowhere else.
                 x_roll_pool = [
                     a for a in body_artifacts
-                    if (
-                        a.get("artifact_type") == "X-roll"
-                        and a.get("artifact_id") not in reserved_closing_ids
-                    )
+                    if a.get("artifact_type") == "X-roll"
                 ]
                 x_roll = self.selector.select_pairing(x_roll_pool)
 
