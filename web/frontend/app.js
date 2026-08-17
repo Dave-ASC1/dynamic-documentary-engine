@@ -5,6 +5,8 @@ const durationInput = document.getElementById("duration");
 const diversityToggle = document.getElementById("diversity-toggle");
 const exactDurationToggle = document.getElementById("exact-duration-toggle");
 const cancelBtn = document.getElementById("cancel-btn");
+const durationUnit = document.getElementById("duration-unit");
+const durationHint = document.getElementById("duration-hint");
 const statusEl = document.getElementById("status");
 const statusText = statusEl.querySelector(".status-text");
 const playerSection = document.getElementById("player-section");
@@ -42,9 +44,23 @@ function setStatus(text, state) {
   if (state) statusEl.classList.add(state);
 }
 
+// Films can run from seconds to feature length, so a bare second count
+// stops being readable quickly ("5400s" tells you nothing). Anything over
+// a minute is broken into h/m/s.
 function formatSeconds(s) {
   if (s == null) return "?";
-  return `${Math.round(s)}s`;
+  const total = Math.round(s);
+  if (total < 60) return `${total}s`;
+
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+
+  const parts = [];
+  if (hours) parts.push(`${hours}h`);
+  if (minutes) parts.push(`${minutes}m`);
+  if (seconds) parts.push(`${seconds}s`);
+  return parts.join(" ");
 }
 
 // Labels come back from the engine as "Title [artifact_type]" — pull the
@@ -332,8 +348,94 @@ async function cancelGeneration() {
   }
 }
 
+// Target length in whole seconds, whichever unit is showing. The engine
+// only ever deals in seconds; minutes are purely an input convenience so a
+// long film can be asked for as "90" rather than "5400".
+function targetSeconds() {
+  const value = parseFloat(durationInput.value);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const seconds = durationUnit.value === "minutes" ? value * 60 : value;
+  return Math.max(1, Math.round(seconds));
+}
+
+// Half-minute steps so switching units can round-trip exactly — 90
+// seconds becomes 1.5 minutes and back, instead of snapping to 2.
+const UNIT_CONFIG = {
+  seconds: { min: 1, max: 36000, step: 1 },
+  minutes: { min: 0.5, max: 600, step: 0.5 },
+};
+
+function applyUnit(unit, convertValue) {
+  if (!UNIT_CONFIG[unit]) unit = "seconds";
+  const cfg = UNIT_CONFIG[unit];
+  durationUnit.value = unit;
+
+  if (convertValue) {
+    const value = parseFloat(durationInput.value);
+    if (Number.isFinite(value) && value > 0) {
+      const converted = unit === "minutes" ? value / 60 : value * 60;
+      // Keep minutes to one decimal; seconds are always whole.
+      durationInput.value =
+        unit === "minutes"
+          ? Math.max(cfg.min, Math.round(converted * 10) / 10)
+          : Math.max(cfg.min, Math.round(converted));
+    }
+  }
+
+  durationInput.min = cfg.min;
+  durationInput.max = cfg.max;
+  durationInput.step = cfg.step;
+  rememberDuration();
+  updateDurationHint();
+}
+
+// The unit and the number are remembered together. Storing only the unit
+// would mean returning to the page with the markup's default of 90 now
+// read as 90 *minutes* — a 90-second film silently becoming a 90-minute
+// one between visits.
+function rememberDuration() {
+  localStorage.setItem("dde-duration-unit", durationUnit.value);
+  localStorage.setItem("dde-duration-value", durationInput.value);
+}
+
+// Shows what the entered number actually works out to, so there's no doubt
+// that "90 minutes" means an hour and a half.
+function updateDurationHint() {
+  const seconds = targetSeconds();
+  if (seconds === null) {
+    durationHint.textContent = "Enter a length greater than zero.";
+    return;
+  }
+  // The raw second count is only worth spelling out when it isn't already
+  // what's shown — "= 45s (45 seconds)" says the same thing twice.
+  const readable = formatSeconds(seconds);
+  durationHint.textContent =
+    readable === `${seconds}s`
+      ? `= ${readable}`
+      : `= ${readable} (${seconds} seconds)`;
+}
+
+durationUnit.addEventListener("change", () => applyUnit(durationUnit.value, true));
+durationInput.addEventListener("input", () => {
+  rememberDuration();
+  updateDurationHint();
+});
+
+(function restoreDuration() {
+  const storedValue = localStorage.getItem("dde-duration-value");
+  applyUnit(localStorage.getItem("dde-duration-unit") || "seconds", false);
+  if (storedValue !== null && parseFloat(storedValue) > 0) {
+    durationInput.value = storedValue;
+  }
+  updateDurationHint();
+})();
+
 async function generateFilm() {
-  const target = parseInt(durationInput.value, 10) || 90;
+  const target = targetSeconds();
+  if (target === null) {
+    setStatus("Enter a target length greater than zero.", "error");
+    return;
+  }
   activeJobId = newJobId();
   generateBtn.disabled = true;
   generateBtn.classList.add("hidden");

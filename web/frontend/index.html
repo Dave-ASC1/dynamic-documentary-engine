@@ -45,10 +45,14 @@
       <div class="field field-centered">
         <label for="duration">Target length</label>
         <div class="field-input">
-          <input type="number" id="duration" min="1" max="9999" value="90" />
-          <span class="unit">seconds</span>
+          <input type="number" id="duration" min="1" max="36000" step="1" value="90" />
+          <select id="duration-unit" class="unit-select" aria-label="Target length unit">
+            <option value="seconds">seconds</option>
+            <option value="minutes">minutes</option>
+          </select>
         </div>
       </div>
+      <p id="duration-hint" class="field-hint"></p>
 
       <button id="generate-btn" type="button">
         <span class="btn-icon">&#9654;</span>

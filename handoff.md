@@ -156,6 +156,15 @@ instead. Files of any resolution, frame rate, or codec are accepted, with or
 without their own audio — the engine letterboxes and re-times them to match
 the film. Each folder has a README.txt explaining this in plain language.
 
+**4. Minutes as well as seconds for target length** — the target length
+field now has a seconds/minutes selector, so a long film can be asked for
+as "90 minutes" rather than "5400 seconds". The engine still works purely
+in seconds; the unit is an input convenience. The chosen unit *and* number
+are both remembered between visits, and a readout under the field shows
+what the entry works out to ("= 1h 30m (5400 seconds)"). Durations shown
+elsewhere in the UI are now formatted the same way rather than as a raw
+second count.
+
 Also: the web server's default port moved from 5000 to **5001**, because
 macOS runs AirPlay Receiver on 5000 and silently takes the port. Set the
 `PORT` environment variable to override.
@@ -265,7 +274,6 @@ Discussed with Dr. Campbell on 2026-07-23: leaning toward an **old loaner laptop
 - [ ] **Get real WWII footage from Dr. Campbell** and load it into `local-media/WWII/assets/` (she committed to sending clips; David to add them to the new folder structure once received — Swiss and any other topics likewise).
 - [ ] **Document how the engine works** — the design decisions and structure, for future reference and potential publications (Dr. Campbell explicitly requested this on 2026-07-23; not yet written up beyond this handoff doc and inline code comments).
 - [ ] **Research live webcam feed integration** — floated as a future enhancement in the 2026-07-23 meeting; no design work started yet.
-- [ ] **Minutes-based duration input** — nice-to-have per Dr. Campbell, not essential; currently seconds-only in the UI.
 - [ ] Configure OneDrive Desktop Sync on the eventual exhibit machine.
 - [ ] Set Flask to auto-start on boot for that machine.
 - [ ] Decide and build the visitor-facing interaction model (staff-started vs. button-triggered).
