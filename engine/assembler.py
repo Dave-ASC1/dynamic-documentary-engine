@@ -67,6 +67,8 @@ import subprocess
 import tempfile
 from typing import Optional
 
+from engine.cancellation import GenerationCancelled, run_subprocess
+
 logger = logging.getLogger(__name__)
 
 
@@ -132,6 +134,7 @@ class Assembler:
         output_height: int = DEFAULT_OUTPUT_HEIGHT,
         output_fps: int = DEFAULT_OUTPUT_FPS,
         video_preset: str = DEFAULT_VIDEO_PRESET,
+        cancel_token=None,
     ):
         """
         Initializes the Assembler.
@@ -153,6 +156,10 @@ class Assembler:
             output_height (int): Normalized segment height in pixels.
             output_fps (int):    Normalized segment frame rate.
             video_preset (str):  FFmpeg encoder preset for segment rendering.
+            cancel_token:        Optional CancellationToken. When supplied,
+                                 the render loop stops between slots if
+                                 cancelled and the running FFmpeg process is
+                                 terminated. None means not cancellable.
         """
         self.loader        = loader
         self.assets_path   = os.path.normpath(assets_path)
@@ -166,6 +173,7 @@ class Assembler:
         self.output_height = output_height
         self.output_fps    = output_fps
         self.video_preset  = video_preset
+        self.cancel_token  = cancel_token
 
     # ------------------------------------------------------------------
     # Public Interface
@@ -223,6 +231,11 @@ class Assembler:
         with tempfile.TemporaryDirectory() as tmpdir:
 
             for i, entry in enumerate(sequence):
+                # Stop between slots on cancel — the FFmpeg call for the
+                # slot already in flight is killed by the token itself.
+                if self.cancel_token is not None:
+                    self.cancel_token.raise_if_cancelled()
+
                 segment_path = os.path.join(
                     tmpdir, f"segment_{i:04d}.{self.output_format}"
                 )
@@ -245,6 +258,11 @@ class Assembler:
                             i + 1, len(sequence),
                             os.path.basename(segment_path),
                         )
+
+                except GenerationCancelled:
+                    # A deliberate stop, not a bad slot — must escape the
+                    # per-slot "skip and keep going" handler below.
+                    raise
 
                 except Exception as e:
                     logger.warning(
@@ -750,7 +768,9 @@ class Assembler:
         label_str = f" [{label}]" if label else ""
         logger.info("FFmpeg%s: %s", label_str, " ".join(cmd))
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = run_subprocess(
+            cmd, self.cancel_token, capture_output=True, text=True
+        )
 
         if result.returncode != 0:
             logger.debug("FFmpeg stderr:\n%s", result.stderr)

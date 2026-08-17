@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dde-web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["web/backend/app.py"],
+      "port": 5001
+    }
+  ]
+}

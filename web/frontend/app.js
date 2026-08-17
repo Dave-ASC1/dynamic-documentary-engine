@@ -4,6 +4,7 @@ const collectionHint = document.getElementById("collection-hint");
 const durationInput = document.getElementById("duration");
 const diversityToggle = document.getElementById("diversity-toggle");
 const exactDurationToggle = document.getElementById("exact-duration-toggle");
+const cancelBtn = document.getElementById("cancel-btn");
 const statusEl = document.getElementById("status");
 const statusText = statusEl.querySelector(".status-text");
 const playerSection = document.getElementById("player-section");
@@ -177,7 +178,24 @@ function renderMeta(result) {
     metaEl.appendChild(chip("Length", result.trimmed ? "Exact (trimmed)" : "Exact (no trim needed)"));
   }
   if (result.title_cards) {
-    metaEl.appendChild(chip("Intro/outro", "Included (+~10s, not counted above)"));
+    // Name the topic's own opening/closing pieces when it has them, so it's
+    // obvious which folder the film actually picked up — falling back to
+    // the generic label only when the standard text cards were used.
+    const custom = [result.opening_title_piece, result.closing_title_piece].filter(Boolean);
+    const added = formatSeconds(result.title_card_seconds);
+    metaEl.appendChild(
+      chip(
+        "Intro/outro",
+        custom.length
+          ? `${custom.join(" / ")} (+${added}, not counted above)`
+          : `Included (+${added}, not counted above)`
+      )
+    );
+  }
+  if (result.titles_exceed_target) {
+    metaEl.appendChild(
+      chip("Note", "Title pieces are longer than the requested length")
+    );
   }
 }
 
@@ -284,9 +302,43 @@ async function loadCollections() {
   }
 }
 
+// Id for the run currently in flight, so the Cancel button can name it to
+// the backend. Null whenever nothing is generating.
+let activeJobId = null;
+
+function newJobId() {
+  // crypto.randomUUID needs a secure context — over a plain-http tunnel or
+  // LAN address it may be missing, so fall back to a random-enough id.
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return `job-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function cancelGeneration() {
+  if (!activeJobId) return;
+  cancelBtn.disabled = true;
+  setStatus("Cancelling…", "active");
+  try {
+    await fetch("/api/generate/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: activeJobId }),
+    });
+    // The in-flight generate request unwinds on its own and reports the
+    // cancellation — no need to update status further from here.
+  } catch (e) {
+    setStatus(`Could not cancel: ${e.message}`, "error");
+  }
+}
+
 async function generateFilm() {
   const target = parseInt(durationInput.value, 10) || 90;
+  activeJobId = newJobId();
   generateBtn.disabled = true;
+  generateBtn.classList.add("hidden");
+  cancelBtn.classList.remove("hidden");
+  cancelBtn.disabled = false;
   setStatus("Generating a unique sequence and rendering the film…", "active");
   traceSection.classList.add("hidden");
 
@@ -299,9 +351,17 @@ async function generateFilm() {
         target_duration: target,
         diversity_mode: diversityToggle.checked,
         exact_duration: exactDurationToggle.checked,
+        job_id: activeJobId,
       }),
     });
     const result = await res.json();
+
+    // 409 is a deliberate cancel, not a failure — say so plainly rather
+    // than showing it as an error.
+    if (res.status === 409 && result.cancelled) {
+      setStatus("Generation cancelled.", "done");
+      return;
+    }
 
     if (!res.ok) {
       throw new Error(result.error || `Server returned ${res.status}`);
@@ -317,9 +377,13 @@ async function generateFilm() {
   } catch (e) {
     setStatus(`Generation failed: ${e.message}`, "error");
   } finally {
+    activeJobId = null;
     generateBtn.disabled = false;
+    generateBtn.classList.remove("hidden");
+    cancelBtn.classList.add("hidden");
   }
 }
 
 generateBtn.addEventListener("click", generateFilm);
+cancelBtn.addEventListener("click", cancelGeneration);
 loadCollections();

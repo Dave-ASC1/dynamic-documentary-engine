@@ -45,6 +45,7 @@ Version: 1.2.0
 import json
 import os
 import sys
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -59,9 +60,41 @@ for _p in (REPO_ROOT, SCRIPTS_DIR):
         sys.path.insert(0, _p)
 
 import dde_runtime  # noqa: E402
+from engine.cancellation import CancellationToken, GenerationCancelled  # noqa: E402
 from flask import Flask, abort, jsonify, request, send_from_directory  # noqa: E402
 
 app = Flask(__name__, static_folder=None)
+
+
+# ----------------------------------------------------------------------
+# In-flight generation registry (for the Cancel button)
+# ----------------------------------------------------------------------
+#
+# Rendering is a long, synchronous FFmpeg-bound job. To let the UI stop one
+# partway through, the client makes up a job_id, sends it with the generate
+# request, and can then POST it to /api/generate/cancel. The two requests
+# land on different Flask threads, so the registry is mutex-guarded.
+#
+# Having the *client* supply the id keeps /api/generate a single
+# request/response — no job-polling protocol — while still giving the
+# cancel request something to name.
+
+_active_jobs = {}
+_active_jobs_lock = threading.Lock()
+
+
+def _register_job(job_id):
+    """Creates and registers a CancellationToken for job_id."""
+    token = CancellationToken()
+    with _active_jobs_lock:
+        _active_jobs[job_id] = token
+    return token
+
+
+def _release_job(job_id):
+    """Drops job_id from the registry once its render has finished."""
+    with _active_jobs_lock:
+        _active_jobs.pop(job_id, None)
 
 
 @app.route("/")
@@ -115,6 +148,12 @@ def generate():
     diversity_mode = bool(body.get("diversity_mode"))
     exact_duration = bool(body.get("exact_duration"))
 
+    # Client-supplied id so a later /api/generate/cancel can name this run.
+    # Absent (e.g. an older client or a scripted call) means uncancellable,
+    # which is the pre-existing behavior.
+    job_id = body.get("job_id")
+    token = _register_job(job_id) if job_id else None
+
     try:
         result = dde_runtime.generate_and_render(
             target_duration=target,
@@ -122,15 +161,50 @@ def generate():
             films_path=collection["films_path"],
             index_path=collection["index_path"],
             metadata_path=collection["metadata_path"],
+            titles_path=collection["titles_path"],
             diversity_mode=diversity_mode,
             exact_duration=exact_duration,
+            cancel_token=token,
         )
+    except GenerationCancelled:
+        # A deliberate stop, not a failure — 409 so the frontend can tell
+        # "you cancelled this" apart from "the render broke".
+        return jsonify({"cancelled": True, "job_id": job_id}), 409
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if job_id:
+            _release_job(job_id)
 
     result["collection_id"] = collection["id"]
     result["film_url"] = f"/films/{collection['id']}/{result['film_filename']}"
     return jsonify(result)
+
+
+@app.route("/api/generate/cancel", methods=["POST"])
+def cancel_generate():
+    """Stops an in-flight generation by job_id.
+
+    Signals the token and kills whatever FFmpeg process that job currently
+    has running, so the stop takes effect immediately rather than after the
+    current clip finishes encoding. The generate request itself then
+    unwinds and answers 409.
+    """
+    body = request.get_json(silent=True) or {}
+    job_id = body.get("job_id")
+    if not job_id:
+        return jsonify({"error": "job_id is required"}), 400
+
+    with _active_jobs_lock:
+        token = _active_jobs.get(job_id)
+
+    if token is None:
+        # Already finished, already cancelled, or never existed — all the
+        # same outcome from the caller's point of view: nothing is running.
+        return jsonify({"cancelled": False, "reason": "not running"}), 404
+
+    token.cancel()
+    return jsonify({"cancelled": True, "job_id": job_id})
 
 
 @app.route("/films/<collection_id>/<path:filename>")
@@ -204,10 +278,17 @@ def list_films():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    # 5001, not 5000: macOS ships AirPlay Receiver listening on 5000, so
+    # the old default silently lost the port on any modern Mac (including
+    # the exhibit/PSU laptops this has to run on turnkey). Override with
+    # the PORT env var if 5001 is taken too.
+    port = int(os.environ.get("PORT", 5001))
     for c in dde_runtime.list_collections():
         os.makedirs(c["films_path"], exist_ok=True)
         os.makedirs(c["assets_path"], exist_ok=True)
+        # Title folders are created up front so they're already visible in
+        # Finder for footage to be dropped into, same as assets/.
+        dde_runtime.ensure_titles_folders(c["titles_path"])
         print(f" * Collection '{c['id']}' ({c['name']}) — "
               f"{c['artifact_counts'].get('total', 0)} artifacts")
     app.run(host="0.0.0.0", debug=True, port=port)

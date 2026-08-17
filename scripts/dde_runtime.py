@@ -133,6 +133,7 @@ def list_collections():
             "index_path": index_path,
             "assets_path": assets_path,
             "films_path": films_path,
+            "titles_path": os.path.join(folder, TITLES_DIRNAME),
             "metadata_path": os.path.join(METADATA_ROOT, topic_id),
             "artifact_counts": data.get("artifact_counts", {"total": 0}),
         })
@@ -667,6 +668,85 @@ CLOSING_CARD_LINES = [
 OPENING_CARD_SECONDS = 6
 CLOSING_CARD_SECONDS = 4
 
+# Per-collection title pieces
+# ---------------------------
+# Per Dr. Campbell (2026-08-17): the opening and closing pieces must not be
+# hard-coded — each film topic needs its own, since a World War II opener
+# (she floated a ~2-minute narrated description) has nothing to do with a
+# Swiss one. So each topic folder gets:
+#
+#   local-media/<Topic>/titles/opening/   <- drop a video file here
+#   local-media/<Topic>/titles/closing/
+#
+# Drop a finished video in either folder and it becomes that topic's
+# opening/closing piece, at whatever length it happens to be. Leave a
+# folder empty and the film falls back to the generated text card above.
+# This deliberately mirrors how assets/ already works — Betsy adds media in
+# Finder, never touching code or a terminal.
+TITLES_DIRNAME = "titles"
+OPENING_DIRNAME = "opening"
+CLOSING_DIRNAME = "closing"
+
+# Video containers accepted as a title piece. Audio-only files are not
+# eligible — a title piece has to put something on screen.
+TITLE_MEDIA_EXTENSIONS = (".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm")
+
+
+def ensure_titles_folders(titles_path):
+    """Creates the opening/ and closing/ subfolders for a topic, each with
+    a short README explaining what to drop in. Called on startup so the
+    folders are already sitting there in Finder for Betsy to fill.
+    """
+    if not titles_path:
+        return
+    for sub, when in ((OPENING_DIRNAME, "start"), (CLOSING_DIRNAME, "end")):
+        folder = os.path.join(titles_path, sub)
+        os.makedirs(folder, exist_ok=True)
+        readme = os.path.join(folder, "README.txt")
+        if not os.path.isfile(readme):
+            try:
+                with open(readme, "w") as f:
+                    f.write(
+                        f"Put ONE video file here to play at the {when} of every\n"
+                        f"film generated for this topic.\n\n"
+                        f"Accepted formats: {', '.join(TITLE_MEDIA_EXTENSIONS)}\n"
+                        f"Any length is fine — a few seconds or a few minutes.\n\n"
+                        f"Leave this folder empty and the standard generated\n"
+                        f"text card is used instead.\n\n"
+                        f"If more than one video is here, the first by filename\n"
+                        f"is used, so name them 01_..., 02_... to be sure which.\n"
+                    )
+            except OSError:
+                pass
+
+
+def find_title_piece(titles_path, which):
+    """Returns the path to a topic's custom opening/closing video, or None
+    to fall back to the generated text card.
+
+    Args:
+        titles_path (str): The topic's titles/ folder.
+        which (str):       OPENING_DIRNAME or CLOSING_DIRNAME.
+
+    Returns:
+        str or None: Path to the video file, or None if the folder is empty
+                     (or holds only the README / non-video files).
+    """
+    if not titles_path:
+        return None
+    folder = os.path.join(titles_path, which)
+    if not os.path.isdir(folder):
+        return None
+
+    candidates = sorted(
+        f for f in os.listdir(folder)
+        if not f.startswith(".")
+        and f.lower().endswith(TITLE_MEDIA_EXTENSIONS)
+    )
+    if not candidates:
+        return None
+    return os.path.join(folder, candidates[0])
+
 
 def _render_card_image(path, lines, width, height, bg_color=(0, 0, 0)):
     """Renders a centered block of multi-line text onto a solid background
@@ -730,12 +810,95 @@ def _make_text_card(path, lines, duration, width, height, fps, bg_color=(0, 0, 0
         return _run(cmd)
 
 
+def _has_audio_stream(path):
+    """True if the file carries at least one audio stream."""
+    try:
+        proc = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a",
+             "-show_entries", "stream=index", "-of", "csv=p=0", path],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return False
+    return bool(proc.stdout.strip())
+
+
+def _prepare_title_piece(src, dest, width, height, fps):
+    """Normalizes a user-supplied title video into a segment the concat
+    filter will accept alongside the rendered film.
+
+    A file Betsy drops in titles/opening/ can be any resolution, aspect,
+    frame rate, or codec, and may have no audio track at all — concat
+    requires every input to match on all of those and to carry both a video
+    and an audio stream. So the piece is letterboxed to the film's frame
+    (rather than stretched, which would distort it), re-timed to the film's
+    fps, and given a silent audio track if it has none.
+
+    Returns True on success.
+    """
+    video_filter = (
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        f"setsar=1,fps={fps}"
+    )
+
+    cmd = ["ffmpeg", "-y", "-i", src]
+    if _has_audio_stream(src):
+        maps = ["-map", "0:v:0", "-map", "0:a:0"]
+    else:
+        # Silent stereo bed so the piece still has an audio stream to
+        # concat against; -shortest stops it at the video's length.
+        cmd += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
+        maps = ["-map", "0:v:0", "-map", "1:a:0", "-shortest"]
+
+    cmd += ["-vf", video_filter, "-r", str(fps)] + maps + [
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-ar", "48000", "-ac", "2",
+        dest,
+    ]
+    return _run(cmd)
+
+
+def title_card_durations(titles_path=None):
+    """Returns (opening_seconds, closing_seconds) for whatever will actually
+    wrap the film — a custom piece's real length if the topic has one, else
+    the fixed generated-card length.
+
+    Needed before rendering, because "exact duration" trims the dynamic
+    sequence by however much the cards will add, and that has to be the
+    real number rather than the default when a topic supplies its own
+    (potentially minutes-long) piece.
+    """
+    opening = OPENING_CARD_SECONDS
+    closing = CLOSING_CARD_SECONDS
+
+    custom_open = find_title_piece(titles_path, OPENING_DIRNAME)
+    if custom_open:
+        probed = _probe_duration(custom_open)
+        if probed:
+            opening = probed
+
+    custom_close = find_title_piece(titles_path, CLOSING_DIRNAME)
+    if custom_close:
+        probed = _probe_duration(custom_close)
+        if probed:
+            closing = probed
+
+    return opening, closing
+
+
 def _wrap_with_title_cards(film_path, output_width, output_height, output_fps,
-                            video_codec="libx264", audio_codec="aac", pix_fmt="yuv420p"):
-    """Prepends a fixed opening title card and appends a fixed closing
-    credits card around film_path, re-encoding the three parts together
-    into a single file at the same path. Returns True on success; leaves
-    film_path untouched if either card fails to render.
+                            video_codec="libx264", audio_codec="aac", pix_fmt="yuv420p",
+                            titles_path=None):
+    """Prepends an opening title piece and appends a closing one around
+    film_path, re-encoding the three parts together into a single file at
+    the same path. Returns True on success; leaves film_path untouched if
+    either piece fails to render.
+
+    If the collection supplies its own video in titles/opening/ or
+    titles/closing/, that is used; otherwise the generated text card is.
+    The two are interchangeable here — both are normalized to the same
+    frame size, fps and stream layout before the join.
 
     Uses the concat *filter* (decoded-frame level), not the concat
     *demuxer* (container-level splicing) — the demuxer approach, even
@@ -748,10 +911,23 @@ def _wrap_with_title_cards(film_path, output_width, output_height, output_fps,
         open_path = os.path.join(tmpdir, "open_card.mp4")
         close_path = os.path.join(tmpdir, "close_card.mp4")
 
-        ok = _make_text_card(open_path, OPENING_CARD_LINES, OPENING_CARD_SECONDS,
-                              output_width, output_height, output_fps)
-        ok = ok and _make_text_card(close_path, CLOSING_CARD_LINES, CLOSING_CARD_SECONDS,
-                                     output_width, output_height, output_fps)
+        custom_open = find_title_piece(titles_path, OPENING_DIRNAME)
+        if custom_open:
+            ok = _prepare_title_piece(
+                custom_open, open_path, output_width, output_height, output_fps
+            )
+        else:
+            ok = _make_text_card(open_path, OPENING_CARD_LINES, OPENING_CARD_SECONDS,
+                                  output_width, output_height, output_fps)
+
+        custom_close = find_title_piece(titles_path, CLOSING_DIRNAME)
+        if custom_close:
+            ok = ok and _prepare_title_piece(
+                custom_close, close_path, output_width, output_height, output_fps
+            )
+        else:
+            ok = ok and _make_text_card(close_path, CLOSING_CARD_LINES, CLOSING_CARD_SECONDS,
+                                         output_width, output_height, output_fps)
         if not ok:
             return False
 
@@ -798,6 +974,8 @@ def generate_and_render(
     juxtaposition_pool_size=None,
     exact_duration=False,
     title_cards=True,
+    titles_path=None,
+    cancel_token=None,
 ):
     """Runs the real engine end to end and returns a JSON-serializable summary.
 
@@ -819,14 +997,22 @@ def generate_and_render(
         target_duration is given and the collection has enough footage to
         reach it in the first place.
 
-    title_cards (bool): Wraps the rendered film with a fixed opening title
-        card and closing credits card (see OPENING_CARD_LINES /
-        CLOSING_CARD_LINES) — per Dr. Campbell's request, every screening
-        opens and closes on the same static slate regardless of what the
+    title_cards (bool): Wraps the rendered film with an opening title
+        piece and a closing one — per Dr. Campbell's request, every
+        screening opens and closes on the same slate regardless of what the
         randomized sequence in between looks like. Defaults on for real
         screenings; the CLI/tests can turn it off to skip the extra
-        render time. Doesn't affect target_duration accounting — the
-        cards sit outside the dynamic sequence entirely.
+        render time.
+
+    titles_path (str): The collection's titles/ folder. A video dropped in
+        titles/opening/ or titles/closing/ becomes that topic's own piece,
+        at whatever length it is; an empty folder falls back to the
+        generated text card. This is what lets each genre carry its own
+        opening/closing rather than sharing one hard-coded slate.
+
+    cancel_token: Optional CancellationToken. When supplied, the run stops
+        between pipeline stages and kills the in-flight FFmpeg process if
+        cancelled, raising GenerationCancelled instead of returning.
 
     Returns:
         dict: JSON-serializable summary — collection info, the ordered
@@ -909,17 +1095,34 @@ def generate_and_render(
         assets_path=assets_path,
         films_path=films_path,
         metadata_path=metadata_path,
+        cancel_token=cancel_token,
     )
     film_path = assembler.render(sequence)
 
-    # Title cards sit outside the dynamic sequence, but "exact duration"
+    # Title pieces sit outside the dynamic sequence, but "exact duration"
     # should still mean the whole file matches target_duration — so the
-    # trim target is the requested length minus however long the fixed
-    # cards will add, not the full requested length.
-    title_card_seconds = (OPENING_CARD_SECONDS + CLOSING_CARD_SECONDS) if title_cards else 0
+    # trim target is the requested length minus however long the pieces
+    # will add, not the full requested length. Measured from the actual
+    # pieces, since a topic's own opener can run minutes rather than the
+    # generated card's fixed few seconds.
+    opening_seconds, closing_seconds = (
+        title_card_durations(titles_path) if title_cards else (0, 0)
+    )
+    title_card_seconds = opening_seconds + closing_seconds
+
+    # A topic's title pieces can be longer than the whole film that was
+    # asked for, which leaves no room to trim into. Report that rather
+    # than silently overshooting the requested length.
+    titles_exceed_target = (
+        target_duration is not None
+        and title_cards
+        and title_card_seconds >= target_duration
+    )
 
     trimmed = False
     if exact_duration and target_duration is not None:
+        if cancel_token is not None:
+            cancel_token.raise_if_cancelled()
         dynamic_target = target_duration - title_card_seconds
         if dynamic_target > 0:
             trimmed = _trim_film_to_duration(
@@ -931,6 +1134,8 @@ def generate_and_render(
 
     cards_added = False
     if title_cards:
+        if cancel_token is not None:
+            cancel_token.raise_if_cancelled()
         cards_added = _wrap_with_title_cards(
             film_path,
             output_width=assembler.output_width,
@@ -939,6 +1144,7 @@ def generate_and_render(
             video_codec=assembler.video_codec,
             audio_codec=assembler.audio_codec,
             pix_fmt=assembler.pix_fmt,
+            titles_path=titles_path,
         )
 
     usage_stats = None
@@ -974,6 +1180,19 @@ def generate_and_render(
         "exact_duration": exact_duration,
         "trimmed": trimmed,
         "title_cards": cards_added,
+        # Which opening/closing actually wrapped this film — a filename
+        # when the topic supplies its own piece, None for the generated
+        # text card. Lets the UI show what played without re-scanning.
+        "opening_title_piece": (
+            os.path.basename(find_title_piece(titles_path, OPENING_DIRNAME))
+            if title_cards and find_title_piece(titles_path, OPENING_DIRNAME) else None
+        ),
+        "closing_title_piece": (
+            os.path.basename(find_title_piece(titles_path, CLOSING_DIRNAME))
+            if title_cards and find_title_piece(titles_path, CLOSING_DIRNAME) else None
+        ),
+        "title_card_seconds": title_card_seconds if title_cards else 0,
+        "titles_exceed_target": titles_exceed_target,
     }
 
     manifest_path = os.path.splitext(film_path)[0] + ".json"

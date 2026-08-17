@@ -13,6 +13,10 @@
   --accent: #001e44;
   --accent-hover: #1e407c;
   --accent-soft: rgba(0, 30, 68, 0.08);
+  /* Cancel/stop red. Deliberately outside the PSU palette — it's the one
+     control that has to read as "stop" at a glance from across a gallery. */
+  --danger: #c1272d;
+  --danger-hover: #9e1f24;
   --type-a: #b5730a;
   --type-b: #0e7fa3;
   --type-x: #7c4fb0;
@@ -51,6 +55,10 @@
   --accent: #001e44;
   --accent-hover: #1e407c;
   --accent-soft: rgba(30, 64, 124, 0.22);
+  /* Lifted against the near-black dark background so the fill still reads
+     as a solid red rather than going muddy. */
+  --danger: #e03e44;
+  --danger-hover: #f05a60;
   --type-a: #e8a33d;
   --type-b: #4fb8d9;
   --type-x: #a875d9;
@@ -445,6 +453,45 @@ button#generate-btn:disabled {
   cursor: default;
   box-shadow: none;
 }
+
+/* .hidden alone can't beat the id selector's specificity above. Cancel
+   takes this button's place while a render runs, rather than sitting
+   next to a dead greyed-out Generate. */
+button#generate-btn.hidden { display: none; }
+
+/* Sits in place of Generate while a render is running — same pill shape,
+   solid red fill so "stop" is unmistakable. The label and the square icon
+   take the page background colour rather than a fixed white, so they knock
+   out of the red and stay legible in both themes. */
+button#cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: var(--danger);
+  color: var(--bg);
+  border: none;
+  padding: 0.75rem 1.6rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 8px 24px -8px rgba(193, 39, 45, 0.55);
+  transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+button#cancel-btn:hover:not(:disabled) {
+  background: var(--danger-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px -6px rgba(193, 39, 45, 0.65);
+}
+
+button#cancel-btn:active:not(:disabled) { transform: translateY(0); }
+
+button#cancel-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* .hidden alone can't beat the id selector's specificity above. */
+button#cancel-btn.hidden { display: none; }
 
 .btn-icon { font-size: 0.75rem; }
 
