@@ -4,6 +4,7 @@ const collectionHint = document.getElementById("collection-hint");
 const durationInput = document.getElementById("duration");
 const diversityToggle = document.getElementById("diversity-toggle");
 const exactDurationToggle = document.getElementById("exact-duration-toggle");
+const audioFadeToggle = document.getElementById("audio-fade-toggle");
 const cancelBtn = document.getElementById("cancel-btn");
 const durationUnit = document.getElementById("duration-unit");
 const durationHint = document.getElementById("duration-hint");
@@ -453,6 +454,7 @@ async function generateFilm() {
         target_duration: target,
         diversity_mode: diversityToggle.checked,
         exact_duration: exactDurationToggle.checked,
+        audio_fade: audioFadeToggle.checked,
         job_id: activeJobId,
       }),
     });

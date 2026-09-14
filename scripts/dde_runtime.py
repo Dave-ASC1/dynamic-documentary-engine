@@ -973,6 +973,7 @@ def generate_and_render(
     diversity_mode=False,
     juxtaposition_pool_size=None,
     exact_duration=False,
+    audio_fade=False,
     title_cards=True,
     titles_path=None,
     cancel_token=None,
@@ -1114,6 +1115,7 @@ def generate_and_render(
         metadata_path=metadata_path,
         cancel_token=cancel_token,
         progress_callback=progress_callback,
+        audio_fade=audio_fade,
     )
     film_path = assembler.render(sequence)
 
@@ -1198,6 +1200,7 @@ def generate_and_render(
         "usage_stats_path": usage_stats,
         "library_sync": library_sync,
         "exact_duration": exact_duration,
+        "audio_fade": audio_fade,
         "trimmed": trimmed,
         "title_cards": cards_added,
         # Which opening/closing actually wrapped this film — a filename

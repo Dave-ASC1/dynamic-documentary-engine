@@ -137,6 +137,7 @@ class Assembler:
         video_preset: str = DEFAULT_VIDEO_PRESET,
         cancel_token=None,
         progress_callback=None,
+        audio_fade: bool = False,
     ):
         """
         Initializes the Assembler.
@@ -182,6 +183,7 @@ class Assembler:
         self.video_preset  = video_preset
         self.cancel_token  = cancel_token
         self.progress_callback = progress_callback
+        self.audio_fade = audio_fade
 
     # ------------------------------------------------------------------
     # Public Interface
@@ -423,6 +425,11 @@ class Assembler:
     # Crossfade applied where one excerpt hands over to the next. Long
     # enough to hide the seam, short enough not to audibly dip the level.
     MAX_EXCERPT_CROSSFADE_SECONDS = 0.4
+
+    # Length of the optional fade up at each clip's start and down at its
+    # end, baked into the segment so cuts dip to silence and back instead
+    # of the music jumping. Enabled per-run via the audio_fade flag.
+    AUDIO_FADE_SECONDS = 1.0
 
     # Fraction of a short audio file used per excerpt. Below 1.0 so there
     # is room left over for the start offset to actually vary — at 1.0
@@ -776,8 +783,22 @@ class Assembler:
         audio_filter = self._build_excerpt_filter(excerpts, crossfade)
 
         cmd += ["-map", "0:v"]              # Video from input 0 (B-roll)
-        if audio_filter:
+
+        # Optional fade up at the clip's start and down at its end, baked
+        # into this segment so consecutive clips dip to silence and back
+        # across each cut instead of the music jumping abruptly. Applies to
+        # B-roll music beds only; A-roll speech is left crisp. Toggled
+        # per-run via audio_fade; length is AUDIO_FADE_SECONDS.
+        fade = self._fade_seconds(duration)
+
+        if audio_filter and fade > 0:
+            graph = f"{audio_filter};[aout]{self._afade_expr(duration, fade)}[afaded]"
+            cmd += ["-filter_complex", graph, "-map", "[afaded]"]
+        elif audio_filter:
             cmd += ["-filter_complex", audio_filter, "-map", "[aout]"]
+        elif fade > 0:
+            graph = f"[1:a]{self._afade_expr(duration, fade)}[afaded]"
+            cmd += ["-filter_complex", graph, "-map", "[afaded]"]
         else:
             cmd += ["-map", "1:a"]          # Audio from input 1 (X-roll)
 
@@ -844,6 +865,33 @@ class Assembler:
                 current = out
 
         return ";".join(parts)
+
+    def _fade_seconds(self, duration):
+        """Fade length for this segment, or 0.0 when fading is off.
+
+        Clamped so the fade-in and fade-out together never exceed the clip
+        (a very short B-roll can't fade a full second each way). When the
+        duration is unknown (a live stream) the capture length stands in as
+        the basis.
+        """
+        if not self.audio_fade:
+            return 0.0
+        basis = duration if (duration and duration > 0) else self.DEFAULT_STREAM_CAPTURE_SECONDS
+        return min(self.AUDIO_FADE_SECONDS, basis / 3.0)
+
+    def _afade_expr(self, duration, fade):
+        """afade in-then-out over a bed of the given length.
+
+        The fade-out starts `fade` seconds before the clip ends so it lands
+        on the cut. -shortest trims the bed to the B-roll's length, so the
+        out-point is measured from that same duration.
+        """
+        basis = duration if (duration and duration > 0) else self.DEFAULT_STREAM_CAPTURE_SECONDS
+        start_out = max(0.0, basis - fade)
+        return (
+            f"afade=t=in:st=0:d={fade:.4f},"
+            f"afade=t=out:st={start_out:.4f}:d={fade:.4f}"
+        )
 
     # Segments joined per FFmpeg call. The concat filter opens every input
     # at once and binds them into one graph, which starts failing somewhere

@@ -232,6 +232,9 @@ def generate():
 
     diversity_mode = bool(body.get("diversity_mode"))
     exact_duration = bool(body.get("exact_duration"))
+    # Smooth audio transitions default ON for the console (the screening
+    # tool); an older/scripted client that omits the flag still gets it.
+    audio_fade = bool(body.get("audio_fade", True))
 
     # Client-supplied id so a later /api/generate/cancel can name this run.
     # Absent (e.g. an older client or a scripted call) means uncancellable,
@@ -249,6 +252,7 @@ def generate():
             titles_path=collection["titles_path"],
             diversity_mode=diversity_mode,
             exact_duration=exact_duration,
+            audio_fade=audio_fade,
             cancel_token=token,
             progress_callback=_job_progress_recorder(job_id) if job_id else None,
         )
