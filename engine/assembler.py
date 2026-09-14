@@ -138,6 +138,7 @@ class Assembler:
         cancel_token=None,
         progress_callback=None,
         audio_fade: bool = False,
+        audio_fade_seconds: float = None,
     ):
         """
         Initializes the Assembler.
@@ -184,6 +185,7 @@ class Assembler:
         self.cancel_token  = cancel_token
         self.progress_callback = progress_callback
         self.audio_fade = audio_fade
+        self.audio_fade_seconds = audio_fade_seconds
 
     # ------------------------------------------------------------------
     # Public Interface
@@ -426,10 +428,15 @@ class Assembler:
     # enough to hide the seam, short enough not to audibly dip the level.
     MAX_EXCERPT_CROSSFADE_SECONDS = 0.4
 
-    # Length of the optional fade up at each clip's start and down at its
-    # end, baked into the segment so cuts dip to silence and back instead
-    # of the music jumping. Enabled per-run via the audio_fade flag.
-    AUDIO_FADE_SECONDS = 1.0
+    # Max length of the optional fade up at each clip's start and down at
+    # its end, baked into the segment so cuts dip to silence and back
+    # instead of the music jumping. Enabled per-run via the audio_fade flag.
+    AUDIO_FADE_SECONDS = 0.8
+
+    # A fade never eats more than this fraction of a clip on each side, so a
+    # short clip gets a proportionally shorter fade and still has time to
+    # play at full volume instead of only swelling in and straight back out.
+    AUDIO_FADE_MAX_FRACTION = 0.2
 
     # Fraction of a short audio file used per excerpt. Below 1.0 so there
     # is room left over for the start offset to actually vary — at 1.0
@@ -876,8 +883,16 @@ class Assembler:
         """
         if not self.audio_fade:
             return 0.0
+        # A caller-supplied length (the console dropdown) sets the ceiling;
+        # otherwise fall back to the default. Either way the max-fraction
+        # cap below still shortens the fade for very short clips.
+        max_fade = (
+            self.audio_fade_seconds
+            if (self.audio_fade_seconds and self.audio_fade_seconds > 0)
+            else self.AUDIO_FADE_SECONDS
+        )
         basis = duration if (duration and duration > 0) else self.DEFAULT_STREAM_CAPTURE_SECONDS
-        return min(self.AUDIO_FADE_SECONDS, basis / 3.0)
+        return min(max_fade, basis * self.AUDIO_FADE_MAX_FRACTION)
 
     def _afade_expr(self, duration, fade):
         """afade in-then-out over a bed of the given length.

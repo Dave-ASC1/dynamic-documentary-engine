@@ -82,13 +82,21 @@
           <span class="toggle-label">Exact duration</span>
           <span class="tooltip" role="tooltip">Exact duration trims the final clip so the film matches your target length precisely — off by default, since it never cuts real footage and may land a few seconds short instead.</span>
         </label>
-        <label class="toggle-field has-tooltip" for="audio-fade-toggle">
-          <input type="checkbox" id="audio-fade-toggle" checked />
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-label">Smooth audio transitions</span>
-          <span class="tooltip" role="tooltip">Fades the music up at the start of each clip and down at the end, so the soundtrack eases across every cut instead of jumping. On by default; turn off to hear the raw, hard transitions.</span>
-        </label>
       </div>
+
+      <div class="field field-centered">
+        <label for="audio-fade-select">Audio transitions</label>
+        <div class="field-input">
+          <select id="audio-fade-select" aria-label="Audio transition fade length">
+            <option value="0">Off — hard cuts</option>
+            <option value="0.3">Subtle (0.3s)</option>
+            <option value="0.5">Balanced (0.5s)</option>
+            <option value="0.8" selected>Smooth (0.8s)</option>
+            <option value="1.2">Long (1.2s)</option>
+          </select>
+        </div>
+      </div>
+      <p class="field-hint">Fades the music across each cut. Longer is softer; short clips shorten the fade automatically.</p>
 
       <div id="status" class="status" role="status">
         <span class="status-dot"></span>

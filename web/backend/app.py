@@ -232,9 +232,19 @@ def generate():
 
     diversity_mode = bool(body.get("diversity_mode"))
     exact_duration = bool(body.get("exact_duration"))
-    # Smooth audio transitions default ON for the console (the screening
-    # tool); an older/scripted client that omits the flag still gets it.
-    audio_fade = bool(body.get("audio_fade", True))
+    # Audio-transition fade. The console sends audio_fade_seconds (0 = off);
+    # older/scripted clients may send the audio_fade bool, or nothing (fade
+    # on at the engine default). When given, audio_fade_seconds sets the max
+    # fade length; the engine still shortens it for very short clips.
+    audio_fade_seconds = body.get("audio_fade_seconds")
+    if audio_fade_seconds is not None:
+        try:
+            audio_fade_seconds = float(audio_fade_seconds)
+        except (TypeError, ValueError):
+            return jsonify({"error": "audio_fade_seconds must be a number"}), 400
+        audio_fade = audio_fade_seconds > 0
+    else:
+        audio_fade = bool(body.get("audio_fade", True))
 
     # Client-supplied id so a later /api/generate/cancel can name this run.
     # Absent (e.g. an older client or a scripted call) means uncancellable,
@@ -253,6 +263,7 @@ def generate():
             diversity_mode=diversity_mode,
             exact_duration=exact_duration,
             audio_fade=audio_fade,
+            audio_fade_seconds=audio_fade_seconds,
             cancel_token=token,
             progress_callback=_job_progress_recorder(job_id) if job_id else None,
         )
