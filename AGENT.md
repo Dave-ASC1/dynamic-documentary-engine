@@ -197,7 +197,7 @@ film_path = assembler.render(sequence)                 # returns output MP4 path
 - `SequencingRules`: `is_eligible()`, `is_eligible_for_pairing()`, `get_target_pacing()`, `register_selection()`, `register_pairing_selection()`, `has_reached_minimum_duration()`, `has_reached_maximum_duration()`, `reset()`.
 - `ArtifactSelector`: `select_next()`, `select_pairing()`, `set_previous_artifact()`, `weighted_random_choice()`.
 - `engine/cancellation.py`: `CancellationToken` (`cancel()`, `raise_if_cancelled()`) + `GenerationCancelled`.
-- Most end-to-end driving (tracing, placeholder media, render, exact-duration trim, title cards, manifests) lives in `scripts/dde_runtime.py` — chiefly `generate_and_render(...)`, which the CLI and the Flask backend both call so they never drift. It threads `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `cancel_token`, and a `progress_callback` down to the engine.
+- Most end-to-end driving (tracing, placeholder media, render, exact-duration trim, title cards, manifests) lives in `scripts/dde_runtime.py` — chiefly `generate_and_render(...)`, which the Flask backend calls. The CLI (`run_first_film.py`, `--topic`/`--fade`) reuses its helpers but drives `Sequencer`/`Assembler` directly for its trace and uniqueness check, so CLI films have no title cards, trim or manifest; thread new engine options through both. `generate_and_render` threads `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `cancel_token`, and a `progress_callback` down to the engine.
 
 ---
 

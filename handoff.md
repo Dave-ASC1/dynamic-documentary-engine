@@ -206,9 +206,14 @@ with Pillow (6s opening, 4s closing). Pillow is used instead of FFmpeg's
 
 ### One shared driver, many front doors
 
-The CLI, the console and the exhibit view all go through
+The console and the exhibit view both go through
 `dde_runtime.generate_and_render()`, so they can't drift apart. Put new
-pipeline steps there, not in `app.py` or `run_first_film.py`.
+pipeline steps there, not in `app.py`. The CLI (`run_first_film.py`) shares
+the tracing, sync and placeholder helpers from `dde_runtime.py` but drives
+`Sequencer` and `Assembler` itself, because it also prints a trace and runs
+a uniqueness check — so it renders the dynamic sequence only (no title
+cards, trim or manifest). If you add an engine option, thread it through
+both.
 
 ### Topics are just folders
 
@@ -313,11 +318,12 @@ time; full JSON-schema validation only runs in
 
 - **Media isn't in git.** A fresh clone has empty `assets/` folders; the
   footage travels separately (drive, OneDrive, copied on the day).
-- **Only some extensions are ignored:** `.gitignore` covers `*.mp4 *.mov
-  *.wav *.mp3`. The engine also accepts `.m4v`, `.m4a` and `.aac`, which are
-  **not** ignored — `git status` before committing if you've added those.
-  Upper-case `.MOV` is only ignored because macOS and Windows git ignore case
-  by default; on Linux it wouldn't be.
+- **Media is ignored by folder.** `local-media/.gitignore` ignores everything
+  inside each topic's `assets/`, `titles/` and `artifacts/` folders, whatever
+  the file type, except the `.gitkeep` placeholders and title READMEs. Those
+  placeholders matter: a topic is only discovered if its `assets/` and
+  `artifacts/` folders exist, so don't delete them. Media dropped anywhere
+  *else* is only caught by the root `.gitignore`'s `*.mp4 *.mov *.wav *.mp3`.
 - **Generated films, their `.json` manifests and `usage_stats.json` are
   gitignored.** They land in `local-media/<Topic>/artifacts/`. Leave them out
   of commits. Delete `usage_stats.json` to reset diversity mode's history.
@@ -333,17 +339,22 @@ time; full JSON-schema validation only runs in
   minutes from 2 minutes of footage and you get about 2 minutes — not an
   error. Allowing repeats would be a design decision, not a bug fix.
 - **The CLI isn't the web app.** `scripts/run_first_film.py` defaults to
-  `demo/` with generated placeholder media, and doesn't turn on the fade. Pass
-  `--assets-path local-media/<Topic>/assets --films-path local-media/<Topic>/artifacts`
-  to use real footage.
-- **`must_not_follow` after a B-roll + X-roll slot checks the X-roll.** The
-  rule compares against the last ID recorded, and pairing records the X-roll
-  after its B-roll. So a "must not follow this B-roll" constraint won't fire
-  after that B-roll's slot. Not yet confirmed whether that's intended — worth
-  a look if you rely on the rule.
-- **Title-card fonts are macOS paths** (Georgia, Arial under
-  `/System/Library/Fonts`). On Windows the cards still render, but with
-  Pillow's plain default font.
+  `demo/` with generated placeholder media and the Validation index. Use
+  `--topic <id>` (e.g. `--topic wwii`) for a topic's real footage; it then
+  writes into that topic's `artifacts/` folder like the web app does. The
+  fade is on at 0.8s by default (`--fade 0` for hard cuts). There are no
+  title cards or trim in CLI films.
+- **Never sync a folder into another topic's index.** Syncing retires every
+  entry whose file isn't in the folder, hand-written metadata included. The
+  CLI refuses to do this, but anything new that calls `sync_media_library()`
+  must pair each topic's `assets/` with its own index.
+- **`must_not_follow` compares against the last shot on screen** (the last
+  A-roll or B-roll), not the audio under it. The closing pair is chosen
+  before the body exists, so it can't honour the rule against the clip
+  before it.
+- **Title-card fonts:** Georgia and Arial, found in the macOS or Windows font
+  folders (DejaVu on Linux). If none is found, the cards render in Pillow's
+  plain built-in font.
 - **Port 5001, not 5000** — macOS AirPlay Receiver takes 5000. Set `PORT` to
   override; the server also moves to the next free port on its own.
   `DDE_DEBUG=1` turns on Flask debug; `DDE_NO_BROWSER=1` stops it opening a
