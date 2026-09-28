@@ -232,3 +232,7 @@ films/
 
 # macOS
 .DS_Store
+
+# Generated film manifests + usage stats (regenerated on every run;
+# the rendered .mp4s are already ignored above)
+local-media/*/artifacts/*.json
