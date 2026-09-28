@@ -58,8 +58,12 @@ class SequencingRules:
     Attributes:
         runtime_rules (dict):       The collection-level runtime rules.
         used_artifact_ids (list):   Artifact IDs already selected in this session,
-                                    in selection order. Used for no-repeat and
-                                    must-not-follow checks.
+                                    in selection order, X-roll pairings included.
+                                    Used for no-repeat checks.
+        last_visual_id (str):       ID of the most recent A-roll or B-roll — the
+                                    last shot on screen. Used for must-not-follow
+                                    checks, so a paired X-roll never hides the
+                                    B-roll it sits under.
         current_duration (float):   Total duration accumulated so far in seconds.
         last_artifact_type (str):   The artifact_type of the most recently selected
                                     artifact ('A-roll', 'B-roll', or 'X-roll').
@@ -77,12 +81,14 @@ class SequencingRules:
         """
         self.runtime_rules = runtime_rules
         self.used_artifact_ids = []
+        self.last_visual_id = None
         self.current_duration = 0.0
         self.last_artifact_type = None
 
     def reset(self):
         """Resets rule state for a new film generation session."""
         self.used_artifact_ids = []
+        self.last_visual_id = None
         self.current_duration = 0.0
         self.last_artifact_type = None
 
@@ -218,13 +224,20 @@ class SequencingRules:
 
     def _passes_must_not_follow_rule(self, artifact):
         """
-        Returns False if the most recently selected artifact appears in
-        this artifact's must_not_follow list.
+        Returns False if the last shot on screen appears in this artifact's
+        must_not_follow list.
 
         This is a collection-designer-defined hard constraint. It exists
         for editorial reasons specific to a collection (e.g. two clips that
         are technically incompatible or factually contradictory) — not for
         mood or tonal reasons.
+
+        "Last shot" is the most recent A-roll or B-roll, not the last ID
+        recorded. Pairing records a B-roll's X-roll after it, so comparing
+        against the last recorded ID would check the audio layer and let a
+        "must not follow this B-roll" constraint slip through after every
+        B-roll slot. For an X-roll being paired, the last shot is the B-roll
+        it will sit under.
 
         Args:
             artifact (dict): The artifact summary dictionary to check.
@@ -233,23 +246,23 @@ class SequencingRules:
             bool: True if this artifact is allowed to follow the previous one.
         """
         must_not_follow = artifact.get("must_not_follow", [])
-        if self.used_artifact_ids:
-            if self.used_artifact_ids[-1] in must_not_follow:
-                return False
+        if self.last_visual_id is not None and self.last_visual_id in must_not_follow:
+            return False
         return True
 
     def register_selection(self, artifact):
         """
         Registers an artifact as selected and updates rule state.
 
-        Records the artifact ID in the used list, adds its duration to
-        the running total, and updates last_artifact_type for review and
-        possible future rules.
+        Records the artifact ID in the used list and as the last shot on
+        screen, adds its duration to the running total, and updates
+        last_artifact_type for review and possible future rules.
 
         Args:
             artifact (dict): The artifact dictionary that was selected.
         """
         self.used_artifact_ids.append(artifact.get("artifact_id"))
+        self.last_visual_id = artifact.get("artifact_id")
         self.current_duration += artifact.get("duration_seconds", 0)
         self.last_artifact_type = artifact.get("artifact_type")
 
@@ -260,9 +273,9 @@ class SequencingRules:
         Only records the artifact ID for no-repeat tracking. Unlike
         register_selection(), this does NOT add the artifact's duration to
         current_duration (its audio does not occupy separate screen time —
-        see is_eligible_for_pairing()) and does NOT update
-        last_artifact_type, so the media-type pacing signal continues to
-        reflect the paired B-roll rather than its audio layer.
+        see is_eligible_for_pairing()) and does NOT update last_visual_id or
+        last_artifact_type, so must-not-follow and the media-type signal
+        continue to reflect the paired B-roll rather than its audio layer.
 
         Args:
             artifact (dict): The X-roll artifact dictionary that was selected.
