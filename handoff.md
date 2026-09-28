@@ -1,447 +1,385 @@
 # Handoff — Dynamic Documentary Engine
 
-Last updated: 2026-08-17
+Last updated: 2026-09-28
 
-## Current Summary
+This is for the student taking the engine over. It assumes you can already
+run it (`SETUP-GUIDE.md`) and know what it is (`README.md` — though parts of
+the README are stale; `AGENT.md` §7 lists which). This document is the map
+and the *why*: how a run flows, why things are built the way they are, where
+to make common changes, and what will bite you if nobody warns you.
 
-Dynamic Documentary Engine is a fully functional end-to-end generative documentary system. It loads local media metadata, generates unique film sequences using contrast-driven selection, pairs B-roll with X-roll audio, and renders playable MP4s with FFmpeg. The system includes both a command-line interface and a web UI for turnkey operation.
+`AGENT.md` is the short rulebook for anyone (or any tool) editing the code;
+read it too. The older, dated session-by-session notes that used to live in
+this file are in its git history (`git log -p handoff.md`).
 
-No external generation services are used at runtime. All sequencing is rule-based creative code driven by metadata, dissimilarity scoring, artifact weights, and optional diversity mode for collection exploration.
+Who to ask: David Ademoye (author) or Dr. Betsy Campbell (supervisor). When a
+change touches *what the films are* rather than how the code works — bookend
+rules, repeating clips, the look of the title cards — ask before building.
 
-Current artifact model:
+---
 
-- **A-roll**: video with synchronized audio; can stand alone.
-- **B-roll**: visual/video material; never stands alone.
-- **X-roll**: audio-only; layered under B-roll as soundtrack.
-- **B+X slot**: one B-roll video paired with one X-roll audio; counts as one screen-time slot.
+## 1. The five-minute mental model
 
-Current generation behavior:
+### Vocabulary (locked — use these words exactly)
 
-- Opening: randomized **B-roll + X-roll** pair from body artifacts.
-- Closing: randomized **B-roll + X-roll** pair reserved before body selection.
-- Body picks: A-roll or B-roll, competing in the same pool.
-- X-roll: strictly paired with B-roll; never selected as standalone.
-- Selection criterion: maximum dissimilarity (contrast) from the previous visual artifact.
-- Diversity mode: boosts underused clips via cross-run usage tracking to prevent oversaturation of high-contrast favorites.
-- **Fixed opening title card and closing credits card** wrap every film (see below) — separate from the randomized B+X bookends above, which is *within* the dynamic sequence, not the fixed cards around it.
+| Term | Means |
+|---|---|
+| **Artifact** | One media clip, plus its metadata. |
+| **Collection** | A curated set of artifacts for one topic (the web UI calls it a "topic"). |
+| **Film** | One generated output. |
+| **A-roll** | Video with its own synchronized audio. Stands alone. |
+| **B-roll** | Video only. Never stands alone — always paired with an X-roll. |
+| **X-roll** | Audio only. Layered under a B-roll. Never shown on its own. |
 
-## What Changed (2026-08-17)
+A **slot** in a film is either one A-roll, or one B-roll + X-roll pair. The
+X-roll adds sound, not screen time.
 
-Three items from the 2026-08-17 meeting with Dr. Campbell, plus two audio
-defects found and fixed afterwards.
+### The modules
 
-**1. Why audio and video sometimes cut together and sometimes don't — root cause, now fixed**
+| File | Job |
+|---|---|
+| `engine/collection_loader.py` | Reads a collection index JSON, checks required fields, hands out artifacts. |
+| `engine/rules.py` | Yes/no eligibility: no-repeat, duration budget, must-not-follow. Tracks running length. |
+| `engine/artifact_selector.py` | Picks the next clip: scores how *different* each candidate is from the last one, then weighted-random picks from the top few. Also picks X-rolls for B-rolls. |
+| `engine/sequencer.py` | The coordinator. Builds the ordered sequence: opening pair → body → closing pair. |
+| `engine/assembler.py` | Turns the sequence into an MP4 with FFmpeg: one normalized segment per slot, then joins them. |
+| `engine/cancellation.py` | Lets the web UI kill a render mid-flight (including the running FFmpeg process). |
+| `scripts/dde_runtime.py` | The layer both the CLI and the web backend call. Topic discovery, media auto-sync, the "why this cut" trace, exact-duration trim, title cards, usage stats, manifests. |
+| `scripts/run_first_film.py` | Command-line runner. |
+| `web/backend/app.py` | Flask API + serves the two frontends. |
+| `web/frontend/` | Plain HTML/CSS/JS. `index.html`/`app.js` = researcher console; `exhibit.*` = gallery kiosk. |
 
-Dr. Campbell noticed the sound sometimes changes at the same moment the
-picture does, and sometimes seems to change on its own. The controlling
-factor is **the X-roll's length versus the B-roll it's paired with** —
-nothing to do with the toggles, which only change it indirectly.
+The engine package knows nothing about Flask, topics, or title cards. Keep it
+that way: engine = sequencing + rendering; `dde_runtime.py` = everything
+around it.
 
-In a B+X slot the video comes from the B-roll and the audio from the
-X-roll, and FFmpeg is told to loop the audio (`-stream_loop -1`) and cut at
-the video's end (`-shortest`). So:
-
-- **X-roll longer than the B-roll** → one unbroken slice of audio runs under
-  the clip and ends with it. Sound and picture change **together**.
-- **X-roll shorter than the B-roll** → the audio runs out mid-clip and
-  restarts from the beginning while the picture keeps going. That restart
-  is heard as the sound "changing" on its own, with no cut on screen.
-
-Confirmed by rendering `war_bong.wav` (6.6s) under `warship_cruising.mp4`
-(10.09s) and hashing the result: the audio at 6.616s is byte-for-byte
-identical to the audio at 0s — it is provably the same audio starting over.
-
-In the current Validation set this affects `war_bong.wav` (6.6s) under
-almost every B-roll, and `piano_sound.wav` (10.105s) under
-`drawn_animation.MOV` (10.548s). The two long MP3s (194s and 141s) never
-loop, which is why clips using them always look in sync.
-
-Why it seemed tied to the "exact duration" toggle: that toggle changes how
-the sequence is composed (the closing clip's runtime is only reserved from
-the budget when it's off) and trims the tail when it's on. Either shifts
-which clips land where, changing the odds of hitting a short-X-roll/long-
-B-roll pairing — but it isn't the cause.
-
-**Fixed**, without putting any restriction on which audio can pair with
-which clip — that mattered, because requiring audio to be at least as long
-as the clip would have undone the random-excerpt behaviour above.
-
-Instead of looping, the audio bed is now built from **several excerpts, each
-taken from its own random point in the file, handed over with a short
-(0.4s) crossfade**. A 6.6-second sound under a 10-second clip now plays two
-different excerpts back to back rather than the same one twice. Nothing
-repeats within a slot, the seam is inaudible, and any audio file still works
-under any clip.
-
-Verified on the original failing case: the audio at 6.616s used to be
-byte-for-byte identical to the audio at 0s; it no longer is, the bed runs
-continuously with no dropout, and segment durations are unchanged from
-before.
-
-One safety net: if a sound is so short relative to the clip that it would
-need more than 24 excerpts (say a 0.3s sound under a minute of video), it
-falls back to plain looping. Repetitive, but it covers the clip — B-roll is
-never left silent.
-
-**1b. Audio bleeding across cuts — separate cause, and this one IS fixed**
-
-A second, unrelated defect, found after David reported hearing sound bleed
-across cuts. This one was not about clip lengths at all.
-
-The final film was assembled with FFmpeg's concat *demuxer* using `-c copy`,
-which splices the already-encoded segments at the container level without
-re-encoding. An AAC audio frame is 1024 samples, so each segment's final
-frame is padded and each carries its own priming samples. Stream-copying
-leaves all of that in place at every join, so roughly **the last 50ms of each
-clip's audio kept playing at full volume over the start of the next clip**.
-
-Measured on a test where a tone clip is followed by a digitally silent one:
-the silent clip's first 20ms came back at **-24 dBFS** — the tone's full
-level — instead of silence.
-
-Fixed by assembling with the concat *filter* instead, which decodes every
-segment and re-encodes one continuous stream so timestamps stay monotonic
-across each join. Same measurement after the fix: **-71 dBFS**, i.e.
-inaudible. This is the identical approach the title-card wrap already used,
-and for the same reason — the main assembly had just never been switched
-over.
-
-Worth being precise about one thing: this bleed happened on **every** film,
-with the "exact duration" toggle on or off. Re-encoding during the trim does
-*not* clean it up — once the bleed is spliced into the audio, re-encoding
-faithfully reproduces it (verified). So the toggle was never what controlled
-it; it was present the whole time and is now gone in all cases.
-
-Side effect: assembly now re-encodes rather than copies, so rendering is
-somewhat slower. A 45-second film takes about 12 seconds to render.
-
-### Can it make a feature-length film?
-
-Two separate limits, worth knowing before promising a long piece.
-
-**1. Footage is the hard ceiling.** The no-repeat rule means each clip is
-used at most once per film, so a film can never be longer than the
-collection's total A-roll + B-roll footage (X-roll doesn't add screen time,
-it sits under B-roll). The Validation set has 105 seconds of visible
-footage, so asking for 90 minutes returns a 1.8-minute film — it isn't an
-error, it just runs out of material and stops. **A 90-minute film needs 90
-minutes of footage.** If a long piece is ever wanted from a small amount of
-material, clips would have to be allowed to repeat, which is a deliberate
-design decision for Dr. Campbell rather than a code change.
-
-**2. Assembly is batched so length isn't a code limit.** The concat filter
-opens every segment at once and starts failing past roughly 200 inputs, and
-a feature-length film is several hundred clips. Segments are therefore
-joined in batches of 100 and the batches joined in turn. Verified at 900
-segments. Films of a normal length take the single-pass route and are
-unchanged.
-
-**Render time** scales with film length, at roughly 0.3x — measured 10.5s
-for a 40s film, 15.2s for 54s, 31.2s for 94s. So a feature-length film is
-on the order of half an hour of rendering, and long ones are re-encoded once
-more than short ones because of the batching.
-
-**2. Cancel button** — the web UI can now stop a render in progress. Because
-generation time is almost entirely FFmpeg, cancelling also kills the FFmpeg
-process actually running, so it stops within a second or two instead of
-after the current clip finishes. A cancelled run reports "Generation
-cancelled", not an error.
-
-**3. Per-genre opening/closing pieces** — these are no longer hard-coded.
-Every topic folder now has `titles/opening/` and `titles/closing/`. Drop a
-video into either and it becomes that topic's opening or closing piece, at
-whatever length it is (a WWII opener can run minutes; a Swiss one can be
-seconds). Leave a folder empty and the standard generated text card is used
-instead. Files of any resolution, frame rate, or codec are accepted, with or
-without their own audio — the engine letterboxes and re-times them to match
-the film. Each folder has a README.txt explaining this in plain language.
-
-**4. Minutes as well as seconds for target length** — the target length
-field now has a seconds/minutes selector, so a long film can be asked for
-as "90 minutes" rather than "5400 seconds". The engine still works purely
-in seconds; the unit is an input convenience. The chosen unit *and* number
-are both remembered between visits, and a readout under the field shows
-what the entry works out to ("= 1h 30m (5400 seconds)"). Durations shown
-elsewhere in the UI are now formatted the same way rather than as a raw
-second count.
-
-**5. Exhibit mode — a separate gallery view at `/exhibit`** — the console
-at `/` is unchanged. It is a researcher's instrument (topic and length
-pickers, the contrast trace, the film history); the exhibit view is a
-single button in front of the public, so it's a separate page rather than a
-mode of the same one.
-
-How it works:
-
-1. **Setup screen** (staff, once before opening): pick the topic, the length
-   of each film, and how films start. Won't let you start on a topic with no
-   footage, so an error can never end up on the gallery wall. Settings are
-   remembered, so a power cut doesn't need staff.
-2. **Two ways to run**, since this was still open with Dr. Campbell:
-   *a visitor presses the button* (screen waits showing one large button —
-   best for shorter films), or *runs by itself all day* (starts on its own
-   and makes a new film each time one finishes — best for longer films).
-3. **While rendering**, a progress bar and plain-language stage
-   ("Assembling the shots — 4 of 9"). This matters now that feature-length
-   is possible: a bare spinner for half an hour tells a viewer nothing.
-4. **The film plays automatically** when ready, full screen. If the browser
-   blocks sound before any interaction, it falls back to muted playback
-   rather than leaving a still frame on the wall. Touching the screen brings
-   up **Pause**, the elapsed time, **Start over** and **Make another**; the
-   controls fade while playing and stay up while paused. The video's own
-   browser control bar is deliberately not used — it looks wrong on a
-   gallery wall — so pause lives in that overlay instead.
-5. **Failures never leave a blank screen** — an apologetic panel with a
-   "Try again" button, and in unattended mode it retries by itself after
-   twelve seconds.
-
-To get back to the setup screen: press **Esc**, or tap the **top-left corner
-three times** (three, so one stray touch doesn't expose settings to a
-visitor). Diversity mode is on and exact-duration off in this view, baked in
-rather than exposed — whole clips are kinder than a hard cut mid-shot.
-
-Reaching it: an **Exhibit mode** link sits in the top-right of the console,
-beside the theme toggle, and the exhibit's setup screen links back. The
-direct address is `/exhibit`.
-
-Files: `web/frontend/exhibit.html`, `exhibit.css`, `exhibit.js`. Progress
-reporting runs through the existing job_id, with a new
-`GET /api/generate/progress`.
-
-**6. Setup guide and double-click launchers** — for handing the engine to
-Dr. Campbell to run on her own machine.
-
-`SETUP-GUIDE.md` at the repo root is written for someone who has never run
-code: install Python and FFmpeg once (Mac and Windows both covered), put the
-project somewhere, add the clips, then double-click to start. The README
-links to it near the top.
-
-`Start Engine (Mac).command` and `Start Engine (Windows).bat` check that
-Python, FFmpeg and the Python packages are present, explain in plain
-language what to install if any are missing, start the server, and open the
-browser. Nothing is ever typed into the window they open.
-
-Supporting changes in `app.py`: it now picks the next free port if the
-default is taken (rather than dying with "Address already in use" in front
-of someone who can't diagnose it), opens the browser itself, and runs with
-debug off unless `DDE_DEBUG=1`.
-
-**The footage still has to travel separately.** `.gitignore` excludes
-`*.mp4`, `*.mov`, `*.wav` and `*.mp3`, so a clone or a zip of the repo
-arrives with empty asset folders — the engine starts fine and reports that
-every topic has no footage. Step 4 of the setup guide covers where the clips
-go, but getting them onto her machine (OneDrive, a USB drive, copied on the
-day) is a separate act.
-
-Also: the web server's default port moved from 5000 to **5001**, because
-macOS runs AirPlay Receiver on 5000 and silently takes the port. Set the
-`PORT` environment variable to override.
-
-## What Changed (2026-07-23)
-
-This was a large working session — engine fixes, a full frontend rebuild, and a real architecture change requested live by Dr. Campbell. In order:
-
-**Engine / duration handling**
-- **Fixed a real overshoot bug**: the closing B+X bookend's duration wasn't checked against the target budget at all, so films reliably ran ~5–10s over the requested length. Now the closing clip's duration is reserved in the budget before body selection runs, so whole-clip sequences never exceed `target_duration`.
-- **Added "exact duration" mode** (opt-in): lets the sequence run past target using whole clips, then trims the final render down to the exact requested length. Off by default (never cuts real footage; may land a few seconds short). Verified frame-accurate via re-encoding, not stream-copy.
-- **Auto-sync media library**: the engine now scans each collection's `assets/` folders on every generate call. Drop a file in → it's auto-tagged (duration, dominant color, pacing heuristic) and enters rotation. Delete a file → its index entry is retired automatically instead of ever regenerating a placeholder for it. This is what fixed the earlier green-screen-placeholder (`SF_Zoo.MOV`) bug for good.
-
-**Fixed opening/closing cards (per Dr. Campbell)**
-- Every generated film now opens on a **title card** ("Welcome to the Dynamic Documentary Engine" + Faculty Supervisor: Dr. Betsy Campbell / Created by: Oluwafemisola David Ademoye / Collaborator: Omotola Ajibike Ajao) and closes on an **end card** ("The End" / "Thanks for watching"). Rendered via Pillow (the installed ffmpeg build has no `drawtext` filter) using the site's own Georgia serif typography, then concatenated around the render. Not counted toward `target_duration` — exact-duration mode accounts for the ~10s the cards add so the *whole file* still lands on target.
-
-**Multi-topic collections (architecture change)**
-- Per Dr. Campbell's direction from the 2026-07-23 planning meeting: each film topic (World War II, Swiss, ...) now gets its own self-contained folder instead of one shared pool — see **Media Collection** below.
-- The engine auto-discovers any `local-media/<Name>/` folder shaped like `assets/` + `artifacts/` and auto-creates a schema-valid metadata index for it the first time it's seen — no code changes needed to add a new topic.
-- Web UI now has a **Film Topic** selector; generating from an empty topic is blocked with a clear message instead of erroring.
-
-**Frontend rebuild**
-- Full cinematic redesign: hero section, framed video player, color-coded contrast timeline, card-grid film history (replacing the original plain layout).
-- **Penn State branding**: official colors (Nittany Navy `#001E44`, Beaver Blue `#1e407c`), official PSU logo (top-left, links to ist.psu.edu), institutional wording.
-- **Light/dark theme toggle** (moon/sun icon, top-right), persisted via `localStorage`. Light = PSU white/navy; dark = original cinematic near-black theme. Both fully maintained, not one replacing the other.
-- Decorative header bars restyled as solid black filmstrip perforation strips (not theme-dependent, like the video screen frame).
-- **Diversity mode** and **exact duration** toggles added to the UI with hover-tooltip explanations, centered layout.
-- **Delete button** on film history entries (`DELETE /api/films/<collection>/<filename>`).
-- Backend now binds to `0.0.0.0` (not just `127.0.0.1`) so it's reachable over the local network / a tunnel, not just from the same machine — this is what let Dr. Campbell test it remotely via a Cloudflare tunnel during the planning meeting.
-
-**Verified in a live meeting**: Dr. Campbell generated and reviewed films herself (45s target, diversity + exact duration both on) over a Cloudflare tunnel during a working session on 2026-07-23. She confirmed satisfaction with progress.
-
-## Current Media Collection
-
-**New structure as of 2026-07-23** — each film topic is self-contained:
+### How one run flows
 
 ```
-local-media/
-├── Validation/                          (13 real clips — original test/demo set)
-│   ├── assets/
-│   │   ├── a-roll/   (5 files: First_skate, chick_stir_fry, gallery_monkey, robotic_arm, skate_boarding)
-│   │   ├── b-roll/   (4 files: colorful_ballerina, plane_drop, warship_cruising, waves_sunset)
-│   │   └── x-roll/   (4 files: birds_call, piano_sound, war_bong, water_stream)
-│   ├── titles/
-│   │   ├── opening/  (drop a video here → this topic's opening piece)
-│   │   └── closing/  (drop a video here → this topic's closing piece)
-│   └── artifacts/    (rendered films + manifests + usage_stats.json)
-├── WWII/                                (empty — waiting on Betsy's footage)
-│   ├── assets/{a-roll,b-roll,x-roll}/
-│   ├── titles/{opening,closing}/
-│   └── artifacts/
-└── SWISS/                               (empty — waiting on footage)
-    ├── assets/{a-roll,b-roll,x-roll}/
-    ├── titles/{opening,closing}/
-    └── artifacts/
+Browser (Generate)
+  → app.py  POST /api/generate
+      → sync_media_library()        reconcile the topic's index with its assets/ folders
+      → dde_runtime.generate_and_render()
+          → Sequencer.generate()
+              1. opening pair   random B-roll + X-roll (weighted by metadata "weight")
+              2. closing pair   chosen now and held back; its screen time reserved in the budget
+              3. body loop      until the duration budget is used up:
+                   selector.select_next()
+                     → rules.is_eligible() filter
+                     → score every candidate's dissimilarity vs. the previous clip
+                     → keep the top 3 (wider in diversity mode)
+                     → weighted-random pick among them
+                   if it's a B-roll → selector.select_pairing() picks its X-roll
+              4. append the closing pair
+          → Assembler.render()      one segment per slot at 1280×720 / 30fps, then concat
+          → exact-duration trim     (only if that toggle is on)
+          → wrap with title cards   opening + closing piece around the whole film
+          → write manifest .json    next to the .mp4
 ```
 
-**To give a topic its own opening/closing:** put one video file in
-`local-media/<Topic>/titles/opening/` (and/or `closing/`). Any length,
-any format. An empty folder falls back to the standard generated text card.
+`Sequencer.generate()` returns a list like
+`[("bv_1","xa_2"), "av_4", ("bv_3","xa_1"), "av_2", ("bv_5","xa_2")]` —
+strings are A-roll, tuples are B-roll + X-roll. First and last are always
+tuples.
 
-Each topic has its own metadata index at `metadata/collections/<topic>_collection_index.json` (auto-created for new topics). **To add a topic**: create `local-media/<Name>/assets/{a-roll,b-roll,x-roll}/` and `local-media/<Name>/artifacts/` — the engine and web UI pick it up automatically, no code or settings needed. **To add footage to an existing topic**: drop files into the right `assets/<roll-type>/` subfolder — auto-detected on next generate.
+---
 
-## Recommended Commands
+## 2. Key design decisions, and why
 
-Web UI (local testing):
+### Juxtaposition, not continuity
 
-```bash
-cd "/Users/kingdavid/documentary engine/dynamic-documentary-engine"
-python3 web/backend/app.py
-# Open http://127.0.0.1:5001 in browser (or http://<machine-ip>:5001 from another device on the same network)
-```
+The guiding idea is **maximum contrast between neighbouring clips**, not a
+smooth emotional arc. `_compute_dissimilarity_score()` in
+`artifact_selector.py` adds a point for each way the candidate differs from
+the previous clip: media type, mood, pacing, geography, dominant lines, plus
+one point for every tag and theme the candidate has that the previous clip
+didn't.
 
-CLI, against a specific topic's footage (bypasses the web UI's topic selector):
+Mood and pacing are *scored dimensions*, not rules. There is no pacing arc
+(`rules.get_target_pacing()` returns `None`), and the `current_mood` argument
+to `select_next()` is accepted but ignored — both are leftovers from an
+earlier continuity-based design, kept so the interfaces didn't break.
 
-```bash
-python3 scripts/run_first_film.py --target 60 --runs 0 --diversity \
-  --assets-path "local-media/Validation/assets" --films-path "local-media/Validation/artifacts"
-```
+It picks from the **top 3**, not the single best, on purpose: always taking
+the top scorer would make the same cuts every time. The artifact's `weight`
+then decides among those three (it's a frequency knob, not a contrast one).
+**Diversity mode** widens the pool (60% of candidates, at least 12) and boosts
+clips that have appeared less across previous films, using
+`usage_stats.json` in the topic's `artifacts/` folder.
 
-## Web UI Features
+### Generated B-roll + X-roll bookends
 
-- **Film topic selector**: choose which collection (World War II, Swiss, Validation, ...) to generate from; disabled with a clear message if the topic has no footage yet.
-- **Generate button**: triggers film generation with target duration input.
-- **Diversity mode toggle**: boosts underused clips across runs.
-- **Exact duration toggle**: trims the final render to match the target length precisely.
-- **Light/dark theme toggle**: PSU-branded light theme or cinematic dark theme, remembered across visits.
-- **Video player**: plays the rendered film (with fixed intro/outro cards) directly in the browser.
-- **Sequence trace**: shows all cuts with dissimilarity scoring and contrast reasoning for each transition.
-- **Film history**: lists previously generated films per topic, with delete buttons.
-- **Sync notice**: banner when the media library auto-detects new or retired clips.
-- **Status messages**: reports generation progress ("Done.").
+There is no designated opening or closing clip. Every film opens and closes
+on a **random B-roll + X-roll pair from the ordinary pool**. Two details
+matter:
 
-## Exhibit Deployment (Next Phase)
+- The **closing pair is chosen before the body**, so the body can't use up
+  every B-roll and leave the film with no ending.
+- Its **screen time is reserved in the budget** up front. Before this, the
+  close was tacked on after the budget check and films overshot the target
+  by 5–10 seconds.
 
-Discussed with Dr. Campbell on 2026-07-23: leaning toward an **old loaner laptop from Penn State IT** rather than buying new hardware, running behind the scenes with output on a wall-mounted screen. Open question still to resolve with her: whether gallery staff start longer films manually, or visitors trigger shorter films via a simple button interface.
+The bookends are *not* the title cards. Title cards are a fixed wrapper
+around the finished film (section on exact duration below); the bookends are
+the first and last slots of the dynamic sequence inside it.
 
-1. **Hardware**: Penn State IT loaner laptop (per Betsy's suggestion) — David to follow up with Penn State IT.
-2. **Network**: Flask now binds to `0.0.0.0`, so it's already reachable via `http://[machine-ip]:5001` from any device on the same network — no further backend change needed for this.
-3. **Media**: still planned to sync footage via OneDrive to the exhibit machine's local storage; not yet tested end-to-end.
-4. **Workflow**: click "Generate" → film renders (title card + dynamic sequence + end card) → plays automatically.
-5. **Hosting for remote testing**: currently using a temporary Cloudflare quick tunnel for remote demos (e.g., the 2026-07-23 meeting with Dr. Campbell) — not meant to be permanent. Next step is connecting with Penn State IT about a safer, Penn State-managed way to host (e.g., something OneDrive-adjacent) instead of relying on Cloudflare long-term.
+Whether A-roll should also be allowed to open/close a film is an **open
+design question** — ask David before changing it.
 
-### Still TODO
+### Audio reuse inside a film
 
-- [ ] **Connect with Penn State IT** — both for a loaner exhibit laptop and for guidance on the safest way to host the engine on Penn State infrastructure instead of Cloudflare.
-- [ ] **Get real WWII footage from Dr. Campbell** and load it into `local-media/WWII/assets/` (she committed to sending clips; David to add them to the new folder structure once received — Swiss and any other topics likewise).
-- [ ] **Document how the engine works** — the design decisions and structure, for future reference and potential publications (Dr. Campbell explicitly requested this on 2026-07-23; not yet written up beyond this handoff doc and inline code comments).
-- [ ] **Research live webcam feed integration** — floated as a future enhancement in the 2026-07-23 meeting; no design work started yet.
-- [ ] Configure OneDrive Desktop Sync on the eventual exhibit machine.
-- [ ] Set Flask to auto-start on boot for that machine.
-- [ ] Decide and build the visitor-facing interaction model (staff-started vs. button-triggered).
-- [x] Create a quick-start guide for Dr. Campbell / gallery staff (no Terminal, no code) — `SETUP-GUIDE.md`, plus double-click launchers for Mac and Windows.
+Clips (A-roll and B-roll) never repeat within a film. **X-roll can.** An
+audio bed is a layer, not a shot, and each use plays a different random
+excerpt of the file. Enforcing no-repeat on audio made the number of audio
+files a hard cap on film length (sixteen clips and two recordings could only
+make a two-shot film). `select_pairing()` spreads reuse evenly by always
+choosing among the least-heard recordings first.
 
-### Key dates
+### The concat *filter*, not stream-copy — the audio-bleed fix
 
-- **Museum exhibition: December 2026** — confirmed success date for the project regardless of festival timing.
-- **Centre County Film Festival**: Dr. Campbell said the August 8 deadline will likely be missed due to scheduling; a later October call may be a fallback submission target.
-- **Internship extension**: David needs to respond to an email about required internship hours; Dr. Campbell confirmed flexibility on hours is fine as long as the project keeps progressing — response pending, possibly CC'ing Dr. Campbell.
+Segments are joined with FFmpeg's concat **filter** (decode everything,
+re-encode one continuous stream), not the concat demuxer with `-c copy`.
 
-## Latest Verified Test
+Why: AAC audio comes in 1024-sample frames, and every segment carries its own
+padding and priming samples. Stream-copying leaves those in place at every
+join, so about **50ms of each clip's audio played over the start of the next
+clip** — measured at −24 dBFS (full level) where there should have been
+silence. With the filter: −71 dBFS, inaudible.
 
-**Test date**: 2026-07-23
-**Setup**: Web UI, Validation topic, real browser end-to-end test after the multi-topic migration
-**Result**: ✅ PASS
+The cost is speed: rendering is roughly 0.3× the film's length (a 90-second
+film takes about 30 seconds). **Don't "optimize" this back to `-c copy`.**
 
-- Topic selector correctly listed all three collections with live clip counts (Validation: 13, WWII: 0, SWISS: 0).
-- Selecting an empty topic (WWII) correctly disabled Generate with an explanatory message; no crash.
-- Generated a real film from Validation through the actual browser UI — correct collection metadata, title card played correctly at the start, video/audio intact.
-- Confirmed (via a scare mid-session, fully recovered) that the 13 clips' hand-authored metadata — moods, weights, tags — survived the migration intact after a background dev-server race briefly corrupted it; recovered from git history and re-verified.
+The filter opens every input at once and starts failing past about 200, so
+long films are joined in batches of 100 (`CONCAT_BATCH_SIZE`) and the batches
+joined in turn. Tested at 900 segments.
 
-Earlier baseline test (pre-restructure, still representative of core engine behavior): 90s target film played correctly in-browser with full contrast trace and no X-roll-standalone artifacts.
+### X-roll excerpts instead of looping
 
-## Architecture Overview
+When an audio file is shorter than its B-roll, the old approach looped it
+(`-stream_loop -1`). The restart was audible — the sound "changed" with no
+cut on screen. Now `_plan_xroll_excerpts()` builds the bed from several
+excerpts, each from its own random point in the file, joined with a short
+(≤0.4s) crossfade. Long audio just gets one excerpt from a random start.
+Live streams and unmeasured files still fall back to looping.
 
-```
-Web UI (browser)
-    ↓
-Flask Backend (app.py)              →  GET /api/collections (list topics)
-    ↓                                  POST /api/generate {collection, target_duration, ...}
-dde_runtime.py (shared generation logic)
-    ↓
-list_collections() / get_collection()  →  resolves paths for the selected topic
-    ↓
-sync_media_library()   →  reconciles that topic's assets/ folder against its metadata index
-    ↓
-Sequencer (generate)   →  loads collection, builds contrast-ranked sequence
-    ↓
-Assembler (render)     →  pairs B+X, normalizes media, renders MP4
-    ↓
-_trim_film_to_duration()    →  (if exact_duration) trims to target minus card time
-    ↓
-_wrap_with_title_cards()    →  prepends/appends fixed intro + outro cards
-    ↓
-FFmpeg                 →  H.264 video, AAC stereo, 1280x720, 30fps
-    ↓
-local-media/<Topic>/artifacts/   →  film_test_1.mp4, film_test_2.mp4, etc.
-```
+### The audio-transition fade
 
-## Important Files
+With the fade on, each **B-roll's music bed fades up at the start of the clip
+and down at the end**, so every cut dips to silence and back instead of the
+music jumping. It's baked into each segment separately.
 
-- **Backend**: `web/backend/app.py` — Flask API, multi-collection aware
-- **Frontend**: `web/frontend/index.html`, `app.js`, `style.css`, `psu-logo.svg`
-- **Shared runtime**: `scripts/dde_runtime.py` — collection registry, sync, trim, title cards, `generate_and_render()`
-- **Engine**: `engine/sequencer.py`, `engine/artifact_selector.py`, `engine/rules.py`, `engine/assembler.py` (all collection-path-agnostic — no changes needed for multi-topic support)
-- **Metadata**: `metadata/collections/<topic>_collection_index.json` (one per topic; auto-created for new ones)
-- **Media**: `local-media/<Topic>/assets/{a-roll,b-roll,x-roll}/`
-- **Output**: `local-media/<Topic>/artifacts/` (generated MP4s and manifests, per topic)
+- **Why a dip, not a crossfade between clips:** overlapping neighbouring
+  clips' audio would shift sound against picture, and the drift adds up
+  over a full film.
+- **Why only B-roll:** A-roll is someone speaking; fading speech in and out
+  sounds wrong. A-roll audio is never touched.
+- **Why it varies:** the chosen length (dropdown, default 0.8s) is a
+  *center*. Each clip's fade-in and fade-out are rolled **independently**
+  within ±35% of it, so every cut breathes a little differently and
+  re-rendering changes them — in keeping with "no two screenings alike".
+- **Guardrails:** a fade is never shorter than 0.15s, and never longer than
+  20% of its clip on either side (short clips get short fades; the 20% cap
+  wins over the 0.15s floor). "Off" adds no filter at all.
 
-## Key Design Decisions
+### Exact duration
 
-1. **No emotional continuity**: Juxtaposition and contrast drive all sequencing decisions. Mood and pacing metadata are scored dimensions, not enforcement rules.
-2. **Diversity mode is optional**: Normal mode keeps a tight top-contrast pool (strongest cuts). Diversity mode widens the pool and boosts underused clips for broader collection exploration.
-3. **X-roll paired, never standalone**: Audio-only clips are always paired with B-roll video; they cannot be selected independently.
-4. **Whole clips only by default**: The engine never cuts into real footage unless "exact duration" is explicitly enabled — undershooting the target is preferred over trimming a clip.
-5. **Fixed cards frame the film, don't compete with it**: The intro/outro cards are a wrapper around the dynamic sequence, not part of the contrast-scored body — they're identical every time on purpose, contrasting with the "different every time" sequence in between.
-6. **Topics are self-contained and auto-discovered**: No central registry file to hand-maintain — a topic is just a correctly-shaped folder. This mirrors the existing "drop a file in, the engine adapts" philosophy already established for individual clips.
-7. **Local-network architecture**: No cloud dependencies at runtime; media stays on the exhibit machine or OneDrive-synced local storage. (Remote *testing* currently uses a temporary Cloudflare tunnel — not part of the permanent architecture.)
+By default the engine **never cuts into real footage**: it uses whole clips
+and lands at or a few seconds under the target. Undershooting is preferred
+to chopping a shot.
 
-## Conversation & Talking Points
+With **Exact duration** on, the sequencer is allowed to run *past* the
+target (`allow_overshoot=True`), then the rendered film is **re-encoded and
+trimmed** to exactly the target minus the title cards' length — so the whole
+file, cards included, matches what was asked for. The title-card length is
+measured from the actual pieces, since a topic's own opener can run minutes.
+Re-encoding (not stream-copy) is what makes the cut frame-accurate instead of
+snapping to a keyframe. The price: whatever was playing gets cut off
+mid-shot. The exhibit view keeps this off.
 
-**For Dr. Campbell (non-technical)**:
+### Title cards
 
-> "The engine generates a different film every time you click 'Generate.' It picks clips from your media collection and arranges them so consecutive clips contrast as much as possible — different moods, different locations, different subjects. It's designed to surprise and engage viewers, not comfort them. Every film opens and closes on the same title and credit cards, but everything in between is unique each time. You can click as many times as you want."
+Every film is wrapped in an opening and closing piece. If
+`local-media/<Topic>/titles/opening/` (or `closing/`) contains a video, that's
+used, at whatever length. If the folder is empty, a text card is generated
+with Pillow (6s opening, 4s closing). Pillow is used instead of FFmpeg's
+`drawtext` because many FFmpeg builds don't include it.
 
-**For academic/technical audiences**:
+### One shared driver, many front doors
 
-- How does the engine differ from traditional documentary editing? (No emotional arc, pure contrast maximization.)
-- What happens if the same clips appear in multiple generated films? (Diversity mode prevents oversaturation; usage counts persist across runs.)
-- Why B-roll + X-roll pairing? (B-roll is visual-only; X-roll provides layered audio without adding screen time.)
-- How does it ensure variety in a small collection? (Dissimilarity scoring + diversity mode + weighted randomness within contrast pool.)
-- How does it scale to multiple documentary topics? (Each topic is an independently-scored, independently-stored collection — no cross-topic mixing, but zero code changes needed to add one.)
+The CLI, the console and the exhibit view all go through
+`dde_runtime.generate_and_render()`, so they can't drift apart. Put new
+pipeline steps there, not in `app.py` or `run_first_film.py`.
 
-## Next Steps
+### Topics are just folders
 
-1. **Get WWII (and other) footage from Dr. Campbell** and load it into the new per-topic folders.
-2. **Follow up with Penn State IT** — a loaner exhibit laptop, and safer hosting than the current Cloudflare tunnel.
-3. **Write up how the engine works** for Dr. Campbell's documentation/publication request.
-4. **Decide the exhibit interaction model** (staff-started vs. visitor button) and build it.
-5. **Test the exhibit setup** on real hardware once IT provides it — local network access, OneDrive sync, auto-start on boot.
-6. Lower priority / nice-to-have: minutes-based duration input, live webcam feed research.
+There's no registry. Any `local-media/<Name>/` with `assets/` and
+`artifacts/` inside becomes a topic. Its metadata index is treated as a
+**cache of what's on disk**, reconciled on every generate.
 
-## Recommended Test Flow
+---
 
-1. Pick a topic in the web UI (start with Validation, since it has real footage).
-2. Generate 5–10 films.
-3. Review sequence traces for contrast reasoning.
-4. Check that no clip repeats within a film.
-5. Verify audio sync and video quality, including the fixed intro/outro cards.
-6. Test diversity mode and exact duration together for a few runs.
-7. Switch to an empty topic (WWII/SWISS) and confirm Generate is correctly blocked with a clear message.
-8. Once real WWII/Swiss footage lands, repeat this whole flow for those topics.
+## 3. Where to change common things
+
+### Add a topic
+
+1. Create `local-media/<Name>/assets/a-roll/`, `assets/b-roll/`,
+   `assets/x-roll/` and `local-media/<Name>/artifacts/`.
+2. Restart the server. It creates
+   `metadata/collections/<name>_collection_index.json` (default runtime rules:
+   35s min, 1800s max) and the `titles/opening/` + `titles/closing/` folders.
+3. Drop clips in. Accepted: A-roll/B-roll `.mov .mp4 .m4v`; X-roll
+   `.wav .mp3 .m4a .aac`. On the next generate each new file is added to the
+   index with its duration, a pacing guess from its length, a dominant-colour
+   tag, and `weight: 0.5`.
+4. **Enrich the index by hand.** Auto-tagged clips have almost nothing to
+   contrast on, so the scorer can barely tell them apart. Open the topic's
+   index and add `mood`, `tags`, `theme`, `geography`, `dominant_lines` and a
+   `title` to each entry (see `metadata/collections/validation_collection_index.json`
+   for well-tagged examples). This is where most of the engine's quality
+   comes from.
+
+A topic needs **at least one B-roll and one X-roll**, or it can't make
+bookends and generation fails.
+
+### Adjust the fade
+
+- Constants at the X-roll section of `Assembler` in `engine/assembler.py`:
+  `AUDIO_FADE_SECONDS` (default center), `AUDIO_FADE_JITTER`,
+  `AUDIO_FADE_MAX_FRACTION`, `AUDIO_FADE_FLOOR_SECONDS`.
+- The math: `_fade_center()`, `_fade_seconds()` (per-clip ceiling),
+  `_roll_fade()` (one jittered value), `_afade_expr()` (the FFmpeg filter).
+  Applied in `_build_broll_xroll_command()`.
+- The dropdown options are in `web/frontend/index.html`
+  (`#audio-fade-select`); their values are the centers. If a request sends no
+  fade setting (the exhibit view, scripts), the backend turns the fade on at
+  the default.
+
+### Tune the dissimilarity scoring
+
+- **What counts as different:** `_compute_dissimilarity_score()` in
+  `engine/artifact_selector.py`. Every dimension is worth 1 point, except
+  tags and themes, which score per unshared value — so clips with lots of tags
+  tend to win. To weight a dimension, multiply its contribution.
+- **How many top candidates compete:** `_JUXTAPOSITION_POOL_SIZE` (3),
+  `_DIVERSITY_POOL_RATIO` (0.6), `_DIVERSITY_POOL_MIN` (12) on
+  `ArtifactSelector`.
+- **How often a clip is picked:** its `weight` in the index (default 0.5).
+- **Keep the trace honest:** `dims()` in `scripts/dde_runtime.py` re-derives
+  the same dimensions to explain each cut in the console's "why this cut"
+  panel. If you add or reweight a dimension, update `dims()` too.
+
+### Add a metadata field
+
+The important thing to know: **the engine reads the flat per-artifact
+entries in the collection index**, not the detailed per-artifact JSON files.
+(The assembler reads per-artifact files only to find a live stream's URL.)
+So a new field that should affect sequencing needs to:
+
+1. Be added to the entries in `metadata/collections/<topic>_collection_index.json`.
+2. Be declared, **optional**, under `artifacts.items.properties` in
+   `metadata/collection_index_schema.json` — and under the matching object
+   (`content` or `sequencing`) in `metadata/artifact_schema.json` if it
+   belongs in the detailed format too.
+3. Be read in the scorer or rules using the existing fallback pattern,
+   `a.get("x") or a.get("content", {}).get("x")`, so both shapes work.
+4. Optionally be inferred for new files in `sync_media_library()`.
+
+Keep new fields optional so existing indexes still load. Note that
+`CollectionLoader` only checks for a handful of required fields at load
+time; full JSON-schema validation only runs in
+`scripts/build_validation_collection.py`.
+
+---
+
+## 4. Gotchas and non-obvious constraints
+
+### Project rules
+
+- **Locked terminology.** A-roll / B-roll / X-roll; artifact / collection /
+  film. Don't introduce synonyms in code, UI or docs.
+- **No AI model, provider or vendor names anywhere** — code, comments,
+  docstrings, filenames, docs. This is a supervisor requirement. The
+  assistant/agent context file is `AGENT.md`; don't add a vendor-named one.
+  Don't add commit trailers naming a tool or model either.
+- **No external generation services.** All sequencing is original
+  algorithmic code. No API calls out to anything for generation.
+- The engine's inspiration and comparison with other generative film work
+  lives in `docs/` only — keep it out of code.
+- **Branch flow:** work on `first-run-demo`, get it verified, then promote to
+  `main` by fast-forward. Never push straight to `main`. The repo is public.
+- Keep the author/credit header at the top of every Python file.
+
+### Media and generated files
+
+- **Media isn't in git.** A fresh clone has empty `assets/` folders; the
+  footage travels separately (drive, OneDrive, copied on the day).
+- **Only some extensions are ignored:** `.gitignore` covers `*.mp4 *.mov
+  *.wav *.mp3`. The engine also accepts `.m4v`, `.m4a` and `.aac`, which are
+  **not** ignored — `git status` before committing if you've added those.
+  Upper-case `.MOV` is only ignored because macOS and Windows git ignore case
+  by default; on Linux it wouldn't be.
+- **Generated films, their `.json` manifests and `usage_stats.json` are
+  gitignored.** They land in `local-media/<Topic>/artifacts/`. Leave them out
+  of commits. Delete `usage_stats.json` to reset diversity mode's history.
+- **Renaming or deleting a media file throws away its hand-written
+  metadata.** The sync matches files by name: a missing file's entry is
+  removed, and a renamed file comes back as a new, bare auto-tagged entry.
+  Rename in the index too, or re-enter the metadata.
+
+### Behaviour that surprises people
+
+- **Footage is the ceiling on length.** Clips never repeat, so a film can't
+  be longer than the topic's total A-roll + B-roll footage. Ask for 90
+  minutes from 2 minutes of footage and you get about 2 minutes — not an
+  error. Allowing repeats would be a design decision, not a bug fix.
+- **The CLI isn't the web app.** `scripts/run_first_film.py` defaults to
+  `demo/` with generated placeholder media, and doesn't turn on the fade. Pass
+  `--assets-path local-media/<Topic>/assets --films-path local-media/<Topic>/artifacts`
+  to use real footage.
+- **`must_not_follow` after a B-roll + X-roll slot checks the X-roll.** The
+  rule compares against the last ID recorded, and pairing records the X-roll
+  after its B-roll. So a "must not follow this B-roll" constraint won't fire
+  after that B-roll's slot. Not yet confirmed whether that's intended — worth
+  a look if you rely on the rule.
+- **Title-card fonts are macOS paths** (Georgia, Arial under
+  `/System/Library/Fonts`). On Windows the cards still render, but with
+  Pillow's plain default font.
+- **Port 5001, not 5000** — macOS AirPlay Receiver takes 5000. Set `PORT` to
+  override; the server also moves to the next free port on its own.
+  `DDE_DEBUG=1` turns on Flask debug; `DDE_NO_BROWSER=1` stops it opening a
+  browser tab.
+- **There's no test suite.** Verify with `scripts/run_first_film.py`, the
+  console, `ffprobe`, and your ears. For audio changes, listen at the cuts.
+- **Known schema bug:** some nullable example fields in
+  `metadata/artifact_schema.json` are typed as plain `string`/`number` but set
+  to `null` (details in `AGENT.md` §4). Confirm the fix direction with David.
+
+---
+
+## 5. Open threads and future directions
+
+None of these have been started unless it says otherwise.
+
+- **Loudness normalization — not started.** Clips come in at very different
+  volumes. FFmpeg's `loudnorm` per segment (in `assembler.py`) would even them
+  out. It's a separate change from the fade and shouldn't be mixed into it.
+  Two-pass `loudnorm` is more accurate but doubles audio analysis time.
+- **Context-aware "memory triggers" — not started.** Dr. Campbell's idea: let
+  real-world context (date, weather, and so on) influence what the engine
+  picks. A research direction for a future version, well beyond the current
+  local system.
+- **A-roll as bookends — undecided.** Should A-roll be allowed to open or
+  close a film? Currently only B-roll + X-roll can. Needs David / Dr. Campbell.
+- **Live webcam / stream input — not started beyond the plumbing.** The
+  assembler can read a `stream` source type from a per-artifact JSON file,
+  but there's no UI or workflow for adding one.
+- **README refresh — not started.** It still describes the old approach. See
+  `AGENT.md` §7.
+- **A proper test suite — not started.** The most valuable first tests would
+  pin down the sequencer's guarantees: bookends are always B-roll + X-roll,
+  no clip repeats, the budget is respected.
+- **Exhibit deployment — status last recorded 2026-08-17; check with Dr.
+  Campbell.** Open at that point: a Penn State IT loaner laptop and hosting
+  (instead of a temporary tunnel), real WWII and Swiss footage, syncing
+  footage to the exhibit machine, and starting the server on boot. The target
+  was a museum exhibition in December 2026.

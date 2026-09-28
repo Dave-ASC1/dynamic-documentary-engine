@@ -99,7 +99,7 @@ dynamic-documentary-engine/
 ├── Start Engine (Windows).bat
 ├── requirements.txt
 ├── SETUP-GUIDE.md   # beginner install/run guide (Windows + Mac)
-├── handoff.md       # handoff notes
+├── handoff.md       # new-student orientation: mental model, design decisions, where to change things, gotchas
 ├── AGENT.md         # this file
 ├── README.md        # PARTLY STALE — see §7
 └── LICENSE          # MIT
@@ -207,7 +207,7 @@ film_path = assembler.render(sequence)                 # returns output MP4 path
 - Every Python file uses **Google-style docstrings** with a file header: Author, Supporting, Project, Institution, Supervisor, Version.
 - Author: **Oluwafemisola David Ademoye**; Supporting: **Omotola Ajibike Ajao**; Supervisor: **Dr. Betsy Campbell**; Institution: **Penn State, College of IST**.
 - Schema: JSON, Draft-07, `allOf` conditional validation.
-- Keep generation logic original and dependency-light (`requirements.txt`: flask, jsonschema).
+- Keep generation logic original and dependency-light (`requirements.txt`: flask, jsonschema, Pillow — Pillow renders the title cards).
 - Media assets live on an **external hard drive** (physical, not cloud) via a **configurable base path** in the Assembler.
 - Tuning constants are class attributes on `Assembler` (output geometry/codecs near the top of the class; `AUDIO_FADE_SECONDS`, `AUDIO_FADE_JITTER`, `AUDIO_FADE_MAX_FRACTION`, `AUDIO_FADE_FLOOR_SECONDS`, excerpt settings beside the X-roll code; `CONCAT_BATCH_SIZE` beside the concat code). Selector pool sizes are class attributes on `ArtifactSelector`.
 - Commits carry no AI co-author or vendor trailers.
