@@ -12,14 +12,10 @@ All sequencing logic is creative code — no external AI engines are used.
 Selection decisions are driven entirely by metadata rules, dissimilarity
 scoring, and weighted random selection.
 
-Inspired by the Brain One engine built by Brendan Dawes for the
-Eno documentary (2024) — a system that produces an algorithmically
-different cut of the film at every screening.
-
 Usage:
     from engine.sequencer import Sequencer
 
-    sequencer = Sequencer("metadata/ww2_collection_index.json")
+    sequencer = Sequencer("metadata/collections/wwii_collection_index.json")
     film = sequencer.generate(target_duration=1800)
     print(film)
 

@@ -12,7 +12,7 @@ to generate and render films.
 Usage:
     from engine import Sequencer, Assembler
  
-    sequencer = Sequencer("metadata/ww2_collection_index.json")
+    sequencer = Sequencer("metadata/collections/wwii_collection_index.json")
     sequence  = sequencer.generate(target_duration=600)
  
     assembler = Assembler(

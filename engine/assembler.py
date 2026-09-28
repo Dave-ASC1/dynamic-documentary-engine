@@ -16,7 +16,7 @@ Usage:
     from engine.sequencer import Sequencer
     from engine.assembler import Assembler
 
-    sequencer = Sequencer("metadata/ww2_collection_index.json")
+    sequencer = Sequencer("metadata/collections/wwii_collection_index.json")
     sequence  = sequencer.generate(target_duration=600)
 
     assembler = Assembler(

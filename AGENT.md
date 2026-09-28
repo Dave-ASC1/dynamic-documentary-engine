@@ -91,9 +91,12 @@ dynamic-documentary-engine/
 │       ├── exhibit.html exhibit.css exhibit.js  # kiosk / gallery view
 │       └── psu-logo.svg
 ├── local-media/                            # real footage workspace (media gitignored)
-│   ├── WWII/  SWISS/  Validation/          # one folder per topic: assets/ + artifacts/ + titles/
-│   └── README.md
+│   ├── WWII/  SWISS/  Validation/          # one folder per topic: assets/ + artifacts/ + titles/{opening,closing}/
+│   └── README.md                           # web-generated films + .json manifests land in <Topic>/artifacts/ (gitignored)
+├── demo/                                   # gitignored; CLI default output + placeholder media
 ├── docs/  (comparative_analysis_brain_one.md, sketches/*.jpg)
+├── Start Engine (Mac).command              # double-click launchers for the web UI
+├── Start Engine (Windows).bat
 ├── requirements.txt
 ├── SETUP-GUIDE.md   # beginner install/run guide (Windows + Mac)
 ├── handoff.md       # handoff notes
@@ -116,7 +119,7 @@ dynamic-documentary-engine/
 **Web layer (web/backend/app.py + scripts/dde_runtime.py):**
 - Auto-discovers every topic folder under `local-media/` (currently WWII, SWISS, Validation) — no hardcoded media path.
 - **Media auto-sync:** drop clips into `local-media/<Topic>/assets/{a-roll,b-roll,x-roll}/` and they're detected on the next request without regenerating anything.
-- Endpoints: `GET /` (console), `GET /exhibit` (kiosk), `GET /api/collections`, `POST /api/generate` (accepts `target_duration`, `diversity_mode`, `exact_duration`, `audio_fade_seconds`, `job_id`), `POST /api/generate/cancel`, `GET /api/generate/progress`, `GET /api/films` (history), `DELETE /api/films/<collection>/<file>`, `GET /films/<collection>/<file>`.
+- Endpoints: `GET /` (console), `GET /exhibit` (kiosk), `GET /<path>` (frontend static files), `GET /api/collections`, `POST /api/generate` (accepts `collection`, `target_duration`, `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `job_id`), `POST /api/generate/cancel`, `GET /api/generate/progress?job_id=`, `GET /api/films?collection=` (history), `DELETE /api/films/<collection>/<file>`, `GET /films/<collection>/<file>`.
 - **Cancel:** the client makes a `job_id`, sends it with generate, and can POST it to cancel — the running FFmpeg process is killed via the `CancellationToken`.
 - **Exact duration:** trims the final file to exactly `target_duration` (minus title-card length). Title cards wrap every film's open/close.
 - Each film writes a **manifest** (`.json` beside the `.mp4`) recording `generated_at`, target/actual duration, and the slot list.
@@ -155,7 +158,7 @@ The engine, pipeline, backend, and UI are complete and validated end to end on r
 3. **Context-aware "memory triggers"** (Dr. Campbell's idea: react to real-world context like date/weather) — a research direction for a *future* version, well beyond the current local system. Not built.
 4. **Open design question (needs David):** should A-roll be eligible to open/close a film? (rule 4). Currently bookends are B-roll+X-roll only.
 
-Optional adjacent cleanup, only with David's OK: the nullable-field schema bug (§4); refreshing the stale `README.md` (§7); a `.gitignore` entry for generated film manifests so they stop showing as changes.
+Optional adjacent cleanup, only with David's OK: the nullable-field schema bug (§4); refreshing the stale `README.md` (§7). (Generated film manifests and usage stats are now gitignored.)
 
 Confirm with David before major new stages.
 
@@ -206,7 +209,8 @@ film_path = assembler.render(sequence)                 # returns output MP4 path
 - Schema: JSON, Draft-07, `allOf` conditional validation.
 - Keep generation logic original and dependency-light (`requirements.txt`: flask, jsonschema).
 - Media assets live on an **external hard drive** (physical, not cloud) via a **configurable base path** in the Assembler.
-- Tuning constants live at the top of `assembler.py` (e.g. `AUDIO_FADE_SECONDS`, `AUDIO_FADE_MAX_FRACTION`, `CONCAT_BATCH_SIZE`, output geometry).
+- Tuning constants are class attributes on `Assembler` (output geometry/codecs near the top of the class; `AUDIO_FADE_SECONDS`, `AUDIO_FADE_MAX_FRACTION`, excerpt settings beside the X-roll code; `CONCAT_BATCH_SIZE` beside the concat code). Selector pool sizes are class attributes on `ArtifactSelector`.
+- Commits carry no AI co-author or vendor trailers.
 
 ---
 
