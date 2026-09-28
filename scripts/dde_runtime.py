@@ -393,6 +393,8 @@ def ensure_assets(loader, assets_path):
         if os.path.exists(out):
             existed += 1
             continue
+        # Index filenames carry their roll subfolder (e.g. "a-roll/x.mov").
+        os.makedirs(os.path.dirname(out), exist_ok=True)
         dur = a.get("duration_seconds", 8)
         freq = 220 + (i * 55) % 880
         colors = a.get("dominant_colors") or []

@@ -22,9 +22,14 @@ Shared logic (tracing, placeholder media generation) lives in
 dde_runtime.py so this CLI script and the Flask backend (web/backend/app.py)
 never drift apart on how a film is actually generated.
 
+Unlike the web app, this renders the dynamic sequence only — no title
+cards, exact-duration trim or manifest.
+
 Usage:
-    python3 scripts/run_first_film.py                 # full run + render
+    python3 scripts/run_first_film.py                 # full run + render (placeholder media)
+    python3 scripts/run_first_film.py --topic validation   # a topic's real footage
     python3 scripts/run_first_film.py --target 120    # aim for ~120s
+    python3 scripts/run_first_film.py --fade 0        # hard cuts (default 0.8s fade center)
     python3 scripts/run_first_film.py --no-render      # trace only, skip FFmpeg
     python3 scripts/run_first_film.py --seed 7         # reproducible sequence
 
@@ -47,7 +52,7 @@ if HERE not in sys.path:
 
 from dde_runtime import (  # noqa: E402
     INDEX_PATH, METADATA_PATH, DEFAULT_ASSETS, DEFAULT_FILMS,
-    art_map, label, dims, SelectionTracer, instrument_pairing, ensure_assets,
+    get_collection, list_collections, art_map, label, dims, SelectionTracer, instrument_pairing, ensure_assets,
     load_usage_counts, merge_usage_counts, save_usage_counts,
     sync_media_library,
 )
@@ -151,9 +156,31 @@ def main():
                     help="Boost underused artifacts across rendered runs.")
     ap.add_argument("--pool-size", type=int, default=None,
                     help="Optional override for top-contrast candidate pool size.")
-    ap.add_argument("--assets-path", default=DEFAULT_ASSETS)
-    ap.add_argument("--films-path", default=DEFAULT_FILMS)
+    ap.add_argument("--topic", default=None,
+                    help="Render a topic's real footage (e.g. validation, wwii) — "
+                         "uses that topic's index, assets and artifacts folders.")
+    ap.add_argument("--fade", type=float, default=0.8,
+                    help="Audio-transition fade center in seconds, jittered per "
+                         "clip like the web console (default: 0.8; 0 = hard cuts).")
+    ap.add_argument("--assets-path", default=None,
+                    help="Advanced: media folder for the Validation index "
+                         "(default: placeholder media in demo/). Prefer --topic.")
+    ap.add_argument("--films-path", default=None)
     args = ap.parse_args()
+
+    index_path, metadata_path = INDEX_PATH, METADATA_PATH
+    if args.topic:
+        if args.assets_path or args.films_path:
+            ap.error("--topic sets the media and output folders; don't combine "
+                     "it with --assets-path/--films-path.")
+        topic = get_collection(args.topic)
+        if topic is None:
+            ap.error(f"unknown topic {args.topic!r}; available: "
+                     + ", ".join(c["id"] for c in list_collections()))
+        index_path, metadata_path = topic["index_path"], topic["metadata_path"]
+        args.assets_path, args.films_path = topic["assets_path"], topic["films_path"]
+    args.assets_path = args.assets_path or DEFAULT_ASSETS
+    args.films_path = args.films_path or DEFAULT_FILMS
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -165,14 +192,25 @@ def main():
     # left alone since ensure_assets() below is what populates it.
     is_demo_mode = os.path.abspath(args.assets_path) == os.path.abspath(DEFAULT_ASSETS)
     if not is_demo_mode and os.path.isdir(args.assets_path):
-        sync = sync_media_library(INDEX_PATH, args.assets_path)
+        # Syncing a folder into the wrong index retires every entry whose
+        # file isn't in that folder — hand-written metadata included — so
+        # only sync a folder that belongs to the index being used.
+        owner = next((c for c in list_collections()
+                      if os.path.abspath(c["assets_path"]) == os.path.abspath(args.assets_path)),
+                     None)
+        if owner is not None and os.path.abspath(owner["index_path"]) != os.path.abspath(index_path):
+            print(f"\n{args.assets_path} belongs to the {owner['id']!r} topic, but this "
+                  f"run uses {os.path.relpath(index_path)}.\n"
+                  f"Use --topic {owner['id']} instead. Nothing was changed.")
+            return 1
+        sync = sync_media_library(index_path, args.assets_path)
         if sync["added"] or sync["removed"]:
             print(f"library sync : +{len(sync['added'])} added, "
                   f"-{len(sync['removed'])} removed (missing file)")
 
     usage_counts = load_usage_counts(args.films_path) if args.diversity else {}
     sequencer = Sequencer(
-        INDEX_PATH,
+        index_path,
         diversity_mode=args.diversity,
         usage_counts=usage_counts,
         juxtaposition_pool_size=args.pool_size,
@@ -198,6 +236,7 @@ def main():
         print("pool size  : automatic — scales with available candidates")
     print(f"target     : {args.target}s"
           + (f"   (seed {args.seed})" if args.seed is not None else "   (unseeded)"))
+    print(f"audio fade : {f'{args.fade}s center, varied per clip' if args.fade > 0 else 'off — hard cuts'}")
 
     # Instrument, then generate through the real API.
     tracer = SelectionTracer(sequencer.selector)
@@ -226,7 +265,9 @@ def main():
         loader=loader,
         assets_path=args.assets_path,
         films_path=args.films_path,
-        metadata_path=METADATA_PATH,
+        metadata_path=metadata_path,
+        audio_fade=args.fade > 0,
+        audio_fade_seconds=args.fade if args.fade > 0 else None,
     )
     try:
         film_path = assembler.render(sequence)
