@@ -3,8 +3,7 @@
 Last updated: 2026-09-28
 
 This is for the student taking the engine over. It assumes you can already
-run it (`SETUP-GUIDE.md`) and know what it is (`README.md` — though parts of
-the README are stale; `AGENT.md` §7 lists which). This document is the map
+run it (`SETUP-GUIDE.md`) and know what it is (`README.md`). This document is the map
 and the *why*: how a run flows, why things are built the way they are, where
 to make common changes, and what will bite you if nobody warns you.
 
@@ -384,8 +383,6 @@ None of these have been started unless it says otherwise.
 - **Live webcam / stream input — not started beyond the plumbing.** The
   assembler can read a `stream` source type from a per-artifact JSON file,
   but there's no UI or workflow for adding one.
-- **README refresh — not started.** It still describes the old approach. See
-  `AGENT.md` §7.
 - **A proper test suite — not started.** The most valuable first tests would
   pin down the sequencer's guarantees: bookends are always B-roll + X-roll,
   no clip repeats, the budget is respected.

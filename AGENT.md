@@ -3,7 +3,7 @@
 > Operating brief for AI coding assistants / agents working on this repository.
 > Read this document before making changes.
 > Where this file and the code disagree, **trust the code** and flag the discrepancy to David.
-> Note: the repo `README.md` is partly **stale** (see §7) — do not treat it as authoritative. `SETUP-GUIDE.md` (how to install and run) and `handoff.md` are the other living docs.
+> Living docs: `README.md` (what it is + how to run/test it), `SETUP-GUIDE.md` (beginner install/run), and `handoff.md` (new-maintainer orientation).
 
 ---
 
@@ -101,7 +101,7 @@ dynamic-documentary-engine/
 ├── SETUP-GUIDE.md   # beginner install/run guide (Windows + Mac)
 ├── handoff.md       # new-student orientation: mental model, design decisions, where to change things, gotchas
 ├── AGENT.md         # this file
-├── README.md        # PARTLY STALE — see §7
+├── README.md        # student-facing overview + run/test guide
 └── LICENSE          # MIT
 ```
 
@@ -158,7 +158,7 @@ The engine, pipeline, backend, and UI are complete and validated end to end on r
 3. **Context-aware "memory triggers"** (Dr. Campbell's idea: react to real-world context like date/weather) — a research direction for a *future* version, well beyond the current local system. Not built.
 4. **Open design question (needs David):** should A-roll be eligible to open/close a film? (rule 4). Currently bookends are B-roll+X-roll only.
 
-Optional adjacent cleanup, only with David's OK: the nullable-field schema bug (§4); refreshing the stale `README.md` (§7). (Generated film manifests and usage stats are now gitignored.)
+Optional adjacent cleanup, only with David's OK: the nullable-field schema bug (§4). (Generated film manifests and usage stats are now gitignored.)
 
 Confirm with David before major new stages.
 
@@ -166,10 +166,7 @@ Confirm with David before major new stages.
 
 ## 7. README status
 
-`README.md` is partly stale and must not be treated as ground truth:
-- Its "Project Structure" lists `pipeline/`, `films/`, `assets/` and puts the assembler in `pipeline/` — none of that matches the real tree (assembler is in `engine/`).
-- It still describes the **old** approach ("pacing arc", "AI as director", "AI-powered", "emotional transitions"). The code is juxtaposition/creative-code with no external AI.
-- Updating it to match the current design is reasonable — confirm scope with David first.
+`README.md` was rewritten on 2026-09-28 as a student-facing overview and run/test guide, and matches the current engine. Keep it in step when behaviour changes.
 
 ---
 
