@@ -428,15 +428,25 @@ class Assembler:
     # enough to hide the seam, short enough not to audibly dip the level.
     MAX_EXCERPT_CROSSFADE_SECONDS = 0.4
 
-    # Max length of the optional fade up at each clip's start and down at
+    # Center length of the optional fade up at each clip's start and down at
     # its end, baked into the segment so cuts dip to silence and back
-    # instead of the music jumping. Enabled per-run via the audio_fade flag.
+    # instead of the music jumping. Enabled per-run via the audio_fade flag;
+    # audio_fade_seconds (the console dropdown) replaces it as the center.
     AUDIO_FADE_SECONDS = 0.8
+
+    # Each fade is rolled within ±this fraction of the center, fade-in and
+    # fade-out independently, so every cut breathes a little differently
+    # rather than all landing on the same uniform length.
+    AUDIO_FADE_JITTER = 0.35
 
     # A fade never eats more than this fraction of a clip on each side, so a
     # short clip gets a proportionally shorter fade and still has time to
     # play at full volume instead of only swelling in and straight back out.
     AUDIO_FADE_MAX_FRACTION = 0.2
+
+    # Shortest fade a roll can land on, so jitter never rounds a fade down
+    # to nothing. The max-fraction cap still wins on a clip too short for it.
+    AUDIO_FADE_FLOOR_SECONDS = 0.15
 
     # Fraction of a short audio file used per excerpt. Below 1.0 so there
     # is room left over for the start offset to actually vary — at 1.0
@@ -795,16 +805,19 @@ class Assembler:
         # into this segment so consecutive clips dip to silence and back
         # across each cut instead of the music jumping abruptly. Applies to
         # B-roll music beds only; A-roll speech is left crisp. Toggled
-        # per-run via audio_fade; length is AUDIO_FADE_SECONDS.
-        fade = self._fade_seconds(duration)
+        # per-run via audio_fade. The in and out lengths are rolled
+        # independently around the center, so each cut is shaped differently.
+        ceiling = self._fade_seconds(duration)
+        fade_in = self._roll_fade(ceiling)
+        fade_out = self._roll_fade(ceiling)
 
-        if audio_filter and fade > 0:
-            graph = f"{audio_filter};[aout]{self._afade_expr(duration, fade)}[afaded]"
+        if audio_filter and ceiling > 0:
+            graph = f"{audio_filter};[aout]{self._afade_expr(duration, fade_in, fade_out)}[afaded]"
             cmd += ["-filter_complex", graph, "-map", "[afaded]"]
         elif audio_filter:
             cmd += ["-filter_complex", audio_filter, "-map", "[aout]"]
-        elif fade > 0:
-            graph = f"[1:a]{self._afade_expr(duration, fade)}[afaded]"
+        elif ceiling > 0:
+            graph = f"[1:a]{self._afade_expr(duration, fade_in, fade_out)}[afaded]"
             cmd += ["-filter_complex", graph, "-map", "[afaded]"]
         else:
             cmd += ["-map", "1:a"]          # Audio from input 1 (X-roll)
@@ -873,39 +886,57 @@ class Assembler:
 
         return ";".join(parts)
 
-    def _fade_seconds(self, duration):
-        """Fade length for this segment, or 0.0 when fading is off.
+    def _fade_center(self):
+        """Center fade length: the caller's choice (the console dropdown),
+        or AUDIO_FADE_SECONDS when none was given."""
+        if self.audio_fade_seconds and self.audio_fade_seconds > 0:
+            return self.audio_fade_seconds
+        return self.AUDIO_FADE_SECONDS
 
-        Clamped so the fade-in and fade-out together never exceed the clip
-        (a very short B-roll can't fade a full second each way). When the
+    def _fade_seconds(self, duration):
+        """Longest fade this segment may take on either side, or 0.0 when
+        fading is off.
+
+        The ceiling is the top of the jitter range, clamped so a fade never
+        eats more than AUDIO_FADE_MAX_FRACTION of the clip on either side (a
+        very short B-roll can't fade a full second each way). When the
         duration is unknown (a live stream) the capture length stands in as
         the basis.
         """
         if not self.audio_fade:
             return 0.0
-        # A caller-supplied length (the console dropdown) sets the ceiling;
-        # otherwise fall back to the default. Either way the max-fraction
-        # cap below still shortens the fade for very short clips.
-        max_fade = (
-            self.audio_fade_seconds
-            if (self.audio_fade_seconds and self.audio_fade_seconds > 0)
-            else self.AUDIO_FADE_SECONDS
-        )
         basis = duration if (duration and duration > 0) else self.DEFAULT_STREAM_CAPTURE_SECONDS
-        return min(max_fade, basis * self.AUDIO_FADE_MAX_FRACTION)
+        return min(
+            self._fade_center() * (1 + self.AUDIO_FADE_JITTER),
+            basis * self.AUDIO_FADE_MAX_FRACTION,
+        )
 
-    def _afade_expr(self, duration, fade):
+    def _roll_fade(self, ceiling):
+        """One jittered fade length within ±AUDIO_FADE_JITTER of the center,
+        clamped to [AUDIO_FADE_FLOOR_SECONDS, ceiling].
+
+        The ceiling (the clip's max-fraction cap) wins over the floor on a
+        clip too short to hold it. Returns 0.0 when the ceiling is 0, i.e.
+        fading is off.
+        """
+        if ceiling <= 0:
+            return 0.0
+        jitter = random.uniform(-self.AUDIO_FADE_JITTER, self.AUDIO_FADE_JITTER)
+        rolled = self._fade_center() * (1 + jitter)
+        return min(ceiling, max(self.AUDIO_FADE_FLOOR_SECONDS, rolled))
+
+    def _afade_expr(self, duration, fade_in, fade_out):
         """afade in-then-out over a bed of the given length.
 
-        The fade-out starts `fade` seconds before the clip ends so it lands
-        on the cut. -shortest trims the bed to the B-roll's length, so the
-        out-point is measured from that same duration.
+        The fade-out starts `fade_out` seconds before the clip ends so it
+        lands on the cut. -shortest trims the bed to the B-roll's length, so
+        the out-point is measured from that same duration.
         """
         basis = duration if (duration and duration > 0) else self.DEFAULT_STREAM_CAPTURE_SECONDS
-        start_out = max(0.0, basis - fade)
+        start_out = max(0.0, basis - fade_out)
         return (
-            f"afade=t=in:st=0:d={fade:.4f},"
-            f"afade=t=out:st={start_out:.4f}:d={fade:.4f}"
+            f"afade=t=in:st=0:d={fade_in:.4f},"
+            f"afade=t=out:st={start_out:.4f}:d={fade_out:.4f}"
         )
 
     # Segments joined per FFmpeg call. The concat filter opens every input

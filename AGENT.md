@@ -114,7 +114,7 @@ dynamic-documentary-engine/
 - Class-based FFmpeg pipeline; mixed sequences, local-file and live-stream sources; normalizes every segment to a common geometry (default **1280×720, 30fps**, libx264/aac) so mixed-resolution / portrait / 4K footage concatenates cleanly.
 - **Concat uses the concat *filter* (decode + re-encode), NOT the stream-copy demuxer.** This fixed an audio "bleed" where ~50ms of each clip's audio carried over the next cut (measured −24 dBFS with the demuxer vs −71 dBFS, inaudible, now). Long films are joined in batches (`CONCAT_BATCH_SIZE = 100`) and the batches joined recursively.
 - **X-roll under B-roll** is assembled from an excerpt plan (`_plan_xroll_excerpts`), not plain looping: a random start offset each render, and if the audio is shorter than the clip it chains several random excerpts with short internal `acrossfade`s (replaces the audible `-stream_loop` restart). Live/unmeasured sources fall back to `-stream_loop -1`.
-- **Optional audio-transition fade** (per run): fades each B-roll music bed **up at the clip's start and down at its end** (a dip to silence and back across each cut), so the soundtrack doesn't jump. A-roll speech is left crisp. Length is capped at **20% of the clip per side** (`AUDIO_FADE_MAX_FRACTION`) so short clips don't over-fade; default max is `AUDIO_FADE_SECONDS = 0.8`. Controlled per run by `audio_fade` / `audio_fade_seconds` (see §8) and, in the UI, the "Audio transitions" dropdown.
+- **Optional audio-transition fade** (per run): fades each B-roll music bed **up at the clip's start and down at its end** (a dip to silence and back across each cut), so the soundtrack doesn't jump. A-roll speech is left crisp. The chosen length (default `AUDIO_FADE_SECONDS = 0.8`) is the **center**: each clip's fade-in and fade-out are rolled **independently** within ±35% of it (`AUDIO_FADE_JITTER`), so every cut breathes differently and re-rendering varies them. Each fade is clamped to at least `AUDIO_FADE_FLOOR_SECONDS = 0.15` and at most **20% of the clip per side** (`AUDIO_FADE_MAX_FRACTION`; the cap wins on very short clips). Off is a true no-op (no filter). Controlled per run by `audio_fade` / `audio_fade_seconds` (see §8) and, in the UI, the "Audio transitions" dropdown.
 
 **Web layer (web/backend/app.py + scripts/dde_runtime.py):**
 - Auto-discovers every topic folder under `local-media/` (currently WWII, SWISS, Validation) — no hardcoded media path.
@@ -187,7 +187,7 @@ assembler = Assembler(
     assets_path="/Volumes/<drive>/dde-assets/",
     films_path="/Volumes/<drive>/dde-films/",
     audio_fade=False,              # enable the transition fade
-    audio_fade_seconds=None,       # max fade length; None = AUDIO_FADE_SECONDS default (0.8)
+    audio_fade_seconds=None,       # center fade length (jittered ±35%); None = AUDIO_FADE_SECONDS (0.8)
 )
 film_path = assembler.render(sequence)                 # returns output MP4 path
 ```
@@ -209,7 +209,7 @@ film_path = assembler.render(sequence)                 # returns output MP4 path
 - Schema: JSON, Draft-07, `allOf` conditional validation.
 - Keep generation logic original and dependency-light (`requirements.txt`: flask, jsonschema).
 - Media assets live on an **external hard drive** (physical, not cloud) via a **configurable base path** in the Assembler.
-- Tuning constants are class attributes on `Assembler` (output geometry/codecs near the top of the class; `AUDIO_FADE_SECONDS`, `AUDIO_FADE_MAX_FRACTION`, excerpt settings beside the X-roll code; `CONCAT_BATCH_SIZE` beside the concat code). Selector pool sizes are class attributes on `ArtifactSelector`.
+- Tuning constants are class attributes on `Assembler` (output geometry/codecs near the top of the class; `AUDIO_FADE_SECONDS`, `AUDIO_FADE_JITTER`, `AUDIO_FADE_MAX_FRACTION`, `AUDIO_FADE_FLOOR_SECONDS`, excerpt settings beside the X-roll code; `CONCAT_BATCH_SIZE` beside the concat code). Selector pool sizes are class attributes on `ArtifactSelector`.
 - Commits carry no AI co-author or vendor trailers.
 
 ---

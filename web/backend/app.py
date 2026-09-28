@@ -234,8 +234,9 @@ def generate():
     exact_duration = bool(body.get("exact_duration"))
     # Audio-transition fade. The console sends audio_fade_seconds (0 = off);
     # older/scripted clients may send the audio_fade bool, or nothing (fade
-    # on at the engine default). When given, audio_fade_seconds sets the max
-    # fade length; the engine still shortens it for very short clips.
+    # on at the engine default). When given, audio_fade_seconds sets the
+    # center fade length; the engine jitters each fade around it and still
+    # shortens it for very short clips.
     audio_fade_seconds = body.get("audio_fade_seconds")
     if audio_fade_seconds is not None:
         try:
