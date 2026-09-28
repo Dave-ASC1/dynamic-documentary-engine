@@ -221,7 +221,12 @@ function renderMeta(result) {
 
 function renderHistoryItem(entry) {
   const li = document.createElement("li");
-  const when = entry.generated_at ? new Date(entry.generated_at).toLocaleTimeString() : "";
+  const when = entry.generated_at
+    ? new Date(entry.generated_at).toLocaleString([], {
+        month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit",
+      })
+    : "";
   li.innerHTML = `
     <div class="history-row">
       <a href="${entry.film_url}" target="_blank">${entry.filename}</a>
