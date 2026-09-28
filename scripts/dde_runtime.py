@@ -641,8 +641,30 @@ def _trim_film_to_duration(film_path, target_duration, video_codec="libx264",
 # screening opens on a title slate and closes on credits regardless of
 # what played in between.
 
-_SERIF_FONT = "/System/Library/Fonts/Supplemental/Georgia.ttf"
-_SANS_FONT = "/System/Library/Fonts/Supplemental/Arial.ttf"
+def _first_existing_font(*paths):
+    """First font file that exists on this machine, or None — in which case
+    _render_card_image falls back to Pillow's plain built-in font."""
+    for p in paths:
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+# Georgia and Arial ship with both macOS and Windows, so the cards look the
+# same on either; DejaVu is the common Linux stand-in.
+_WINDOWS_FONTS = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+_SERIF_FONT = _first_existing_font(
+    "/System/Library/Fonts/Supplemental/Georgia.ttf",
+    "/Library/Fonts/Georgia.ttf",
+    os.path.join(_WINDOWS_FONTS, "georgia.ttf"),
+    "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+)
+_SANS_FONT = _first_existing_font(
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/Library/Fonts/Arial.ttf",
+    os.path.join(_WINDOWS_FONTS, "arial.ttf"),
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+)
 _CARD_WHITE = (255, 255, 255)
 _CARD_MUTED = (170, 176, 190)
 
