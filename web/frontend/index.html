@@ -98,6 +98,41 @@
       </div>
       <p class="field-hint">Fades the music across each cut. Longer is softer; short clips shorten the fade automatically.</p>
 
+      <div class="toggle-row">
+        <label class="toggle-field has-tooltip" for="context-toggle">
+          <input type="checkbox" id="context-toggle" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Memory triggers</span>
+          <span class="tooltip" role="tooltip">Lets this screening's date, season and weather favour clips tagged with a matching context, and always brings the best match into the film — the way a day's weather can bring a memory back.</span>
+        </label>
+      </div>
+
+      <div id="context-fields" class="context-fields hidden">
+        <div class="field field-centered">
+          <label for="context-date-mode">Date</label>
+          <div class="field-input context-date-input">
+            <select id="context-date-mode" aria-label="Screening date">
+              <option value="today">Today</option>
+              <option value="custom">Pick a date…</option>
+            </select>
+            <input type="date" id="context-date" class="hidden" aria-label="Custom screening date" />
+          </div>
+        </div>
+        <div class="field field-centered">
+          <label for="context-season">Season</label>
+          <div class="field-input">
+            <select id="context-season"></select>
+          </div>
+        </div>
+        <div class="field field-centered">
+          <label for="context-weather">Weather</label>
+          <div class="field-input">
+            <select id="context-weather"></select>
+          </div>
+        </div>
+      </div>
+      <p id="context-hint" class="field-hint hidden"></p>
+
       <div id="status" class="status" role="status">
         <span class="status-dot"></span>
         <span class="status-text"></span>

@@ -189,6 +189,28 @@
           "description": "Dominant compositional line direction â€” used by the Dyn UIS Engine and by the selector as a dissimilarity dimension.",
           "enum": ["horizontal", "vertical", "diagonal", "curved", "mixed"],
           "example": "horizontal"
+        },
+        "context": {
+          "type": "object",
+          "description": "Optional memory-trigger context: when this clip happened and in what conditions. Matched against the screening's date, season and weather (engine/context.py).",
+          "properties": {
+            "date": {
+              "type": "string",
+              "description": "YYYY-MM-DD, YYYY-MM or YYYY. Matched on month and day (an anniversary), whatever the year.",
+              "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$",
+              "example": "1944-12-18"
+            },
+            "season": {
+              "type": "string",
+              "description": "Inferred from the date's month when omitted.",
+              "enum": ["winter", "spring", "summer", "autumn"]
+            },
+            "weather": {
+              "type": "array",
+              "items": { "type": "string" },
+              "example": ["snow", "cold"]
+            }
+          }
         }
       }
     },

@@ -37,6 +37,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from engine import Sequencer, Assembler  # noqa: E402
+from engine.context import ScreeningContext  # noqa: E402
 
 METADATA_ROOT = os.path.join(REPO_ROOT, "metadata")
 COLLECTIONS_METADATA_DIR = os.path.join(METADATA_ROOT, "collections")
@@ -275,10 +276,26 @@ class SelectionTracer:
         self._orig_select = selector.select_next
         self._orig_juxta = selector._apply_juxtaposition_filter
         self._orig_weighted = selector._weighted_random_select
+        self._orig_place = selector.place
 
         selector.select_next = self._select_next
         selector._apply_juxtaposition_filter = self._juxta
         selector._weighted_random_select = self._weighted
+        selector.place = self._place
+
+    def _place(self, artifact):
+        # The screening-context memory is placed directly rather than chosen
+        # by contrast, so it gets its own event (no candidate ranking).
+        prev = self.selector._last_selected
+        placed = self._orig_place(artifact)
+        self.events.append({
+            "kind": "memory",
+            "prev": prev,
+            "ranking": None,
+            "pool": [artifact],
+            "chosen": placed,
+        })
+        return placed
 
     def _select_next(self, candidates, current_mood=None, target_pacing=None):
         self._state["kind"] = "primary"
@@ -999,6 +1016,7 @@ def generate_and_render(
     exact_duration=False,
     audio_fade=False,
     audio_fade_seconds=None,
+    context=None,
     title_cards=True,
     titles_path=None,
     cancel_token=None,
@@ -1023,6 +1041,13 @@ def generate_and_render(
         instant, mid-shot or mid-sound. Only takes effect if a
         target_duration is given and the collection has enough footage to
         reach it in the first place.
+
+    context (ScreeningContext | dict): The screening's date, season and
+        weather ("memory triggers", see engine/context.py). Matching clips
+        are favoured and the best match is placed partway through the film;
+        the result's "context" and "memory" keys record what happened, and
+        the trace marks each context-matched pick. None leaves the run
+        exactly as without it.
 
     title_cards (bool): Wraps the rendered film with an opening title
         piece and a closing one — per Dr. Campbell's request, every
@@ -1071,6 +1096,9 @@ def generate_and_render(
         except Exception:
             pass
 
+    if isinstance(context, dict):
+        context = ScreeningContext.from_dict(context)
+
     report("sequencing")
     usage_counts = load_usage_counts(films_path) if diversity_mode else {}
     sequencer = Sequencer(
@@ -1086,7 +1114,8 @@ def generate_and_render(
     instrument_pairing(sequencer.selector, tracer)
 
     sequence = sequencer.generate(
-        target_duration=target_duration, allow_overshoot=exact_duration
+        target_duration=target_duration, allow_overshoot=exact_duration,
+        context=context,
     )
 
     slots = []
@@ -1120,6 +1149,14 @@ def generate_and_render(
         if chosen is None:
             continue
         ranking = ev["ranking"] or []
+        match = sequencer.context_matches.get(chosen.get("artifact_id"))
+        if ev["kind"] == "memory":
+            # Placed for its context match, not its contrast — say so.
+            contrast = [f"memory trigger — {', '.join(match[1])}"] if match else []
+        else:
+            contrast = dims(ev["prev"], chosen)
+            if match:
+                contrast.append(f"context: {', '.join(match[1])}")
         trace.append({
             "kind": ev["kind"],
             "previous": label(ev["prev"]),
@@ -1128,8 +1165,13 @@ def generate_and_render(
                 for a, s in ranking[:6]
             ],
             "chosen": label(chosen),
-            "contrast": dims(ev["prev"], chosen),
+            "contrast": contrast,
         })
+
+    memory = None
+    if sequencer.memory:
+        memory = dict(sequencer.memory)
+        memory["title"] = amap.get(memory["artifact_id"], {}).get("title", memory["artifact_id"])
 
     if is_demo_mode:
         ensure_assets(loader, assets_path)
@@ -1228,6 +1270,11 @@ def generate_and_render(
         "exact_duration": exact_duration,
         "audio_fade": audio_fade,
         "audio_fade_seconds": audio_fade_seconds,
+        # The screening context this film was made for, and the memory it
+        # triggered (None when no context was set or nothing matched).
+        "context": context.as_dict() if context is not None else None,
+        "memory": memory,
+        "context_matches": len(sequencer.context_matches),
         "trimmed": trimmed,
         "title_cards": cards_added,
         # Which opening/closing actually wrapped this film — a filename

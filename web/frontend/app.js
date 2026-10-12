@@ -8,6 +8,15 @@ const audioFadeSelect = document.getElementById("audio-fade-select");
 const savedFade = localStorage.getItem("dde-audio-fade");
 if (savedFade !== null) audioFadeSelect.value = savedFade;
 audioFadeSelect.addEventListener("change", () => localStorage.setItem("dde-audio-fade", audioFadeSelect.value));
+const contextToggle = document.getElementById("context-toggle");
+const contextFields = document.getElementById("context-fields");
+const contextDateMode = document.getElementById("context-date-mode");
+const contextDate = document.getElementById("context-date");
+const contextSeason = document.getElementById("context-season");
+const contextWeather = document.getElementById("context-weather");
+const contextHint = document.getElementById("context-hint");
+const CONTEXT_KEY = "dde-context";
+let contextOptions = null;
 const cancelBtn = document.getElementById("cancel-btn");
 const durationUnit = document.getElementById("duration-unit");
 const durationHint = document.getElementById("duration-hint");
@@ -149,7 +158,11 @@ function renderTrace(result) {
     const isPairing = ev.kind === "pairing";
     const marker = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
     const badgeCls = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
-    const badgeLabel = isPairing ? "Audio pairing" : `Cut ${step} · ${badgeText(parsed.type)}`;
+    const badgeLabel = isPairing
+      ? "Audio pairing"
+      : ev.kind === "memory"
+        ? `Cut ${step} · Memory trigger · ${badgeText(parsed.type)}`
+        : `Cut ${step} · ${badgeText(parsed.type)}`;
     traceList.appendChild(
       buildCutCard(marker, badgeCls, badgeLabel, parsed.title, ev.contrast)
     );
@@ -217,6 +230,130 @@ function renderMeta(result) {
       chip("Note", "Title pieces are longer than the requested length")
     );
   }
+  if (result.context) {
+    metaEl.appendChild(textChip("Context", result.context.label));
+    const memory = result.memory;
+    let memoryText;
+    if (memory) {
+      const where = memory.placement === "body" ? "" : ` (as the ${memory.placement})`;
+      memoryText = `${memory.title}${where} — ${memory.reasons.join(", ")}`;
+    } else {
+      memoryText = "none — no clip is tagged with a matching context yet";
+    }
+    metaEl.appendChild(textChip("Memory", memoryText));
+  }
+}
+
+// Like chip(), but for values that come from clip metadata — set as text,
+// never parsed as HTML.
+function textChip(label, value) {
+  const span = document.createElement("span");
+  span.className = "chip";
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+  span.append(`${label} `, strong);
+  return span;
+}
+
+/* ---------------------------------------------------------------------------
+ * Memory triggers (screening context)
+ * ------------------------------------------------------------------------ */
+
+const SEASON_BY_MONTH = ["winter", "winter", "spring", "spring", "spring", "summer",
+                         "summer", "summer", "autumn", "autumn", "autumn", "winter"];
+
+function contextDateValue() {
+  return contextDateMode.value === "custom" && contextDate.value ? contextDate.value : null;
+}
+
+function inferredSeason() {
+  const custom = contextDateValue();
+  if (custom) return SEASON_BY_MONTH[parseInt(custom.slice(5, 7), 10) - 1];
+  return contextOptions ? contextOptions.today_season : "";
+}
+
+function formatContextDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" });
+}
+
+function saveContextPrefs() {
+  try {
+    localStorage.setItem(CONTEXT_KEY, JSON.stringify({
+      enabled: contextToggle.checked,
+      dateMode: contextDateMode.value,
+      date: contextDate.value,
+      season: contextSeason.value,
+      weather: contextWeather.value,
+    }));
+  } catch (e) {
+    /* Private browsing or a full quota — the pickers still work. */
+  }
+}
+
+function loadContextPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem(CONTEXT_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function updateContextUI() {
+  const on = contextToggle.checked;
+  contextFields.classList.toggle("hidden", !on);
+  contextHint.classList.toggle("hidden", !on);
+  contextDate.classList.toggle("hidden", contextDateMode.value !== "custom");
+
+  // Keep the "Auto" label honest about which season it will use.
+  const autoOption = contextSeason.querySelector('option[value=""]');
+  if (autoOption) autoOption.textContent = `Auto (${inferredSeason()})`;
+
+  if (on && contextOptions) {
+    const date = contextDateValue() || contextOptions.today;
+    const season = contextSeason.value || inferredSeason();
+    const weather = contextWeather.value ? `, ${contextWeather.value}` : "";
+    contextHint.textContent =
+      `Films will favour clips tagged for ${formatContextDate(date)} — ${season}${weather}. ` +
+      `Clips without a context tag are unaffected.`;
+  }
+  saveContextPrefs();
+}
+
+async function loadContextOptions() {
+  try {
+    const res = await fetch("/api/context-options");
+    contextOptions = await res.json();
+  } catch (e) {
+    return; // Older backend: leave memory triggers off.
+  }
+
+  contextSeason.innerHTML = '<option value="">Auto</option>' +
+    contextOptions.seasons.map((s) => `<option value="${s}">${s[0].toUpperCase()}${s.slice(1)}</option>`).join("");
+  contextWeather.innerHTML = '<option value="">Not set</option>' +
+    contextOptions.weather.map((w) => `<option value="${w}">${w[0].toUpperCase()}${w.slice(1)}</option>`).join("");
+
+  const prefs = loadContextPrefs();
+  contextToggle.checked = Boolean(prefs.enabled);
+  if (prefs.dateMode) contextDateMode.value = prefs.dateMode;
+  contextDate.value = prefs.date || contextOptions.today;
+  if (prefs.season !== undefined) contextSeason.value = prefs.season;
+  if (prefs.weather !== undefined) contextWeather.value = prefs.weather;
+  updateContextUI();
+}
+
+// The request's "context", or undefined (dropped from the JSON) when off.
+function contextPayload() {
+  if (!contextToggle.checked || !contextOptions) return undefined;
+  return {
+    date: contextDateValue() || "today",
+    season: contextSeason.value || null,
+    weather: contextWeather.value || null,
+  };
+}
+
+for (const el of [contextToggle, contextDateMode, contextDate, contextSeason, contextWeather]) {
+  el.addEventListener("change", updateContextUI);
 }
 
 function renderHistoryItem(entry) {
@@ -463,6 +600,7 @@ async function generateFilm() {
         diversity_mode: diversityToggle.checked,
         exact_duration: exactDurationToggle.checked,
         audio_fade_seconds: parseFloat(audioFadeSelect.value),
+        context: contextPayload(),
         job_id: activeJobId,
       }),
     });
@@ -499,3 +637,4 @@ async function generateFilm() {
 generateBtn.addEventListener("click", generateFilm);
 cancelBtn.addEventListener("click", cancelGeneration);
 loadCollections();
+loadContextOptions();

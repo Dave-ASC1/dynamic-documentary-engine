@@ -22,6 +22,10 @@ const setupDuration = document.getElementById("setup-duration");
 const setupUnit = document.getElementById("setup-unit");
 const setupDurationHint = document.getElementById("setup-duration-hint");
 const setupStart = document.getElementById("setup-start");
+const setupContext = document.getElementById("setup-context");
+const setupWeather = document.getElementById("setup-weather");
+const setupWeatherField = document.getElementById("setup-weather-field");
+const setupContextHint = document.getElementById("setup-context-hint");
 
 const panels = {
   attract: document.getElementById("attract"),
@@ -118,6 +122,45 @@ function refreshStartButton() {
   setupStart.disabled = !collection || empty || setupSeconds() === null;
 }
 
+// Memory triggers: the date always follows the calendar (the server's own
+// clock, so a long-running exhibit rolls over by itself); staff set the
+// weather. Hidden entirely if the backend predates the feature.
+async function loadContextOptions(saved) {
+  let options = null;
+  try {
+    const res = await fetch("/api/context-options");
+    if (res.ok) options = await res.json();
+  } catch (e) {
+    options = null;
+  }
+  if (!options) {
+    for (const el of [setupContext.closest(".setup-field"), setupWeatherField, setupContextHint]) {
+      el.classList.add("hidden");
+    }
+    setupContext.value = "off";
+    return;
+  }
+  for (const w of options.weather) {
+    const opt = document.createElement("option");
+    opt.value = w;
+    opt.textContent = w[0].toUpperCase() + w.slice(1);
+    setupWeather.appendChild(opt);
+  }
+  if (saved && saved.context) {
+    setupContext.value = saved.context.enabled ? "on" : "off";
+    setupWeather.value = saved.context.weather || "";
+  }
+  refreshContextFields();
+}
+
+function refreshContextFields() {
+  const on = setupContext.value === "on";
+  setupWeatherField.classList.toggle("hidden", !on);
+  setupContextHint.classList.toggle("hidden", !on);
+}
+
+setupContext.addEventListener("change", refreshContextFields);
+
 async function loadCollections() {
   try {
     const res = await fetch("/api/collections");
@@ -144,6 +187,8 @@ async function loadCollections() {
     const radio = document.querySelector(`input[name="exhibit-mode"][value="${saved.mode}"]`);
     if (radio) radio.checked = true;
   }
+
+  await loadContextOptions(saved);
 
   updateSetupHint();
 }
@@ -181,6 +226,10 @@ setupStart.addEventListener("click", () => {
     collection: setupCollection.value,
     seconds,
     mode: currentMode(),
+    context: {
+      enabled: setupContext.value === "on",
+      weather: setupWeather.value || null,
+    },
   };
   saveSettings(settings);
   enterExhibit();
@@ -313,6 +362,11 @@ async function generate() {
         // cut mid-shot on a gallery wall.
         diversity_mode: true,
         exact_duration: false,
+        // "today" is resolved by the server each time, so the context
+        // follows the calendar through a long-running day.
+        context: settings.context && settings.context.enabled
+          ? { date: "today", weather: settings.context.weather }
+          : undefined,
       }),
     });
     const result = await res.json();

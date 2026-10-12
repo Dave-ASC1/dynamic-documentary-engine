@@ -71,6 +71,14 @@ Each run, the engine:
 
 Two optional modes: **Diversity mode** (boosts underused clips so favourites don't dominate) and **Exact duration** (trims the final render to the exact requested length; off by default so whole clips are preserved).
 
+**Memory triggers** (optional, *draft*): set the screening's date, season and weather — the way a day's weather can bring a memory back. Clips tagged with a matching context are favoured, and the best match always appears partway through the film. The engine runs offline, so the date comes from the computer's clock and the weather is chosen by a person. Clips carry the context in their index entry:
+
+```json
+"context": { "date": "1944-12-18", "season": "winter", "weather": ["snow", "cold"] }
+```
+
+Dates match on month and day (an anniversary, whatever the year); the season is inferred from the date when left out. Untagged clips are unaffected, and with memory triggers off the engine behaves exactly as before.
+
 ---
 
 ## Terminology
@@ -114,8 +122,8 @@ Drop a file into an `assets` subfolder and it's auto-tagged (duration, dominant 
 
 Two views onto the same engine:
 
-- **Director's console (`/`)** — the working instrument: topic and length pickers, the generate/cancel controls, the audio/diversity/exact-duration options, the **sequence trace** (why each cut was chosen), and a replayable **film history** with the date and time each was made.
-- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic and length once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
+- **Director's console (`/`)** — the working instrument: topic and length pickers, the generate/cancel controls, the audio/diversity/exact-duration options, the **Memory triggers** pickers (date, season, weather), the **sequence trace** (why each cut was chosen), and a replayable **film history** with the date and time each was made.
+- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic, length and (optionally) today's weather once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
 
 ---
 
@@ -127,6 +135,7 @@ dynamic-documentary-engine/
 │   ├── sequencer.py            #   coordinates a run: bookends + body
 │   ├── rules.py                #   no-repeat, duration budget, pairing
 │   ├── artifact_selector.py    #   dissimilarity scoring + weighted selection
+│   ├── context.py              #   memory triggers: date/season/weather matching
 │   ├── collection_loader.py    #   loads/validates a collection index
 │   ├── assembler.py            #   FFmpeg rendering, audio layering + fades
 │   └── cancellation.py         #   stops a render in progress
@@ -159,9 +168,9 @@ New to the code? Read **[AGENT.md](AGENT.md)** — it's the developer's orientat
 
 ## Status
 
-**The core engine is complete and validated end to end on real media.** Done: the metadata schema, the rule-based sequencing engine, the FFmpeg pipeline, multi-topic auto-discovered collections, the web console and exhibit view, saved film manifests, turnkey setup (guide + launchers), and audio polish (eased transitions with a per-run, per-clip varying fade).
+**The core engine is complete and validated end to end on real media.** Done: the metadata schema, the rule-based sequencing engine, the FFmpeg pipeline, multi-topic auto-discovered collections, the web console and exhibit view, saved film manifests, turnkey setup (guide + launchers), and audio polish (eased transitions with a per-run, per-clip varying fade). In draft: **memory triggers** (date/season/weather context), pending review with Dr. Campbell and context tags on real clips.
 
-Remaining / future directions: loading the full real WWII and Swiss footage, the gallery installation, and the technical documentation report. A future research direction is a more context-aware engine (reacting to real-world signals like date or weather) — beyond the current local system.
+Remaining / future directions: loading the full real WWII and Swiss footage, the gallery installation, and the technical documentation report. Memory triggers currently take the weather from a person; reacting to live signals (e.g. a weather feed) would need an internet connection and is beyond the current local system.
 
 ---
 

@@ -40,6 +40,7 @@ X-roll adds sound, not screen time.
 | `engine/collection_loader.py` | Reads a collection index JSON, checks required fields, hands out artifacts. |
 | `engine/rules.py` | Yes/no eligibility: no-repeat, duration budget, must-not-follow. Tracks running length. |
 | `engine/artifact_selector.py` | Picks the next clip: scores how *different* each candidate is from the last one, then weighted-random picks from the top few. Also picks X-rolls for B-rolls. |
+| `engine/context.py` | Memory triggers (draft): scores how well each clip's date/season/weather tags match the screening's. |
 | `engine/sequencer.py` | The coordinator. Builds the ordered sequence: opening pair → body → closing pair. |
 | `engine/assembler.py` | Turns the sequence into an MP4 with FFmpeg: one normalized segment per slot, then joins them. |
 | `engine/cancellation.py` | Lets the web UI kill a render mid-flight (including the running FFmpeg process). |
@@ -62,6 +63,8 @@ Browser (Generate)
           → Sequencer.generate()
               1. opening pair   random B-roll + X-roll (weighted by metadata "weight")
               2. closing pair   chosen now and held back; its screen time reserved in the budget
+                 (memory)       if a context is set and a clip matches it: the best match is
+                                held back the same way, to be placed 25–75% through the body
               3. body loop      until the duration budget is used up:
                    selector.select_next()
                      → rules.is_eligible() filter
@@ -195,6 +198,37 @@ Re-encoding (not stream-copy) is what makes the cut frame-accurate instead of
 snapping to a keyframe. The price: whatever was playing gets cut off
 mid-shot. The exhibit view keeps this off.
 
+### Memory triggers (draft, October 2026)
+
+Dr. Campbell's idea: memories are triggered by surroundings — a date, the
+season, the weather — the way veterans' journals open each entry with the
+date and the weather. So a screening can carry a **context** (date, season,
+weather), and clips can carry matching **context tags** (when it happened,
+in what conditions). It is all in `engine/context.py`.
+
+- **A person sets the weather.** The engine is offline by design, so it
+  can't look anything up. The date defaults to the computer's own clock
+  ("today"); the season is inferred from the date; the weather is picked in
+  the console or on the exhibit setup screen.
+- **Matching is points, not rules:** same month and day (an anniversary,
+  any year) 3, same month 2, same season 1, shared weather word 2.
+- **It works alongside juxtaposition, not against it.** Matching clips get a
+  selection-weight boost (×1.5 per point) — but only *within* the top-3
+  contrast pool, so contrast still decides who competes. Then the single
+  best match is **guaranteed**: held back like the closing pair, its screen
+  time reserved, and placed at a random point 25–75% through the body. The
+  cut after it contrasts against it as usual.
+- **No context, or nothing matching, changes nothing** — verified to produce
+  identical films to the engine without this feature, seed for seed.
+- If the only matching clips are B-roll, one may land as an opening/closing
+  bookend instead (the boost applies there too); the result still reports it
+  as the film's memory.
+- The trace marks the memory ("Memory trigger") and any context-boosted
+  pick; the manifest records the context and the memory.
+
+The strength of the pull (gentle boost + one guaranteed memory) is a draft
+default awaiting Dr. Campbell's call — see §5.
+
 ### Title cards
 
 Every film is wrapped in an opening and closing piece. If
@@ -257,6 +291,20 @@ bookends and generation fails.
   (`#audio-fade-select`); their values are the centers. If a request sends no
   fade setting (the exhibit view, scripts), the backend turns the fade on at
   the default.
+
+### Tag clips for memory triggers, or tune them
+
+- **Tag a clip:** add a `context` block to its entry in the topic's index,
+  e.g. `"context": {"date": "1944-12-18", "weather": ["snow", "cold"]}`.
+  `date` may be `YYYY-MM-DD`, `YYYY-MM` or `YYYY`; `season` is optional
+  (inferred from the date's month, northern hemisphere); `weather` is a list
+  of free words matched case-insensitively.
+- **Weather words offered in the pickers:** `WEATHER_TERMS` in
+  `engine/context.py` (the UI loads them from `/api/context-options`).
+- **How strong the pull is:** the point values, `WEIGHT_BOOST_PER_POINT` and
+  `MEMORY_WINDOW` at the top of `engine/context.py`. The guaranteed memory
+  is chosen and placed in `Sequencer._select_context_memory()` /
+  `_place_context_memory()`.
 
 ### Tune the dissimilarity scoring
 
@@ -374,10 +422,13 @@ None of these have been started unless it says otherwise.
   volumes. FFmpeg's `loudnorm` per segment (in `assembler.py`) would even them
   out. It's a separate change from the fade and shouldn't be mixed into it.
   Two-pass `loudnorm` is more accurate but doubles audio analysis time.
-- **Context-aware "memory triggers" — not started.** Dr. Campbell's idea: let
-  real-world context (date, weather, and so on) influence what the engine
-  picks. A research direction for a future version, well beyond the current
-  local system.
+- **Memory triggers — drafted, needs decisions and tags.** Built as described
+  in §2, but no real clip is tagged with a context yet, and these questions
+  are open with Dr. Campbell: is a clip's date *when it happened* or *when it
+  was filmed*; anniversary vs. month vs. season; how strong the pull should
+  be (gentle, guaranteed — the draft — or anchoring the opening); the weather
+  vocabulary; and who sets the context at the exhibit. Reacting to *live*
+  weather would need an internet connection, which the local design avoids.
 - **A-roll as bookends — undecided.** Should A-roll be allowed to open or
   close a film? Currently only B-roll + X-roll can. Needs David / Dr. Campbell.
 - **Live webcam / stream input — not started beyond the plumbing.** The

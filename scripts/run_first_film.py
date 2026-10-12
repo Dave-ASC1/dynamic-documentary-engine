@@ -30,6 +30,7 @@ Usage:
     python3 scripts/run_first_film.py --topic validation   # a topic's real footage
     python3 scripts/run_first_film.py --target 120    # aim for ~120s
     python3 scripts/run_first_film.py --fade 0        # hard cuts (default 0.8s fade center)
+    python3 scripts/run_first_film.py --date 2026-12-18 --weather snow   # memory triggers
     python3 scripts/run_first_film.py --no-render      # trace only, skip FFmpeg
     python3 scripts/run_first_film.py --seed 7         # reproducible sequence
 
@@ -57,6 +58,7 @@ from dde_runtime import (  # noqa: E402
     sync_media_library,
 )
 from engine import Sequencer, Assembler  # noqa: E402
+from engine.context import ScreeningContext  # noqa: E402
 
 BAR = "=" * 72
 
@@ -75,7 +77,7 @@ def print_trace(events):
         if chosen is None:
             continue
         step += 1
-        tag = "B-roll audio pairing" if kind == "pairing" else "body pick"
+        tag = {"pairing": "B-roll audio pairing", "memory": "memory trigger"}.get(kind, "body pick")
         print(f"\nStep {step}  [{tag}]")
         print(f"  previous : {label(prev)}")
 
@@ -121,11 +123,11 @@ def print_sequence(sequence, amap):
     print(f"\n  approx. total runtime: {total:.0f}s")
 
 
-def print_uniqueness(sequencer, amap, target, runs):
+def print_uniqueness(sequencer, amap, target, runs, context=None):
     print(f"\n{BAR}\nUNIQUENESS CHECK — {runs} independent generations\n{BAR}")
     seen = []
     for r in range(runs):
-        seq = sequencer.generate(target_duration=target)
+        seq = sequencer.generate(target_duration=target, context=context)
         seen.append(tuple(str(e) for e in seq))
         titles = []
         for e in seq:
@@ -162,6 +164,12 @@ def main():
     ap.add_argument("--fade", type=float, default=0.8,
                     help="Audio-transition fade center in seconds, jittered per "
                          "clip like the web console (default: 0.8; 0 = hard cuts).")
+    ap.add_argument("--date", default=None,
+                    help="Memory triggers: screening date, YYYY-MM-DD or 'today'.")
+    ap.add_argument("--season", default=None,
+                    help="Memory triggers: override the season inferred from the date.")
+    ap.add_argument("--weather", default=None,
+                    help="Memory triggers: the weather, e.g. snow (comma-separate several).")
     ap.add_argument("--assets-path", default=None,
                     help="Advanced: media folder for the Validation index "
                          "(default: placeholder media in demo/). Prefer --topic.")
@@ -180,6 +188,15 @@ def main():
         index_path, metadata_path = topic["index_path"], topic["metadata_path"]
         args.assets_path, args.films_path = topic["assets_path"], topic["films_path"]
     args.assets_path = args.assets_path or DEFAULT_ASSETS
+    context = None
+    if args.date or args.season or args.weather:
+        try:
+            context = ScreeningContext(
+                date=args.date, season=args.season,
+                weather=args.weather.split(",") if args.weather else None,
+            )
+        except ValueError as e:
+            ap.error(str(e))
     args.films_path = args.films_path or DEFAULT_FILMS
 
     if args.seed is not None:
@@ -237,18 +254,28 @@ def main():
     print(f"target     : {args.target}s"
           + (f"   (seed {args.seed})" if args.seed is not None else "   (unseeded)"))
     print(f"audio fade : {f'{args.fade}s center, varied per clip' if args.fade > 0 else 'off — hard cuts'}")
+    print(f"context    : {context.describe() if context else 'off'}")
 
     # Instrument, then generate through the real API.
     tracer = SelectionTracer(sequencer.selector)
     instrument_pairing(sequencer.selector, tracer)
-    sequence = sequencer.generate(target_duration=args.target)
+    sequence = sequencer.generate(target_duration=args.target, context=context)
+    if context is not None:
+        matched = len(sequencer.context_matches)
+        if sequencer.memory:
+            m = sequencer.memory
+            print(f"memory     : {label(amap.get(m['artifact_id'], {}))} "
+                  f"({m['placement']}) — {', '.join(m['reasons'])}  "
+                  f"[{matched} clip(s) match this context]")
+        else:
+            print("memory     : none — no clip is tagged with a matching context")
 
     print_trace(tracer.events)
     print_sequence(sequence, amap)
 
     # Uniqueness check reuses the same sequencer (fresh state each generate()).
     if args.runs > 0:
-        print_uniqueness(sequencer, amap, args.target, args.runs)
+        print_uniqueness(sequencer, amap, args.target, args.runs, context=context)
 
     # Render the film we traced above.
     if args.no_render:

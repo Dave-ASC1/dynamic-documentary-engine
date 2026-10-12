@@ -385,8 +385,29 @@ h2 {
 
 /* The duration readout is informational, not a warning — .field-hint's
    colour is used elsewhere to flag problems like an empty topic. */
-#duration-hint {
+#duration-hint,
+#context-hint {
   color: var(--muted-dim);
+}
+
+/* Memory-trigger pickers: date, season, weather, shown only when the
+   toggle is on. */
+.context-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: 100%;
+}
+
+.field-input input[type="date"] {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  color-scheme: light dark;
 }
 
 .toggle-field {

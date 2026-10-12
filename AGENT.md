@@ -68,6 +68,7 @@ dynamic-documentary-engine/
 │   ├── collection_loader.py   # CollectionLoader — loads/validates a collection index
 │   ├── rules.py               # SequencingRules — eligibility, no-repeat, duration budget
 │   ├── artifact_selector.py   # ArtifactSelector — dissimilarity scoring + juxtaposition
+│   ├── context.py             # ScreeningContext — memory triggers (date/season/weather matching), DRAFT
 │   ├── assembler.py           # Assembler — FFmpeg pipeline (lives here, NOT in pipeline/)
 │   └── cancellation.py        # CancellationToken — cooperative cancel for in-flight renders
 ├── metadata/
@@ -109,6 +110,7 @@ dynamic-documentary-engine/
 - `sequencer.py` — opens AND closes each film with a **generated randomized B-roll+X-roll pair** from the body pool (closing pair reserved before body selection). `generate(target_duration, allow_overshoot=False)` reserves the closing clip's screen time in the budget so whole clips don't overshoot the target. Body picks come from any eligible A-roll or B-roll; X-roll is only ever a B-roll's audio partner, never standalone.
 - `rules.py` — no forced A/B pacing arc (`get_target_pacing()` returns `None`). Enforces no-repeat, duration budget, must-not-follow. X-roll pairing skips the duration budget (it adds no screen time).
 - `artifact_selector.py` — dissimilarity scoring ranks the **most unlike** next artifact across type, mood, pacing, tags, theme, geography, dominant lines. Normal mode = tight top-3 weighted-random pool; **diversity mode** widens the pool by collection size and boosts underused artifacts via persisted usage counts.
+- `context.py` (**draft, Oct 2026**) — memory triggers. A `ScreeningContext` (date — default the computer's clock —, season inferred from it, weather set by a person; the engine stays offline) is matched against optional per-clip `context` tags (`date` YYYY[-MM[-DD]], `season`, `weather` list): anniversary 3 / same month 2 / season 1 / shared weather 2 points. Matching clips get a weight boost **within** the contrast pool (×(1+0.5·points)), and the best-matching A-/B-roll is reserved like the closing pair and placed 25–75% through the body (`Sequencer.memory` records it). No context or no match = identical output to before (verified seed-for-seed). No real clips are tagged yet; pull strength awaits Dr. Campbell.
 
 **Rendering (engine/assembler.py):**
 - Class-based FFmpeg pipeline; mixed sequences, local-file and live-stream sources; normalizes every segment to a common geometry (default **1280×720, 30fps**, libx264/aac) so mixed-resolution / portrait / 4K footage concatenates cleanly.
@@ -119,14 +121,14 @@ dynamic-documentary-engine/
 **Web layer (web/backend/app.py + scripts/dde_runtime.py):**
 - Auto-discovers every topic folder under `local-media/` (currently WWII, SWISS, Validation) — no hardcoded media path.
 - **Media auto-sync:** drop clips into `local-media/<Topic>/assets/{a-roll,b-roll,x-roll}/` and they're detected on the next request without regenerating anything.
-- Endpoints: `GET /` (console), `GET /exhibit` (kiosk), `GET /<path>` (frontend static files), `GET /api/collections`, `POST /api/generate` (accepts `collection`, `target_duration`, `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `job_id`), `POST /api/generate/cancel`, `GET /api/generate/progress?job_id=`, `GET /api/films?collection=` (history), `DELETE /api/films/<collection>/<file>`, `GET /films/<collection>/<file>`.
+- Endpoints: `GET /` (console), `GET /exhibit` (kiosk), `GET /<path>` (frontend static files), `GET /api/collections`, `POST /api/generate` (accepts `collection`, `target_duration`, `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `context` {date|"today", season, weather}, `job_id`), `GET /api/context-options` (seasons, weather vocabulary, server's today), `POST /api/generate/cancel`, `GET /api/generate/progress?job_id=`, `GET /api/films?collection=` (history), `DELETE /api/films/<collection>/<file>`, `GET /films/<collection>/<file>`.
 - **Cancel:** the client makes a `job_id`, sends it with generate, and can POST it to cancel — the running FFmpeg process is killed via the `CancellationToken`.
 - **Exact duration:** trims the final file to exactly `target_duration` (minus title-card length). Title cards wrap every film's open/close.
 - Each film writes a **manifest** (`.json` beside the `.mp4`) recording `generated_at`, target/actual duration, and the slot list.
 
 **Frontend:**
-- **Console** (`index.html`/`app.js`): topic picker, target length (seconds/minutes), Diversity + Exact-duration toggles, **Audio transitions dropdown** (Off / Subtle 0.3 / Balanced 0.5 / Smooth 0.8 / Long 1.2s; default **Smooth**), Generate/Cancel, a "why this cut" dissimilarity trace, film history (shows **date + time**, per-film delete), light/dark theme.
-- **Exhibit** (`exhibit.html`/`exhibit.js`): single-button kiosk view with progress and pause, for public/gallery use.
+- **Console** (`index.html`/`app.js`): topic picker, target length (seconds/minutes), Diversity + Exact-duration toggles, **Audio transitions dropdown** (Off / Subtle 0.3 / Balanced 0.5 / Smooth 0.8 / Long 1.2s; default **Smooth**), **Memory triggers** toggle + date (Today / pick) / season (Auto) / weather pickers, Generate/Cancel, a "why this cut" dissimilarity trace (memory cut marked), film history (shows **date + time**, per-film delete), light/dark theme.
+- **Exhibit** (`exhibit.html`/`exhibit.js`): single-button kiosk view with progress and pause, for public/gallery use. Setup can turn memory triggers on (date always "today", resolved by the server each run) and set today's weather.
 
 **Validation state:**
 - A live validation collection is wired to real footage; the full pipeline (`scripts/run_first_film.py`) renders a valid H.264/AAC MP4 and all metadata validates against both schemas.
@@ -155,7 +157,7 @@ The engine, pipeline, backend, and UI are complete and validated end to end on r
 
 1. **Handoff / documentation** for the incoming students (this file, `SETUP-GUIDE.md`, `handoff.md`) — the priority as David transitions off.
 2. **Audio:** the transition fade is done. Possible next lever — **loudness normalization** (FFmpeg `loudnorm`) so clips sit at an even level (a separate change from the fade). Not built.
-3. **Context-aware "memory triggers"** (Dr. Campbell's idea: react to real-world context like date/weather) — a research direction for a *future* version, well beyond the current local system. Not built.
+3. **Memory triggers** (Dr. Campbell's idea: date/season/weather as cues, like veterans' journals) — **drafted** on `first-run-demo` (human-set context, `engine/context.py`). Open with Dr. Campbell: what a clip's date means (event vs. filming), anniversary/month/season matching, pull strength (draft = boost + one guaranteed memory), weather vocabulary, who sets it at the exhibit. Tola (Omotola Ajao) may own the context tagging.
 4. **Open design question (needs David):** should A-roll be eligible to open/close a film? (rule 4). Currently bookends are B-roll+X-roll only.
 
 Optional adjacent cleanup, only with David's OK: the nullable-field schema bug (§4). (Generated film manifests and usage stats are now gitignored.)
@@ -177,7 +179,8 @@ from engine import Sequencer, Assembler, CollectionLoader, SequencingRules, Arti
 
 sequencer = Sequencer(collection_path)                 # e.g. "metadata/collections/wwii_collection_index.json"
 sequence  = sequencer.generate(target_duration=600)    # seconds, 1–9999; allow_overshoot=False by default
-# also: sequencer.generate_multiple(count, target_duration=None)
+# optional: context=ScreeningContext(date="2026-12-18", weather="snow") (or a dict); then sequencer.memory / sequencer.context_matches
+# also: sequencer.generate_multiple(count, target_duration=None, context=None)
 
 assembler = Assembler(
     loader=sequencer.loader,
@@ -191,10 +194,10 @@ film_path = assembler.render(sequence)                 # returns output MP4 path
 
 - `Sequencer.generate()` returns a mixed sequence: strings for A-roll IDs, tuples for B-roll/X-roll pairs. First and last entries are generated bookend tuples (rule 4).
 - `CollectionLoader`: `get_artifacts()`, `get_body_artifacts()`, `get_runtime_rules()`.
-- `SequencingRules`: `is_eligible()`, `is_eligible_for_pairing()`, `get_target_pacing()`, `register_selection()`, `register_pairing_selection()`, `has_reached_minimum_duration()`, `has_reached_maximum_duration()`, `reset()`.
-- `ArtifactSelector`: `select_next()`, `select_pairing()`, `set_previous_artifact()`, `weighted_random_choice()`.
+- `SequencingRules`: `is_eligible()`, `is_available()`, `can_follow_last_shot()`, `is_eligible_for_pairing()`, `get_target_pacing()`, `register_selection()`, `register_pairing_selection()`, `has_reached_minimum_duration()`, `has_reached_maximum_duration()`, `reset()`.
+- `ArtifactSelector`: `select_next()`, `select_pairing()`, `place()` (direct placement, used for the memory), `set_previous_artifact()`, `weighted_random_choice()`; `context_scores` holds per-run context points.
 - `engine/cancellation.py`: `CancellationToken` (`cancel()`, `raise_if_cancelled()`) + `GenerationCancelled`.
-- Most end-to-end driving (tracing, placeholder media, render, exact-duration trim, title cards, manifests) lives in `scripts/dde_runtime.py` — chiefly `generate_and_render(...)`, which the Flask backend calls. The CLI (`run_first_film.py`, `--topic`/`--fade`) reuses its helpers but drives `Sequencer`/`Assembler` directly for its trace and uniqueness check, so CLI films have no title cards, trim or manifest; thread new engine options through both. `generate_and_render` threads `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `cancel_token`, and a `progress_callback` down to the engine.
+- Most end-to-end driving (tracing, placeholder media, render, exact-duration trim, title cards, manifests) lives in `scripts/dde_runtime.py` — chiefly `generate_and_render(...)`, which the Flask backend calls. The CLI (`run_first_film.py`, `--topic`/`--fade`/`--date`/`--season`/`--weather`) reuses its helpers but drives `Sequencer`/`Assembler` directly for its trace and uniqueness check, so CLI films have no title cards, trim or manifest; thread new engine options through both. `generate_and_render` threads `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `context`, `cancel_token`, and a `progress_callback` down to the engine; the result/manifest gain `context`, `memory`, `context_matches`.
 
 ---
 

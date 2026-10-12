@@ -36,6 +36,8 @@ Version: 2.0.0
 
 import random
 
+from engine.context import WEIGHT_BOOST_PER_POINT
+
 
 class ArtifactSelector:
     """
@@ -90,6 +92,9 @@ class ArtifactSelector:
         self.diversity_mode = diversity_mode
         self.usage_counts = usage_counts or {}
         self.juxtaposition_pool_size = juxtaposition_pool_size
+        # Artifact ID -> screening-context match points, set per generation
+        # by the sequencer (see engine/context.py). Empty means no context.
+        self.context_scores = {}
 
     def set_previous_artifact(self, artifact):
         """
@@ -104,6 +109,25 @@ class ArtifactSelector:
             artifact (dict): The artifact to compare the next candidate against.
         """
         self._last_selected = artifact
+
+    def place(self, artifact):
+        """
+        Places a specific artifact as the next primary pick.
+
+        Used for the screening-context memory, which the sequencer chooses
+        by context match rather than by contrast. Registered exactly as a
+        select_next() pick would be, so the following cut contrasts against
+        it as usual.
+
+        Args:
+            artifact (dict): The artifact to place.
+
+        Returns:
+            dict: The placed artifact.
+        """
+        self.rules.register_selection(artifact)
+        self._last_selected = artifact
+        return artifact
 
     def select_next(self, candidates, current_mood=None, target_pacing=None):
         """
@@ -429,7 +453,9 @@ class ArtifactSelector:
 
         Normal mode uses the artifact's metadata weight only. Diversity mode
         preserves the contrast-ranked candidate pool, then boosts artifacts
-        that have appeared less often across previous generated films.
+        that have appeared less often across previous generated films. A
+        screening context, when set, boosts artifacts that match it — again
+        only within the pool, so contrast still decides who competes.
 
         Args:
             artifact (dict): Artifact summary dictionary.
@@ -437,12 +463,17 @@ class ArtifactSelector:
         Returns:
             float: Weight used by random.choices().
         """
-        base = artifact.get("weight", 0.5)
-        if not self.diversity_mode:
-            return base
-
+        weight = artifact.get("weight", 0.5)
         artifact_id = artifact.get("artifact_id")
-        usage = self.usage_counts.get(artifact_id, 0)
-        max_usage = max(self.usage_counts.values(), default=0)
-        diversity_gap = max_usage - usage
-        return base * (1 + diversity_gap)
+
+        if self.diversity_mode:
+            usage = self.usage_counts.get(artifact_id, 0)
+            max_usage = max(self.usage_counts.values(), default=0)
+            diversity_gap = max_usage - usage
+            weight *= 1 + diversity_gap
+
+        points = self.context_scores.get(artifact_id, 0)
+        if points:
+            weight *= 1 + WEIGHT_BOOST_PER_POINT * points
+
+        return weight

@@ -115,15 +115,47 @@ class SequencingRules:
         Returns:
             bool: True if the artifact is eligible, False otherwise.
         """
+        if not self.is_available(artifact):
+            return False
+        if not self._passes_must_not_follow_rule(artifact):
+            return False
+        return True
+
+    def is_available(self, artifact):
+        """
+        Whether an artifact could still be shown somewhere in this film:
+        a visual roll that is not used up and fits the remaining budget.
+
+        This is is_eligible() without the must-not-follow check, which
+        depends on what comes directly before. Used when the sequencer
+        reserves an artifact (the screening-context memory) to place later.
+
+        Args:
+            artifact (dict): The artifact summary dictionary to evaluate.
+
+        Returns:
+            bool: True if the artifact is still available.
+        """
         if artifact.get("artifact_type") == "X-roll":
             return False
         if not self._passes_no_repeat_rule(artifact):
             return False
         if not self._passes_duration_budget_rule(artifact):
             return False
-        if not self._passes_must_not_follow_rule(artifact):
-            return False
         return True
+
+    def can_follow_last_shot(self, artifact):
+        """
+        Public form of the must-not-follow check, for an artifact the
+        sequencer places directly rather than through the selector.
+
+        Args:
+            artifact (dict): The artifact summary dictionary to check.
+
+        Returns:
+            bool: True if it may directly follow the last shot on screen.
+        """
+        return self._passes_must_not_follow_rule(artifact)
 
     def is_eligible_for_pairing(self, artifact):
         """

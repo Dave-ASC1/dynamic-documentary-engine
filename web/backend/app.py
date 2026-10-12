@@ -63,6 +63,7 @@ for _p in (REPO_ROOT, SCRIPTS_DIR):
 
 import dde_runtime  # noqa: E402
 from engine.cancellation import CancellationToken, GenerationCancelled  # noqa: E402
+from engine.context import SEASONS, WEATHER_TERMS, ScreeningContext  # noqa: E402
 from flask import Flask, abort, jsonify, request, send_from_directory  # noqa: E402
 
 app = Flask(__name__, static_folder=None)
@@ -193,6 +194,20 @@ def collections():
     return jsonify([_synced_collection(c) for c in dde_runtime.list_collections()])
 
 
+@app.route("/api/context-options")
+def context_options():
+    # The pickers' vocabulary lives in engine/context.py so the UI and the
+    # matcher never disagree. "today" is this computer's date — the one a
+    # "Today" context will actually use, wherever the browser is.
+    today = ScreeningContext()
+    return jsonify({
+        "seasons": list(SEASONS),
+        "weather": list(WEATHER_TERMS),
+        "today": today.date.isoformat(),
+        "today_season": today.season,
+    })
+
+
 @app.route("/api/generate", methods=["POST"])
 def generate():
     body = request.get_json(silent=True) or {}
@@ -247,6 +262,19 @@ def generate():
     else:
         audio_fade = bool(body.get("audio_fade", True))
 
+    # Screening context ("memory triggers"): {"date", "season", "weather"},
+    # all optional. A missing date or "today" means this computer's own date
+    # — the engine runs offline, so the weather is always set by a person.
+    # No context key at all leaves generation exactly as before.
+    context = body.get("context")
+    if context is not None:
+        if not isinstance(context, dict):
+            return jsonify({"error": "context must be an object"}), 400
+        try:
+            context = ScreeningContext.from_dict(context)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
     # Client-supplied id so a later /api/generate/cancel can name this run.
     # Absent (e.g. an older client or a scripted call) means uncancellable,
     # which is the pre-existing behavior.
@@ -265,6 +293,7 @@ def generate():
             exact_duration=exact_duration,
             audio_fade=audio_fade,
             audio_fade_seconds=audio_fade_seconds,
+            context=context,
             cancel_token=token,
             progress_callback=_job_progress_recorder(job_id) if job_id else None,
         )
