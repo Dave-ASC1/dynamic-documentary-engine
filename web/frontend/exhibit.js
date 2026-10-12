@@ -26,6 +26,8 @@ const setupContext = document.getElementById("setup-context");
 const setupWeather = document.getElementById("setup-weather");
 const setupWeatherField = document.getElementById("setup-weather-field");
 const setupContextHint = document.getElementById("setup-context-hint");
+const setupCue = document.getElementById("setup-cue");
+const setupCueField = document.getElementById("setup-cue-field");
 
 const panels = {
   attract: document.getElementById("attract"),
@@ -134,7 +136,7 @@ async function loadContextOptions(saved) {
     options = null;
   }
   if (!options) {
-    for (const el of [setupContext.closest(".setup-field"), setupWeatherField, setupContextHint]) {
+    for (const el of [setupContext.closest(".setup-field"), setupWeatherField, setupCueField, setupContextHint]) {
       el.classList.add("hidden");
     }
     setupContext.value = "off";
@@ -149,6 +151,7 @@ async function loadContextOptions(saved) {
   if (saved && saved.context) {
     setupContext.value = saved.context.enabled ? "on" : "off";
     setupWeather.value = saved.context.weather || "";
+    setupCue.value = saved.context.cue || "";
   }
   refreshContextFields();
 }
@@ -156,6 +159,7 @@ async function loadContextOptions(saved) {
 function refreshContextFields() {
   const on = setupContext.value === "on";
   setupWeatherField.classList.toggle("hidden", !on);
+  setupCueField.classList.toggle("hidden", !on);
   setupContextHint.classList.toggle("hidden", !on);
 }
 
@@ -229,6 +233,7 @@ setupStart.addEventListener("click", () => {
     context: {
       enabled: setupContext.value === "on",
       weather: setupWeather.value || null,
+      cue: setupCue.value.trim() || null,
     },
   };
   saveSettings(settings);
@@ -365,7 +370,7 @@ async function generate() {
         // "today" is resolved by the server each time, so the context
         // follows the calendar through a long-running day.
         context: settings.context && settings.context.enabled
-          ? { date: "today", weather: settings.context.weather }
+          ? { date: "today", weather: settings.context.weather, cue: settings.context.cue }
           : undefined,
       }),
     });

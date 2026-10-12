@@ -71,7 +71,7 @@ Each run, the engine:
 
 Two optional modes: **Diversity mode** (boosts underused clips so favourites don't dominate) and **Exact duration** (trims the final render to the exact requested length; off by default so whole clips are preserved).
 
-**Memory triggers** (optional, *draft*): set the screening's date, season and weather — the way a day's weather can bring a memory back. Clips tagged with a matching context are favoured, and the best match always appears partway through the film. The engine runs offline, so the date comes from the computer's clock and the weather is chosen by a person. Clips carry the context in their index entry:
+**Memory triggers** (optional, *draft*): set the screening's date, season and weather, or type a **cue** (any word or phrase, e.g. "Camp Swift") — the way a day's weather or a name can bring a memory back. A cue matches clips whose title, tag, theme, person, place, mood or weather is exactly that word or phrase (capitals ignored). Clips tagged with a matching context are favoured, and the best match always appears partway through the film. The engine runs offline, so the date comes from the computer's clock and the weather is chosen by a person. Clips carry the context in their index entry:
 
 ```json
 "context": { "date": "1944-12-18", "season": "winter", "weather": ["snow", "cold"] }
@@ -116,6 +116,8 @@ local-media/
 
 Drop a file into an `assets` subfolder and it's auto-tagged (duration, dominant colour, pacing) and enters rotation on the next run; delete one to retire it. Leave `titles/` empty and a generated text card is used instead.
 
+**Label clips in the Clip library** (`/library`, linked from the console): pick a topic, watch each clip, and type its people, place, mood, tags, themes, date and weather. Each field saves itself as you move on, is checked first (e.g. dates like *18 December 1944*), and is used by the very next film; the previous version is kept as a backup in `metadata/collections/.backups/`. Labels can only be changed on the computer running the engine — a shared link shows the library read-only.
+
 ---
 
 ## The interface
@@ -123,7 +125,8 @@ Drop a file into an `assets` subfolder and it's auto-tagged (duration, dominant 
 Two views onto the same engine:
 
 - **Director's console (`/`)** — the working instrument: topic and length pickers, the generate/cancel controls, the audio/diversity/exact-duration options, the **Memory triggers** pickers (date, season, weather), the **sequence trace** (why each cut was chosen), and a replayable **film history** with the date and time each was made.
-- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic, length and (optionally) today's weather once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
+- **Clip library (`/library`)** — label every clip in the browser (people, place, tags, mood, date, weather); saves automatically.
+- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic, length and (optionally) today's weather and cue once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
 
 ---
 
@@ -141,10 +144,11 @@ dynamic-documentary-engine/
 │   └── cancellation.py         #   stops a render in progress
 ├── scripts/
 │   ├── dde_runtime.py          # shared pipeline used by both CLI and web
+│   ├── clip_library.py         # Clip library: validate + save clip labels
 │   └── run_first_film.py       # command-line film generation
 ├── web/
 │   ├── backend/app.py          # Flask API
-│   └── frontend/               # plain HTML/CSS/JS: console + exhibit view
+│   └── frontend/               # plain HTML/CSS/JS: console, Clip library, exhibit view
 ├── local-media/<topic>/        # per-topic footage, titles, rendered films (media gitignored)
 ├── metadata/                   # collection indexes + JSON schemas
 ├── docs/                       # research writing + design sketches

@@ -14,6 +14,7 @@ const contextDateMode = document.getElementById("context-date-mode");
 const contextDate = document.getElementById("context-date");
 const contextSeason = document.getElementById("context-season");
 const contextWeather = document.getElementById("context-weather");
+const contextCue = document.getElementById("context-cue");
 const contextHint = document.getElementById("context-hint");
 const CONTEXT_KEY = "dde-context";
 let contextOptions = null;
@@ -285,6 +286,7 @@ function saveContextPrefs() {
       date: contextDate.value,
       season: contextSeason.value,
       weather: contextWeather.value,
+      cue: contextCue.value,
     }));
   } catch (e) {
     /* Private browsing or a full quota — the pickers still work. */
@@ -313,9 +315,11 @@ function updateContextUI() {
     const date = contextDateValue() || contextOptions.today;
     const season = contextSeason.value || inferredSeason();
     const weather = contextWeather.value ? `, ${contextWeather.value}` : "";
+    const cue = contextCue.value.trim();
     contextHint.textContent =
-      `Films will favour clips tagged for ${formatContextDate(date)} — ${season}${weather}. ` +
-      `Clips without a context tag are unaffected.`;
+      `Films will favour clips tagged for ${formatContextDate(date)} — ${season}${weather}` +
+      (cue ? `, and clips labelled exactly “${cue.split(",").map((c) => c.trim()).filter(Boolean).join("” or “")}”. ` : ". ") +
+      `Label clips in the Clip library; unlabelled clips are unaffected.`;
   }
   saveContextPrefs();
 }
@@ -339,6 +343,7 @@ async function loadContextOptions() {
   contextDate.value = prefs.date || contextOptions.today;
   if (prefs.season !== undefined) contextSeason.value = prefs.season;
   if (prefs.weather !== undefined) contextWeather.value = prefs.weather;
+  if (prefs.cue !== undefined) contextCue.value = prefs.cue;
   updateContextUI();
 }
 
@@ -349,10 +354,11 @@ function contextPayload() {
     date: contextDateValue() || "today",
     season: contextSeason.value || null,
     weather: contextWeather.value || null,
+    cue: contextCue.value.trim() || null,
   };
 }
 
-for (const el of [contextToggle, contextDateMode, contextDate, contextSeason, contextWeather]) {
+for (const el of [contextToggle, contextDateMode, contextDate, contextSeason, contextWeather, contextCue]) {
   el.addEventListener("change", updateContextUI);
 }
 

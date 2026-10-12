@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clip library — Dynamic Documentary Engine</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="library.css" />
+  <script>
+    // Applied before first paint so the page never flashes the wrong theme.
+    (function () {
+      var saved = localStorage.getItem("dde-theme");
+      if (saved === "dark" || saved === "light") {
+        document.documentElement.setAttribute("data-theme", saved);
+      }
+    })();
+  </script>
+</head>
+<body class="library-page">
+  <header class="hero hero-compact">
+    <div class="sprockets" aria-hidden="true"></div>
+    <a class="brand-logo" href="https://ist.psu.edu/" target="_blank" rel="noopener">
+      <img src="psu-logo.svg" alt="Pennsylvania State University" />
+    </a>
+    <a class="exhibit-link" href="/" title="Back to the director's console">
+      <span class="exhibit-link-icon" aria-hidden="true">&#8592;</span>
+      <span>Console</span>
+    </a>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">
+      <span class="theme-toggle-icon" aria-hidden="true"></span>
+    </button>
+    <div class="hero-inner">
+      <p class="eyebrow">Dynamic Documentary Engine</p>
+      <h1>Clip library</h1>
+      <p class="tagline">Label each clip so the engine can contrast it and bring it up as a memory. Changes save as you type.</p>
+    </div>
+    <div class="sprockets" aria-hidden="true"></div>
+  </header>
+
+  <main>
+    <section class="library-toolbar" aria-label="Choose and filter clips">
+      <label class="toolbar-field">
+        <span>Film topic</span>
+        <select id="topic-select"></select>
+      </label>
+      <label class="toolbar-field toolbar-grow">
+        <span>Find a clip</span>
+        <input type="search" id="search" placeholder="Title or file name" />
+      </label>
+      <label class="toolbar-field">
+        <span>Show</span>
+        <select id="filter-select">
+          <option value="all">All clips</option>
+          <option value="unlabelled">Needs labels</option>
+          <option value="labelled">Labelled</option>
+        </select>
+      </label>
+    </section>
+
+    <p id="summary" class="library-summary" role="status"></p>
+    <p class="library-help">
+      A <strong>cue</strong> typed in the console's Memory triggers brings up clips whose title, tag,
+      theme, person, place, mood or weather is exactly that word or phrase (capitals don't matter).
+      <strong>Dates</strong> can be typed as 18 December 1944, December 1944 or 1944.
+    </p>
+    <p id="readonly-note" class="library-note hidden">
+      View only. Labels can be changed on the computer running the engine,
+      so a shared link can never alter the tagging.
+    </p>
+
+    <section id="clip-list" class="clip-list" aria-label="Clips"></section>
+  </main>
+
+  <footer class="foot">
+    <p>Labels are saved to this topic's clip list and used by the very next film. Earlier versions are kept as backups.</p>
+  </footer>
+
+  <script src="library.js"></script>
+</body>
+</html>

@@ -149,6 +149,17 @@ body {
 }
 
 .exhibit-link:hover { color: var(--text); border-color: var(--accent); }
+
+/* Several page links side by side in the top-right corner. */
+.page-links {
+  position: absolute;
+  top: 1.25rem;
+  right: 4.6rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.5rem;
+}
+.page-links .exhibit-link { position: static; }
 .exhibit-link-icon { font-size: 0.9rem; line-height: 1; }
 
 /* The label would crowd the header on a phone; the icon still reads. */
@@ -365,7 +376,8 @@ h2 {
    The unit selector next to the target length is excluded — it's a couple
    of words, and stretching that field to 340px left most of the box empty
    to the right of the number. */
-.field-input:has(select:not(.unit-select)) {
+.field-input:has(select:not(.unit-select)),
+.field-input:has(input[type="text"]) {
   width: 100%;
   max-width: 340px;
   box-sizing: border-box;
@@ -397,6 +409,18 @@ h2 {
   flex-direction: column;
   gap: 0.9rem;
   width: 100%;
+}
+
+.field-input input[type="text"] {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  width: 100%;
+  min-width: 0;
 }
 
 .field-input input[type="date"] {

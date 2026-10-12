@@ -28,6 +28,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -66,6 +67,29 @@ DEFAULT_USAGE_STATS = "usage_stats.json"
 # <Name>/assets/ + <Name>/artifacts/ becomes a selectable collection, and
 # gets an empty-but-valid metadata index the first time it's seen.
 
+# One lock for every write to a collection index. The web server answers
+# requests on several threads, and both the media sync (on every page load)
+# and the Clip library (on every saved label) rewrite the same file — without
+# the lock one could silently undo the other's change.
+INDEX_LOCK = threading.RLock()
+
+
+def write_index(index_path, data):
+    """Writes a collection index atomically: to a temporary file in the same
+    folder, then swapped into place, so a crash or a reader mid-write never
+    sees a half-written file."""
+    folder = os.path.dirname(index_path)
+    fd, tmp_path = tempfile.mkstemp(prefix=".index-", suffix=".json", dir=folder)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_path, index_path)
+    except BaseException:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+
 def _slugify_topic(name):
     slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
     return slug or "collection"
@@ -94,8 +118,7 @@ def _create_empty_collection_index(index_path, topic_id, display_name):
         "artifact_counts": {"total": 0, "a_roll": 0, "b_roll": 0, "x_roll": 0},
         "artifacts": [],
     }
-    with open(index_path, "w") as f:
-        json.dump(data, f, indent=2)
+    write_index(index_path, data)
 
 
 def list_collections():
@@ -540,8 +563,14 @@ def sync_media_library(index_path, assets_path):
     """Reconciles the collection index against what's actually on disk.
 
     Returns {"added": [artifact_id, ...], "removed": [artifact_id, ...]}.
-    Rewrites index_path only if something actually changed.
+    Rewrites index_path only if something actually changed. Holds
+    INDEX_LOCK throughout, so it never interleaves with a Clip library save.
     """
+    with INDEX_LOCK:
+        return _sync_media_library_locked(index_path, assets_path)
+
+
+def _sync_media_library_locked(index_path, assets_path):
     with open(index_path) as f:
         data = json.load(f)
 
@@ -610,8 +639,7 @@ def sync_media_library(index_path, assets_path):
             "x_roll": counts.get("X-roll", 0),
         }
         data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        with open(index_path, "w") as f:
-            json.dump(data, f, indent=2)
+        write_index(index_path, data)
 
     return {"added": added, "removed": removed}
 

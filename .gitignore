@@ -233,3 +233,7 @@ films/
 # Generated film manifests + usage stats (regenerated on every run;
 # the rendered .mp4s are already ignored above)
 local-media/*/artifacts/*.json
+
+# Clip library save backups and interrupted index writes (local only)
+metadata/collections/.backups/
+metadata/collections/.index-*

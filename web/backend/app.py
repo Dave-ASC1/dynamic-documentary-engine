@@ -61,6 +61,7 @@ for _p in (REPO_ROOT, SCRIPTS_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import clip_library  # noqa: E402
 import dde_runtime  # noqa: E402
 from engine.cancellation import CancellationToken, GenerationCancelled  # noqa: E402
 from engine.context import SEASONS, WEATHER_TERMS, ScreeningContext  # noqa: E402
@@ -154,6 +155,12 @@ def exhibit():
     return send_from_directory(FRONTEND_DIR, "exhibit.html")
 
 
+@app.route("/library")
+def library():
+    """Clip library — label clips in the browser; see web/frontend/library.html."""
+    return send_from_directory(FRONTEND_DIR, "library.html")
+
+
 @app.route("/<path:filename>")
 def frontend_assets(filename):
     """Serves style.css / app.js alongside index.html."""
@@ -192,6 +199,73 @@ def collections():
     # Synced here so the topic list and its clip counts reflect the folders
     # as they are right now, without needing a film to be generated first.
     return jsonify([_synced_collection(c) for c in dde_runtime.list_collections()])
+
+
+def _edits_allowed():
+    """Labels can be changed only from the computer running the engine.
+
+    Anyone with a shared link (a tunnel, or another machine on the network)
+    can browse the Clip library but not change it, so a link sent to a
+    viewer can never alter or wipe the tagging. A tunnel connects from this
+    same machine, so its forwarding headers are what give it away. Set
+    DDE_ALLOW_REMOTE_EDITS=1 to allow editing from anywhere.
+    """
+    if os.environ.get("DDE_ALLOW_REMOTE_EDITS") == "1":
+        return True
+    forwarded = any(
+        h in request.headers
+        for h in ("X-Forwarded-For", "Forwarded", "Cf-Connecting-Ip", "X-Real-Ip")
+    )
+    return request.remote_addr in ("127.0.0.1", "::1") and not forwarded
+
+
+@app.route("/api/library/<collection_id>")
+def library_clips(collection_id):
+    collection = dde_runtime.get_collection(collection_id)
+    if collection is None:
+        return jsonify({"error": f"Unknown film topic '{collection_id}'."}), 404
+    # Synced first, so clips just dropped into the folders show up to label.
+    collection = _synced_collection(collection)
+    data = clip_library.list_clips(collection["index_path"])
+    for clip in data["clips"]:
+        clip["media_url"] = (
+            f"/media/{collection['id']}/{clip['filename']}" if clip.get("filename") else None
+        )
+    return jsonify({
+        "collection": {"id": collection["id"], "name": collection["name"]},
+        "editable": _edits_allowed(),
+        "options": clip_library.options(),
+        **data,
+    })
+
+
+@app.route("/api/library/<collection_id>/<artifact_id>", methods=["PATCH"])
+def library_update(collection_id, artifact_id):
+    if not _edits_allowed():
+        return jsonify({
+            "error": "Labels can only be changed on the computer running the engine."
+        }), 403
+    collection = dde_runtime.get_collection(collection_id)
+    if collection is None:
+        return jsonify({"error": f"Unknown film topic '{collection_id}'."}), 404
+    try:
+        clip = clip_library.update_clip(
+            collection["index_path"], artifact_id, request.get_json(silent=True)
+        )
+    except clip_library.ValidationError as e:
+        return jsonify({"errors": e.errors}), 400
+    except KeyError:
+        return jsonify({"error": f"No clip '{artifact_id}' in this topic."}), 404
+    return jsonify(clip)
+
+
+@app.route("/media/<collection_id>/<path:filename>")
+def media(collection_id, filename):
+    """A topic's source clip, for previewing while labelling."""
+    collection = dde_runtime.get_collection(collection_id)
+    if collection is None:
+        abort(404)
+    return send_from_directory(collection["assets_path"], filename)
 
 
 @app.route("/api/context-options")

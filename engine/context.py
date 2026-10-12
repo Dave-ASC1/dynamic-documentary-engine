@@ -3,8 +3,8 @@ context.py
 ----------
 Dynamic Documentary Engine — Screening Context ("Memory Triggers")
 
-Lets the circumstances of a screening — the date, the season, the weather —
-influence which artifacts surface, the way a cold, snowy December day can
+Lets the circumstances of a screening — the date, the season, the weather,
+or any word someone types as a cue — influence which artifacts surface, the way a cold, snowy December day can
 bring a veteran's own December back. A person sets the context (the engine
 runs offline, so it cannot look up the weather), and artifacts carry
 optional context metadata saying when they happened and in what conditions.
@@ -29,6 +29,10 @@ Artifact metadata (optional, in a collection index entry):
         "weather": ["snow", "cold"]
     }
 
+A cue (e.g. "Camp Swift") matches an artifact when it is exactly equal —
+ignoring capitals and surrounding punctuation — to one of its labels: the
+title, a tag, a theme, a person, the place, the mood or a weather word.
+
 Author: Oluwafemisola David Ademoye
 Supporting: Omotola Ajibike Ajao
 Project: Dynamic Documentary Engine
@@ -52,6 +56,7 @@ ANNIVERSARY_POINTS = 3     # same month and day
 SAME_MONTH_POINTS = 2      # same month, different or unknown day
 SEASON_POINTS = 1          # same season
 WEATHER_POINTS = 2         # at least one weather word in common
+CUE_POINTS = 4             # per cue that exactly equals one of the artifact's labels
 
 # Selection weight is multiplied by (1 + WEIGHT_BOOST_PER_POINT * points),
 # so an anniversary in matching weather (6 points) is four times as likely
@@ -115,6 +120,80 @@ def parse_partial_date(value):
     return year, month, day
 
 
+def normalize_date_input(value):
+    """Turns a date as a person types it into the stored "YYYY[-MM[-DD]]" form.
+
+    Accepts "1944-12-18", "1944-12", "1944", "18 December 1944",
+    "18 Dec 1944", "December 18, 1944", "December 1944" and "Dec 1944".
+    Slash forms like 12/18/1944 are refused: day and month order is
+    ambiguous.
+
+    Args:
+        value (str): The typed date.
+
+    Returns:
+        str: The normalized date.
+
+    Raises:
+        ValueError: If the date is not recognised.
+    """
+    text = " ".join(str(value).replace(",", " ").split())
+    iso = text.split("-")
+    if all(p.isdigit() for p in iso) and len(iso[0]) == 4 and len(iso) <= 3:
+        normalized = "-".join([iso[0]] + [p.zfill(2) for p in iso[1:]])
+        if parse_partial_date(normalized):
+            return normalized
+        raise ValueError(f"{value!r} is not a real date.")
+
+    months = {name.lower(): i + 1 for i, name in enumerate(_MONTH_NAMES)}
+    months.update({name[:3].lower(): i + 1 for i, name in enumerate(_MONTH_NAMES)})
+    words = text.lower().split()
+    month = next((months[w.rstrip(".")] for w in words if w.rstrip(".") in months), None)
+    numbers = [w for w in words if w.isdigit()]
+    year = next((int(n) for n in numbers if len(n) == 4), None)
+    day = next((int(n) for n in numbers if len(n) <= 2), None)
+    if month is None or year is None or len(words) != 2 + (day is not None):
+        raise ValueError(
+            f"{value!r} isn't a date the engine understands — try 18 December 1944, "
+            "December 1944, 1944 or 1944-12-18."
+        )
+    normalized = f"{year:04d}-{month:02d}" + (f"-{day:02d}" if day is not None else "")
+    if not parse_partial_date(normalized):
+        raise ValueError(f"{value!r} is not a real date.")
+    return normalized
+
+
+def _normalize_label(value):
+    """Lower-case, single-spaced, without surrounding punctuation — the form
+    labels and cues are compared in, so "Camp Swift." matches "camp swift"."""
+    return " ".join(str(value).lower().split()).strip(" .,;:!?\"'()[]")
+
+
+def _artifact_labels(artifact):
+    """Every label on an artifact that a cue may match exactly."""
+    content = artifact.get("content", {})
+    labels = set()
+    for key in ("title", "mood", "geography"):
+        value = artifact.get(key) or content.get(key)
+        if value:
+            labels.add(_normalize_label(value))
+    for key in ("tags", "theme", "people"):
+        values = artifact.get(key) or content.get(key) or []
+        if isinstance(values, str):
+            values = [values]
+        labels.update(_normalize_label(v) for v in values)
+    labels.update(_normalize_label(w) for w in _weather_set(_artifact_context(artifact).get("weather")))
+    labels.discard("")
+    return labels
+
+
+def _cue_list(value):
+    """A cue as typed ("Camp Swift, 1252nd") -> ["Camp Swift", "1252nd"]."""
+    if isinstance(value, str):
+        value = value.split(",")
+    return [c.strip() for c in (value or []) if str(c).strip()]
+
+
 def _artifact_context(artifact):
     """The context block of an artifact, from the index summary or the
     detailed per-artifact format."""
@@ -136,9 +215,11 @@ class ScreeningContext:
         season (str):         The season — given explicitly, or inferred
                               from the date.
         weather (set):        Lower-case weather words; may be empty.
+        cues (list):          Words or phrases to match exactly against
+                              artifact labels; may be empty.
     """
 
-    def __init__(self, date=None, season=None, weather=None):
+    def __init__(self, date=None, season=None, weather=None, cue=None):
         """
         Initializes a screening context.
 
@@ -148,6 +229,7 @@ class ScreeningContext:
                 own date — no internet needed.
             season (str): Overrides the season inferred from the date.
             weather (str | list): The weather, e.g. "snow" or ["rain", "cold"].
+            cue (str | list): Words or phrases, e.g. "Camp Swift, 1252nd".
 
         Raises:
             ValueError: If the date or season is not recognised.
@@ -167,13 +249,14 @@ class ScreeningContext:
                 raise ValueError(f"Context season must be one of {', '.join(SEASONS)}; got {season!r}.")
         self.season = season or season_for_month(date.month)
         self.weather = _weather_set(weather)
+        self.cues = _cue_list(cue)
 
     @classmethod
     def from_dict(cls, data):
         """Builds a context from a request or manifest dict.
 
         Args:
-            data (dict): Keys "date", "season", "weather" (all optional).
+            data (dict): Keys "date", "season", "weather", "cue" (all optional).
 
         Returns:
             ScreeningContext: The context.
@@ -186,6 +269,7 @@ class ScreeningContext:
             date=data.get("date"),
             season=data.get("season") or None,
             weather=data.get("weather"),
+            cue=data.get("cue"),
         )
 
     def as_dict(self):
@@ -194,6 +278,7 @@ class ScreeningContext:
             "date": self.date.isoformat(),
             "season": self.season,
             "weather": sorted(self.weather),
+            "cue": list(self.cues),
             "label": self.describe(),
         }
 
@@ -202,6 +287,8 @@ class ScreeningContext:
         parts = [f"{self.date.day} {_MONTH_NAMES[self.date.month - 1]}", self.season]
         if self.weather:
             parts.append(", ".join(sorted(self.weather)))
+        if self.cues:
+            parts.append(", ".join(f"\u201c{c}\u201d" for c in self.cues))
         return " · ".join(parts)
 
     def match(self, artifact):
@@ -215,11 +302,19 @@ class ScreeningContext:
                    reasons are short phrases for the trace, e.g.
                    ["anniversary (18 December)", "weather (snow)"].
         """
+        points, reasons = 0, []
+
+        if self.cues:
+            labels = _artifact_labels(artifact)
+            for cue in self.cues:
+                if _normalize_label(cue) in labels:
+                    points += CUE_POINTS
+                    reasons.append(f"cue (\u201c{cue}\u201d)")
+
         ctx = _artifact_context(artifact)
         if not ctx:
-            return 0, []
+            return points, reasons
 
-        points, reasons = 0, []
         parsed = parse_partial_date(ctx.get("date"))
         month = parsed[1] if parsed else None
         day = parsed[2] if parsed else None

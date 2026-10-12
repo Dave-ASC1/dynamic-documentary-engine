@@ -46,8 +46,9 @@ X-roll adds sound, not screen time.
 | `engine/cancellation.py` | Lets the web UI kill a render mid-flight (including the running FFmpeg process). |
 | `scripts/dde_runtime.py` | The layer both the CLI and the web backend call. Topic discovery, media auto-sync, the "why this cut" trace, exact-duration trim, title cards, usage stats, manifests. |
 | `scripts/run_first_film.py` | Command-line runner. |
+| `scripts/clip_library.py` | Backs the Clip library page: checks and saves clip labels to a topic's index, with backups. |
 | `web/backend/app.py` | Flask API + serves the two frontends. |
-| `web/frontend/` | Plain HTML/CSS/JS. `index.html`/`app.js` = researcher console; `exhibit.*` = gallery kiosk. |
+| `web/frontend/` | Plain HTML/CSS/JS. `index.html`/`app.js` = researcher console; `library.*` = Clip library; `exhibit.*` = gallery kiosk. |
 
 The engine package knows nothing about Flask, topics, or title cards. Keep it
 that way: engine = sequencing + rendering; `dde_runtime.py` = everything
@@ -211,7 +212,14 @@ in what conditions). It is all in `engine/context.py`.
   ("today"); the season is inferred from the date; the weather is picked in
   the console or on the exhibit setup screen.
 - **Matching is points, not rules:** same month and day (an anniversary,
-  any year) 3, same month 2, same season 1, shared weather word 2.
+  any year) 3, same month 2, same season 1, shared weather word 2, and a
+  **cue** 4 per match.
+- **A cue is any word or phrase someone types** ("Camp Swift", a veteran's
+  name). It matches a clip only when it *exactly equals* one of its labels —
+  title, a tag, a theme, a person, the place, the mood or a weather word —
+  ignoring capitals and surrounding punctuation. "camp" does not match
+  "Camp Swift"; a long title does not match a word inside it. That keeps
+  results predictable: what was labelled is what comes up.
 - **It works alongside juxtaposition, not against it.** Matching clips get a
   selection-weight boost (×1.5 per point) — but only *within* the top-3
   contrast pool, so contrast still decides who competes. Then the single
@@ -228,6 +236,26 @@ in what conditions). It is all in `engine/context.py`.
 
 The strength of the pull (gentle boost + one guaranteed memory) is a draft
 default awaiting Dr. Campbell's call — see §5.
+
+### The Clip library (labels without editing files)
+
+Dr. Campbell asked to type labels on the website and have them saved
+automatically. `/library` lists a topic's clips with a preview player and a
+form per clip; each field saves when the person moves on (`PATCH
+/api/library/<topic>/<clip>`).
+
+- **Checked before saving** (`scripts/clip_library.py`): known pacing/line
+  values only, a weight between 0.05 and 1, dates people actually type
+  ("18 December 1944", "Dec 1944", "1944") normalized to `YYYY[-MM[-DD]]`.
+  A bad value is refused with a plain message and nothing is written.
+- **Never loses a change:** saves and the media sync share one lock
+  (`dde_runtime.INDEX_LOCK`), every write is atomic (temp file + swap), and
+  the previous index is kept in `metadata/collections/.backups/<topic>/`
+  (newest 30, gitignored). Auto-detected `color-*` tags are kept but hidden.
+- **Edit only on the engine's computer.** Requests through a tunnel or from
+  another machine get a read-only library (forwarding headers give a tunnel
+  away). `DDE_ALLOW_REMOTE_EDITS=1` lifts this, e.g. on a trusted Penn State
+  host.
 
 ### Title cards
 
@@ -294,11 +322,13 @@ bookends and generation fails.
 
 ### Tag clips for memory triggers, or tune them
 
-- **Tag a clip:** add a `context` block to its entry in the topic's index,
-  e.g. `"context": {"date": "1944-12-18", "weather": ["snow", "cold"]}`.
-  `date` may be `YYYY-MM-DD`, `YYYY-MM` or `YYYY`; `season` is optional
-  (inferred from the date's month, northern hemisphere); `weather` is a list
-  of free words matched case-insensitively.
+- **Tag a clip:** use the Clip library (`/library`). Under the hood it writes
+  the same fields to the topic's index, e.g. `"people": ["G. Moore"]`,
+  `"geography": "Camp Swift"`, `"context": {"date": "1944-12-18", "weather":
+  ["snow"]}`. `date` is stored as `YYYY-MM-DD`, `YYYY-MM` or `YYYY`; `season`
+  is optional (inferred from the date's month, northern hemisphere).
+- **After labelling,** the topic's index file shows as changed in git — that
+  is the labelling itself; commit it like any other change.
 - **Weather words offered in the pickers:** `WEATHER_TERMS` in
   `engine/context.py` (the UI loads them from `/api/context-options`).
 - **How strong the pull is:** the point values, `WEIGHT_BOOST_PER_POINT` and
@@ -422,8 +452,9 @@ None of these have been started unless it says otherwise.
   volumes. FFmpeg's `loudnorm` per segment (in `assembler.py`) would even them
   out. It's a separate change from the fade and shouldn't be mixed into it.
   Two-pass `loudnorm` is more accurate but doubles audio analysis time.
-- **Memory triggers — drafted, needs decisions and tags.** Built as described
-  in §2, but no real clip is tagged with a context yet, and these questions
+- **Memory triggers and cues — built, needs labels and decisions.** Built as
+  described in §2, with the Clip library to label clips, but no real clip is
+  labelled yet, and these questions
   are open with Dr. Campbell: is a clip's date *when it happened* or *when it
   was filmed*; anniversary vs. month vs. season; how strong the pull should
   be (gentle, guaranteed — the draft — or anchoring the opening); the weather

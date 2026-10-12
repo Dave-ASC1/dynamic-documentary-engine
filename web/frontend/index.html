@@ -21,11 +21,18 @@
     <a class="brand-logo" href="https://ist.psu.edu/" target="_blank" rel="noopener">
       <img src="psu-logo.svg" alt="Pennsylvania State University" />
     </a>
-    <a class="exhibit-link" href="/exhibit"
-       title="Full-screen gallery view — one button, plays automatically">
-      <span class="exhibit-link-icon" aria-hidden="true">&#9635;</span>
-      <span>Exhibit mode</span>
-    </a>
+    <nav class="page-links" aria-label="Other views">
+      <a class="exhibit-link" href="/library"
+         title="Label clips: people, places, tags, dates and weather">
+        <span class="exhibit-link-icon" aria-hidden="true">&#9998;</span>
+        <span>Clip library</span>
+      </a>
+      <a class="exhibit-link" href="/exhibit"
+         title="Full-screen gallery view — one button, plays automatically">
+        <span class="exhibit-link-icon" aria-hidden="true">&#9635;</span>
+        <span>Exhibit mode</span>
+      </a>
+    </nav>
     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">
       <span class="theme-toggle-icon" aria-hidden="true"></span>
     </button>
@@ -128,6 +135,12 @@
           <label for="context-weather">Weather</label>
           <div class="field-input">
             <select id="context-weather"></select>
+          </div>
+        </div>
+        <div class="field field-centered">
+          <label for="context-cue">Cue — any word or phrase</label>
+          <div class="field-input">
+            <input type="text" id="context-cue" placeholder="e.g. Camp Swift, 1252nd" autocomplete="off" />
           </div>
         </div>
       </div>

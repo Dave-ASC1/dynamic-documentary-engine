@@ -87,6 +87,7 @@ body { overflow: hidden; }          /* a kiosk never scrolls */
 }
 
 .setup select,
+.setup input[type="text"],
 .setup input[type="number"] {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -99,6 +100,7 @@ body { overflow: hidden; }          /* a kiosk never scrolls */
 }
 
 .setup select:focus,
+.setup input[type="text"]:focus,
 .setup input[type="number"]:focus {
   outline: none;
   border-color: var(--accent-bright);
