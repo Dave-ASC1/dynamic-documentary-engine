@@ -255,7 +255,8 @@ that. It only has an effect once clips are labelled — see the next step.
 Click **Clip library** at the top-right of the main page. You'll see a
 table with one row per clip in the chosen topic — the clips are found from
 the folders by themselves. Each row starts with a small picture of the
-clip; click it (or its ▶) to watch the clip. The very first time a clip is
+clip: rest the mouse on it to see the clip play silently right there, or
+click it (or its ▶) to watch it with sound. The very first time a clip is
 played it takes a few seconds to prepare.
 
 1. Choose the **Film topic** at the top.

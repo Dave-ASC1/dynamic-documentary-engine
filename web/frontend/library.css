@@ -174,6 +174,28 @@
 }
 .thumb:hover .play,
 .thumb:focus-visible .play { transform: scale(1.15); background: var(--accent-hover); }
+
+/* Hover-to-play: the muted preview fades in over the picture once it plays. */
+.thumb-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.thumb.is-playing .thumb-video { opacity: 1; }
+.thumb.is-playing .play { opacity: 0; }
+.thumb .play { z-index: 1; }
+.thumb.is-loading .play { animation: thumb-pulse 0.9s ease-in-out infinite; }
+@keyframes thumb-pulse {
+  50% { transform: scale(1.25); background: var(--accent-hover); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thumb.is-loading .play { animation: none; }
+}
 .thumb:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; }
 .clip-name .sub { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.25rem; color: var(--muted-dim); font-size: 0.74rem; }
 

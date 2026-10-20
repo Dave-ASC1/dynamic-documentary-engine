@@ -222,8 +222,61 @@ function buildThumb(clip) {
     button.appendChild(img);
   }
   button.appendChild(el("span", { className: "play", "aria-hidden": "true" }, "\u25B6"));
-  button.addEventListener("click", () => openPreview(clip));
+  button.addEventListener("click", () => { stopHoverPlay(button); openPreview(clip); });
+  if (!audio && CAN_HOVER) {
+    let timer = null;
+    button.addEventListener("mouseenter", () => {
+      timer = setTimeout(() => startHoverPlay(button, clip), HOVER_DELAY_MS);
+    });
+    button.addEventListener("mouseleave", () => {
+      clearTimeout(timer);
+      stopHoverPlay(button);
+    });
+  }
   return button;
+}
+
+/* ---------------------------------------------------------------------------
+ * Hover to play inside the thumbnail
+ * ------------------------------------------------------------------------ */
+
+// Only on devices with a mouse; on touch screens a tap opens the player.
+const CAN_HOVER = window.matchMedia("(hover: hover)").matches;
+// A short pause first, so sweeping the mouse across the table doesn't start
+// every clip it passes over.
+const HOVER_DELAY_MS = 250;
+// Start where the thumbnail picture was taken, so the picture comes to life.
+const THUMB_POSITION = 0.3;
+
+// Plays the clip's preview muted and looping inside its thumbnail. Muted
+// because browsers block sound that starts without a click; the click opens
+// the full player with sound.
+function startHoverPlay(button, clip) {
+  if (button.querySelector(".thumb-video")) return;
+  const video = el("video", { className: "thumb-video", src: clip.preview_url, preload: "auto",
+                              playsinline: true, loop: true, "aria-hidden": "true" });
+  video.muted = true;
+  button.classList.add("is-loading");
+  video.addEventListener("loadedmetadata", () => {
+    if (video.duration > 1) video.currentTime = video.duration * THUMB_POSITION;
+  }, { once: true });
+  video.addEventListener("playing", () => {
+    button.classList.remove("is-loading");
+    button.classList.add("is-playing");
+  });
+  video.addEventListener("error", () => stopHoverPlay(button));
+  button.appendChild(video);
+  video.play().catch(() => { /* stopped before it started */ });
+}
+
+function stopHoverPlay(button) {
+  button.classList.remove("is-loading", "is-playing");
+  const video = button.querySelector(".thumb-video");
+  if (!video) return;
+  video.pause();
+  video.removeAttribute("src");
+  video.load();   // releases the download
+  video.remove();
 }
 
 /* ---------------------------------------------------------------------------
