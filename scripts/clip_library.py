@@ -3,9 +3,10 @@ clip_library.py
 ---------------
 Dynamic Documentary Engine — Clip Library (metadata editing)
 
-Backs the Clip library page (web/frontend/library.html): lists every clip in
-a collection with its labels, and saves a label the moment someone edits it,
-so nobody has to open a collection index file by hand.
+Backs the Clip library page (web/frontend/library.html): a table of every
+clip in a collection with its labels, saving a label the moment someone edits
+a cell, so nobody has to open a collection index file by hand. Clips are
+matched to the table by their files, which the media sync detects.
 
 A save is checked against what the engine can use (a date it can read, a
 pacing it knows), applied under the same lock the media sync uses, written
@@ -18,7 +19,7 @@ Editable labels and where they matter:
     people, geography (place)      — matched by cues
     mood, pacing, tags, theme,
     dominant_lines                 — contrast scoring between cuts
-    context.date/.season/.weather  — memory triggers
+    context.date, context.season   — memory triggers (dates and seasonality)
 
 Author: Oluwafemisola David Ademoye
 Supporting: Omotola Ajibike Ajao
@@ -35,7 +36,7 @@ import shutil
 from datetime import datetime, timezone
 
 import dde_runtime
-from engine.context import SEASONS, WEATHER_TERMS, normalize_date_input
+from engine.context import SEASONS, normalize_date_input
 
 PACING = ("slow", "medium", "fast")
 LINES = ("horizontal", "vertical", "diagonal", "curved", "mixed")
@@ -58,11 +59,10 @@ FIELDS = {
     "dominant_lines":   ("enum", {"choices": LINES}),
     "context.date":     ("date", {}),
     "context.season":   ("enum", {"choices": SEASONS}),
-    "context.weather":  ("list", {}),
 }
 
 # Fields offered as type-ahead suggestions, drawn from the whole collection.
-SUGGESTED = ("mood", "tags", "theme", "people", "geography", "context.weather")
+SUGGESTED = ("mood", "tags", "theme", "people", "geography")
 
 
 class ValidationError(ValueError):
@@ -204,6 +204,7 @@ def clip_view(entry):
         "filename": entry.get("filename"),
         "duration_seconds": entry.get("duration_seconds"),
         "labelled": is_labelled(entry),
+        "dated": bool(_get(entry, "context.date") or _get(entry, "context.season")),
         "fields": {field: _get(entry, field) for field in FIELDS},
     }
 
@@ -228,7 +229,6 @@ def list_clips(index_path):
             value = _get(entry, field)
             values = value if isinstance(value, list) else [value] if value else []
             suggestions[field].update(v for v in values if not str(v).startswith("color-"))
-    suggestions["context.weather"].update(WEATHER_TERMS)
 
     order = {"A-roll": 0, "B-roll": 1, "X-roll": 2}
     clips = sorted(
@@ -295,5 +295,4 @@ def options():
         "pacing": list(PACING),
         "dominant_lines": list(LINES),
         "seasons": list(SEASONS),
-        "weather": list(WEATHER_TERMS),
     }

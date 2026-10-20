@@ -23,8 +23,6 @@ const setupUnit = document.getElementById("setup-unit");
 const setupDurationHint = document.getElementById("setup-duration-hint");
 const setupStart = document.getElementById("setup-start");
 const setupContext = document.getElementById("setup-context");
-const setupWeather = document.getElementById("setup-weather");
-const setupWeatherField = document.getElementById("setup-weather-field");
 const setupContextHint = document.getElementById("setup-context-hint");
 const setupCue = document.getElementById("setup-cue");
 const setupCueField = document.getElementById("setup-cue-field");
@@ -125,8 +123,8 @@ function refreshStartButton() {
 }
 
 // Memory triggers: the date always follows the calendar (the server's own
-// clock, so a long-running exhibit rolls over by itself); staff set the
-// weather. Hidden entirely if the backend predates the feature.
+// clock, so a long-running exhibit rolls over by itself); staff may add a
+// cue. Hidden entirely if the backend predates the feature.
 async function loadContextOptions(saved) {
   let options = null;
   try {
@@ -136,21 +134,14 @@ async function loadContextOptions(saved) {
     options = null;
   }
   if (!options) {
-    for (const el of [setupContext.closest(".setup-field"), setupWeatherField, setupCueField, setupContextHint]) {
+    for (const el of [setupContext.closest(".setup-field"), setupCueField, setupContextHint]) {
       el.classList.add("hidden");
     }
     setupContext.value = "off";
     return;
   }
-  for (const w of options.weather) {
-    const opt = document.createElement("option");
-    opt.value = w;
-    opt.textContent = w[0].toUpperCase() + w.slice(1);
-    setupWeather.appendChild(opt);
-  }
   if (saved && saved.context) {
     setupContext.value = saved.context.enabled ? "on" : "off";
-    setupWeather.value = saved.context.weather || "";
     setupCue.value = saved.context.cue || "";
   }
   refreshContextFields();
@@ -158,7 +149,6 @@ async function loadContextOptions(saved) {
 
 function refreshContextFields() {
   const on = setupContext.value === "on";
-  setupWeatherField.classList.toggle("hidden", !on);
   setupCueField.classList.toggle("hidden", !on);
   setupContextHint.classList.toggle("hidden", !on);
 }
@@ -232,7 +222,6 @@ setupStart.addEventListener("click", () => {
     mode: currentMode(),
     context: {
       enabled: setupContext.value === "on",
-      weather: setupWeather.value || null,
       cue: setupCue.value.trim() || null,
     },
   };
@@ -370,7 +359,7 @@ async function generate() {
         // "today" is resolved by the server each time, so the context
         // follows the calendar through a long-running day.
         context: settings.context && settings.context.enabled
-          ? { date: "today", weather: settings.context.weather, cue: settings.context.cue }
+          ? { date: "today", cue: settings.context.cue }
           : undefined,
       }),
     });

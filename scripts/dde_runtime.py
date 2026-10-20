@@ -1071,7 +1071,7 @@ def generate_and_render(
         reach it in the first place.
 
     context (ScreeningContext | dict): The screening's date, season and
-        weather ("memory triggers", see engine/context.py). Matching clips
+        cues ("memory triggers", see engine/context.py). Matching clips
         are favoured and the best match is placed partway through the film;
         the result's "context" and "memory" keys record what happened, and
         the trace marks each context-matched pick. None leaves the run

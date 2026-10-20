@@ -71,10 +71,10 @@ Each run, the engine:
 
 Two optional modes: **Diversity mode** (boosts underused clips so favourites don't dominate) and **Exact duration** (trims the final render to the exact requested length; off by default so whole clips are preserved).
 
-**Memory triggers** (optional, *draft*): set the screening's date, season and weather, or type a **cue** (any word or phrase, e.g. "Camp Swift") — the way a day's weather or a name can bring a memory back. A cue matches clips whose title, tag, theme, person, place, mood or weather is exactly that word or phrase (capitals ignored). Clips tagged with a matching context are favoured, and the best match always appears partway through the film. The engine runs offline, so the date comes from the computer's clock and the weather is chosen by a person. Clips carry the context in their index entry:
+**Memory triggers** (optional, *draft*): the screening's date — taken from the computer's own clock — and its season favour clips labelled with a matching date or season, the way an anniversary can bring a memory back. A **cue** (any word or phrase typed in, e.g. "Camp Swift") also brings up clips whose title, tag, theme, person, place or mood is exactly that word or phrase (capitals ignored). The best match always appears partway through the film. Clips carry the context in their index entry:
 
 ```json
-"context": { "date": "1944-12-18", "season": "winter", "weather": ["snow", "cold"] }
+"context": { "date": "1944-12-18", "season": "winter" }
 ```
 
 Dates match on month and day (an anniversary, whatever the year); the season is inferred from the date when left out. Untagged clips are unaffected, and with memory triggers off the engine behaves exactly as before.
@@ -116,7 +116,7 @@ local-media/
 
 Drop a file into an `assets` subfolder and it's auto-tagged (duration, dominant colour, pacing) and enters rotation on the next run; delete one to retire it. Leave `titles/` empty and a generated text card is used instead.
 
-**Label clips in the Clip library** (`/library`, linked from the console): pick a topic, watch each clip, and type its people, place, mood, tags, themes, date and weather. Each field saves itself as you move on, is checked first (e.g. dates like *18 December 1944*), and is used by the very next film; the previous version is kept as a backup in `metadata/collections/.backups/`. Labels can only be changed on the computer running the engine — a shared link shows the library read-only.
+**Label clips in the Clip library** (`/library`, linked from the console): a table with one row per clip — the clips are detected from the topic's folders — where you type each clip's **date** and **season**, plus title, mood, tags, people and place (more under *Details*, with a preview player). Each cell saves itself as you move on (Enter saves and moves down a row), is checked first (e.g. dates like *18 December 1944*), and is used by the very next film; the previous version is kept as a backup in `metadata/collections/.backups/`. Labels can only be changed on the computer running the engine — a shared link shows the library read-only.
 
 ---
 
@@ -124,9 +124,9 @@ Drop a file into an `assets` subfolder and it's auto-tagged (duration, dominant 
 
 Two views onto the same engine:
 
-- **Director's console (`/`)** — the working instrument: topic and length pickers, the generate/cancel controls, the audio/diversity/exact-duration options, the **Memory triggers** pickers (date, season, weather), the **sequence trace** (why each cut was chosen), and a replayable **film history** with the date and time each was made.
-- **Clip library (`/library`)** — label every clip in the browser (people, place, tags, mood, date, weather); saves automatically.
-- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic, length and (optionally) today's weather and cue once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
+- **Director's console (`/`)** — the working instrument: topic and length pickers, the generate/cancel controls, the audio/diversity/exact-duration options, the **Memory triggers** pickers (date, season, cue), the **sequence trace** (why each cut was chosen), and a replayable **film history** with the date and time each was made.
+- **Clip library (`/library`)** — a table of every clip to label in the browser (date, season, title, mood, tags, people, place); saves automatically.
+- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic, length and (optionally) memory triggers and a cue once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
 
 ---
 
@@ -138,7 +138,7 @@ dynamic-documentary-engine/
 │   ├── sequencer.py            #   coordinates a run: bookends + body
 │   ├── rules.py                #   no-repeat, duration budget, pairing
 │   ├── artifact_selector.py    #   dissimilarity scoring + weighted selection
-│   ├── context.py              #   memory triggers: date/season/weather matching
+│   ├── context.py              #   memory triggers: date/season/cue matching
 │   ├── collection_loader.py    #   loads/validates a collection index
 │   ├── assembler.py            #   FFmpeg rendering, audio layering + fades
 │   └── cancellation.py         #   stops a render in progress
@@ -172,9 +172,9 @@ New to the code? Read **[AGENT.md](AGENT.md)** — it's the developer's orientat
 
 ## Status
 
-**The core engine is complete and validated end to end on real media.** Done: the metadata schema, the rule-based sequencing engine, the FFmpeg pipeline, multi-topic auto-discovered collections, the web console and exhibit view, saved film manifests, turnkey setup (guide + launchers), and audio polish (eased transitions with a per-run, per-clip varying fade). In draft: **memory triggers** (date/season/weather context), pending review with Dr. Campbell and context tags on real clips.
+**The core engine is complete and validated end to end on real media.** Done: the metadata schema, the rule-based sequencing engine, the FFmpeg pipeline, multi-topic auto-discovered collections, the web console and exhibit view, saved film manifests, turnkey setup (guide + launchers), and audio polish (eased transitions with a per-run, per-clip varying fade). In draft: **memory triggers** (date/season context and cues) with the Clip library table for entering dates and seasons, pending dates and seasons on real clips on real clips.
 
-Remaining / future directions: loading the full real WWII and Swiss footage, the gallery installation, and the technical documentation report. Memory triggers currently take the weather from a person; reacting to live signals (e.g. a weather feed) would need an internet connection and is beyond the current local system.
+Remaining / future directions: loading the full real WWII and Swiss footage, the gallery installation, and the technical documentation report. Memory triggers use the computer's date and human-entered labels; reacting to live outside signals would need an internet connection and is beyond the current local system.
 
 ---
 

@@ -402,7 +402,7 @@ h2 {
   color: var(--muted-dim);
 }
 
-/* Memory-trigger pickers: date, season, weather, shown only when the
+/* Memory-trigger pickers: date, season, cue, shown only when the
    toggle is on. */
 .context-fields {
   display: flex;

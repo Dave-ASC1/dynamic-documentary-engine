@@ -13,7 +13,6 @@ const contextFields = document.getElementById("context-fields");
 const contextDateMode = document.getElementById("context-date-mode");
 const contextDate = document.getElementById("context-date");
 const contextSeason = document.getElementById("context-season");
-const contextWeather = document.getElementById("context-weather");
 const contextCue = document.getElementById("context-cue");
 const contextHint = document.getElementById("context-hint");
 const CONTEXT_KEY = "dde-context";
@@ -285,7 +284,6 @@ function saveContextPrefs() {
       dateMode: contextDateMode.value,
       date: contextDate.value,
       season: contextSeason.value,
-      weather: contextWeather.value,
       cue: contextCue.value,
     }));
   } catch (e) {
@@ -314,10 +312,9 @@ function updateContextUI() {
   if (on && contextOptions) {
     const date = contextDateValue() || contextOptions.today;
     const season = contextSeason.value || inferredSeason();
-    const weather = contextWeather.value ? `, ${contextWeather.value}` : "";
     const cue = contextCue.value.trim();
     contextHint.textContent =
-      `Films will favour clips tagged for ${formatContextDate(date)} — ${season}${weather}` +
+      `Films will favour clips labelled for ${formatContextDate(date)} — ${season}` +
       (cue ? `, and clips labelled exactly “${cue.split(",").map((c) => c.trim()).filter(Boolean).join("” or “")}”. ` : ". ") +
       `Label clips in the Clip library; unlabelled clips are unaffected.`;
   }
@@ -334,15 +331,12 @@ async function loadContextOptions() {
 
   contextSeason.innerHTML = '<option value="">Auto</option>' +
     contextOptions.seasons.map((s) => `<option value="${s}">${s[0].toUpperCase()}${s.slice(1)}</option>`).join("");
-  contextWeather.innerHTML = '<option value="">Not set</option>' +
-    contextOptions.weather.map((w) => `<option value="${w}">${w[0].toUpperCase()}${w.slice(1)}</option>`).join("");
 
   const prefs = loadContextPrefs();
   contextToggle.checked = Boolean(prefs.enabled);
   if (prefs.dateMode) contextDateMode.value = prefs.dateMode;
   contextDate.value = prefs.date || contextOptions.today;
   if (prefs.season !== undefined) contextSeason.value = prefs.season;
-  if (prefs.weather !== undefined) contextWeather.value = prefs.weather;
   if (prefs.cue !== undefined) contextCue.value = prefs.cue;
   updateContextUI();
 }
@@ -353,12 +347,11 @@ function contextPayload() {
   return {
     date: contextDateValue() || "today",
     season: contextSeason.value || null,
-    weather: contextWeather.value || null,
     cue: contextCue.value.trim() || null,
   };
 }
 
-for (const el of [contextToggle, contextDateMode, contextDate, contextSeason, contextWeather, contextCue]) {
+for (const el of [contextToggle, contextDateMode, contextDate, contextSeason, contextCue]) {
   el.addEventListener("change", updateContextUI);
 }
 

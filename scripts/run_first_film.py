@@ -30,7 +30,7 @@ Usage:
     python3 scripts/run_first_film.py --topic validation   # a topic's real footage
     python3 scripts/run_first_film.py --target 120    # aim for ~120s
     python3 scripts/run_first_film.py --fade 0        # hard cuts (default 0.8s fade center)
-    python3 scripts/run_first_film.py --date 2026-12-18 --weather snow   # memory triggers
+    python3 scripts/run_first_film.py --date 2026-12-18   # memory triggers for that day
     python3 scripts/run_first_film.py --cue "Camp Swift"   # clips labelled exactly that
     python3 scripts/run_first_film.py --no-render      # trace only, skip FFmpeg
     python3 scripts/run_first_film.py --seed 7         # reproducible sequence
@@ -169,8 +169,6 @@ def main():
                     help="Memory triggers: screening date, YYYY-MM-DD or 'today'.")
     ap.add_argument("--season", default=None,
                     help="Memory triggers: override the season inferred from the date.")
-    ap.add_argument("--weather", default=None,
-                    help="Memory triggers: the weather, e.g. snow (comma-separate several).")
     ap.add_argument("--cue", default=None,
                     help="Memory triggers: words or phrases clips must be labelled with "
                          "exactly (comma-separate several).")
@@ -193,11 +191,10 @@ def main():
         args.assets_path, args.films_path = topic["assets_path"], topic["films_path"]
     args.assets_path = args.assets_path or DEFAULT_ASSETS
     context = None
-    if args.date or args.season or args.weather or args.cue:
+    if args.date or args.season or args.cue:
         try:
             context = ScreeningContext(
                 date=args.date, season=args.season,
-                weather=args.weather.split(",") if args.weather else None,
                 cue=args.cue,
             )
         except ValueError as e:

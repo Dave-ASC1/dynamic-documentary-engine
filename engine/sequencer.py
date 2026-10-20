@@ -146,7 +146,7 @@ class Sequencer:
                                              real footage past the target to
                                              cut is the point.
             context (ScreeningContext | dict, optional): The screening's
-                                             date, season and weather. Clips
+                                             date, season and any cues. Clips
                                              whose context metadata matches
                                              get a selection-weight boost,
                                              and the best match is placed

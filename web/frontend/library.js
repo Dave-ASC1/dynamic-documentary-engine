@@ -1,10 +1,14 @@
-/* Clip library — label clips in the browser.
+/* Clip library — label clips in a table.
  *
- * Every field saves on its own as soon as it is changed (when the person
- * moves to the next field), through PATCH /api/library/<topic>/<clip>. The
- * server checks the value, writes the topic's clip list and keeps a backup;
- * the next generated film uses it. Nothing here builds HTML from clip data:
- * titles and labels are set as text.
+ * One row per clip; the clip column comes from the topic's folders (the
+ * media sync detects new files), so rows always match the engine. Every cell
+ * saves on its own as soon as it changes, through
+ * PATCH /api/library/<topic>/<clip>: the server checks the value, writes the
+ * topic's clip list and keeps a backup, and the next film uses it.
+ *
+ * Enter saves a cell and moves down to the same column in the next row, so a
+ * column of dates can be typed straight through. Nothing here builds HTML
+ * from clip data: titles and labels are always set as text.
  */
 
 const topicSelect = document.getElementById("topic-select");
@@ -12,39 +16,35 @@ const searchInput = document.getElementById("search");
 const filterSelect = document.getElementById("filter-select");
 const summaryEl = document.getElementById("summary");
 const readonlyNote = document.getElementById("readonly-note");
-const clipList = document.getElementById("clip-list");
+const rowsEl = document.getElementById("clip-rows");
 const themeToggle = document.getElementById("theme-toggle");
 
 const TOPIC_KEY = "dde-library-topic";
+const COLUMN_COUNT = 9;
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
                 "August", "September", "October", "November", "December"];
 
 // How often a clip appears: the engine's weight, in plain words.
 const WEIGHTS = [[0.2, "Rarely"], [0.35, "Less often"], [0.5, "Normal"], [0.7, "More often"], [0.9, "Often"]];
 
-// The form, in the order it is shown. kind: text | list | enum | weight | date | notes
-const GROUPS = [
-  { legend: "About this clip", fields: [
-    { field: "title", label: "Title", kind: "text", span: 2 },
-    { field: "weight", label: "How often it appears", kind: "weight" },
-    { field: "notes", label: "Notes (for people, not matched)", kind: "notes", span: 2 },
-  ] },
-  { legend: "People and places", fields: [
-    { field: "people", label: "People", kind: "list", placeholder: "e.g. G. Moore, Ruth Moore", span: 2 },
-    { field: "geography", label: "Place", kind: "text", placeholder: "e.g. Camp Swift", suggest: true, span: 2 },
-  ] },
-  { legend: "For contrast between cuts", fields: [
-    { field: "mood", label: "Mood", kind: "text", placeholder: "e.g. somber", suggest: true },
-    { field: "pacing", label: "Pacing", kind: "enum", options: "pacing" },
-    { field: "tags", label: "Tags", kind: "list", placeholder: "e.g. soldiers, jeep, 1252nd", span: 2 },
-    { field: "theme", label: "Themes", kind: "list", placeholder: "e.g. training, homecoming" },
-    { field: "dominant_lines", label: "Line direction", kind: "enum", options: "dominant_lines" },
-  ] },
-  { legend: "Memory triggers", fields: [
-    { field: "context.date", label: "Date", kind: "date", placeholder: "e.g. 18 December 1944" },
-    { field: "context.season", label: "Season", kind: "enum", options: "seasons", empty: "Auto (from date)" },
-    { field: "context.weather", label: "Weather", kind: "list", placeholder: "e.g. snow, cold", span: 2 },
-  ] },
+// Table columns after the clip name. kind: text | list | enum | date
+const COLUMNS = [
+  { field: "title", label: "Title", kind: "text" },
+  { field: "context.date", label: "Date", kind: "date", placeholder: "e.g. 18 Dec 1944", cell: "cell-date" },
+  { field: "context.season", label: "Season", kind: "enum", options: "seasons", empty: "Auto", cell: "cell-season" },
+  { field: "mood", label: "Mood", kind: "text", placeholder: "e.g. somber", suggest: true },
+  { field: "tags", label: "Tags", kind: "list", placeholder: "comma, separated" },
+  { field: "people", label: "People", kind: "list", placeholder: "e.g. G. Moore", suggest: true },
+  { field: "geography", label: "Place", kind: "text", placeholder: "e.g. Camp Swift", suggest: true },
+];
+
+// Less-used labels, in the details row under each clip.
+const DETAILS = [
+  { field: "weight", label: "How often it appears", kind: "weight" },
+  { field: "pacing", label: "Pacing", kind: "enum", options: "pacing" },
+  { field: "dominant_lines", label: "Line direction", kind: "enum", options: "dominant_lines" },
+  { field: "theme", label: "Themes", kind: "list", placeholder: "e.g. training, homecoming", span: 3 },
+  { field: "notes", label: "Notes (for people, not used by the engine)", kind: "notes", span: 3 },
 ];
 
 let collections = [];
@@ -99,6 +99,8 @@ function formatSeconds(s) {
   return total >= 60 ? `${Math.floor(total / 60)}m ${total % 60}s` : `${total}s`;
 }
 
+function capital(s) { return s[0].toUpperCase() + s.slice(1); }
+
 function el(tag, attrs = {}, text) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -111,110 +113,162 @@ function el(tag, attrs = {}, text) {
 }
 
 /* ---------------------------------------------------------------------------
- * Building a clip card
+ * Inputs
  * ------------------------------------------------------------------------ */
 
-function buildInput(def, clip, inputId) {
+function buildInput(def, clip, className) {
   const value = clip.fields[def.field];
   const disabled = !library.editable;
+  const label = `${def.label} — ${clip.fields.title || clip.artifact_id}`;
 
   if (def.kind === "enum") {
-    const select = el("select", { id: inputId, disabled });
+    const select = el("select", { className, disabled, "aria-label": label });
     select.appendChild(el("option", { value: "" }, def.empty || "—"));
-    for (const opt of library.options[def.options]) {
-      select.appendChild(el("option", { value: opt }, opt[0].toUpperCase() + opt.slice(1)));
-    }
+    for (const opt of library.options[def.options]) select.appendChild(el("option", { value: opt }, capital(opt)));
     select.value = value || "";
     return select;
   }
 
   if (def.kind === "weight") {
-    const select = el("select", { id: inputId, disabled });
+    const select = el("select", { className, disabled, "aria-label": label });
     const current = value ?? 0.5;
     const known = WEIGHTS.some(([w]) => Math.abs(w - current) < 1e-6);
-    for (const [w, label] of WEIGHTS) select.appendChild(el("option", { value: w }, label));
+    for (const [w, text] of WEIGHTS) select.appendChild(el("option", { value: w }, text));
     if (!known) select.appendChild(el("option", { value: current }, `Custom (${current})`));
     select.value = String(current);
     return select;
   }
 
   if (def.kind === "notes") {
-    const area = el("textarea", { id: inputId, rows: 2, disabled });
+    const area = el("textarea", { className, rows: 2, disabled, "aria-label": label });
     area.value = value || "";
     return area;
   }
 
-  const input = el("input", { type: "text", id: inputId, placeholder: def.placeholder, disabled,
-                              list: def.suggest ? `suggest-${def.field}` : null, autocomplete: "off" });
+  const input = el("input", { type: "text", className, placeholder: def.placeholder, disabled,
+                              list: def.suggest ? `suggest-${def.field}` : null, autocomplete: "off",
+                              "aria-label": label });
   input.value = displayValue(def, value);
   return input;
 }
 
-function buildField(def, clip) {
-  const inputId = `f-${clip.artifact_id}-${def.field}`;
-  const wrap = el("label", { className: `clip-field${def.span === 2 ? " span-2" : ""}`, for: inputId });
-  wrap.appendChild(el("span", {}, def.label));
-  const input = buildInput(def, clip, inputId);
-  wrap.appendChild(input);
-  const status = el("span", { className: "field-status", "aria-live": "polite" });
-  wrap.appendChild(status);
-
-  input.addEventListener("change", () => saveField(clip, def, input, wrap, status));
-  return wrap;
+// Enter: save (via the change event) and move down to the same column in
+// the next visible row — quick for filling a column of dates.
+function onCellKeydown(event) {
+  if (event.key !== "Enter" || event.target.tagName === "TEXTAREA") return;
+  event.preventDefault();
+  const input = event.target;
+  const td = input.closest("td");
+  const col = td.cellIndex;
+  let row = input.closest("tr").nextElementSibling;
+  while (row && !row.classList.contains("clip-row")) row = row.nextElementSibling;
+  input.blur();
+  const next = row && row.cells[col] && row.cells[col].querySelector(".cell-input");
+  if (next) next.focus();
 }
 
-function buildCard(clip) {
-  const card = el("article", { className: "clip-card", "data-id": clip.artifact_id });
+/* ---------------------------------------------------------------------------
+ * Rows
+ * ------------------------------------------------------------------------ */
 
-  const media = el("div", { className: "clip-media" });
+function buildRow(clip) {
+  const tr = el("tr", { className: "clip-row", "data-id": clip.artifact_id });
+
+  const nameCell = el("td", { className: "clip-name" });
+  nameCell.appendChild(el("div", { className: "file" }, (clip.filename || clip.artifact_id).split("/").pop()));
+  const sub = el("div", { className: "sub" });
+  sub.appendChild(el("span", { className: `type-badge ${typeClass(clip.artifact_type)}` }, clip.artifact_type || ""));
+  sub.appendChild(el("span", {}, formatSeconds(clip.duration_seconds)));
+  nameCell.appendChild(sub);
+  tr.appendChild(nameCell);
+
+  for (const def of COLUMNS) {
+    const td = el("td", { className: def.cell || null });
+    const input = buildInput(def, clip, "cell-input");
+    input.addEventListener("change", () => saveField(clip, def, input, td));
+    input.addEventListener("keydown", onCellKeydown);
+    td.appendChild(input);
+    tr.appendChild(td);
+  }
+
+  const moreCell = el("td");
+  const more = el("button", { type: "button", className: "more-btn", "aria-expanded": "false" }, "Details ▾");
+  more.addEventListener("click", () => toggleDetails(clip, tr, more));
+  moreCell.appendChild(more);
+  tr.appendChild(moreCell);
+  return tr;
+}
+
+function toggleDetails(clip, tr, button) {
+  const open = tr.nextElementSibling && tr.nextElementSibling.classList.contains("detail-row");
+  if (open) {
+    tr.nextElementSibling.remove();
+    tr.classList.remove("open");
+    button.setAttribute("aria-expanded", "false");
+    button.textContent = "Details ▾";
+    return;
+  }
+  tr.classList.add("open");
+  button.setAttribute("aria-expanded", "true");
+  button.textContent = "Close ▴";
+
+  const detail = el("tr", { className: "detail-row" });
+  const td = el("td", { colspan: COLUMN_COUNT });
+  const grid = el("div", { className: "detail-grid" });
+
+  const media = el("div", { className: "detail-media" });
   if (clip.media_url && clip.artifact_type !== "X-roll") {
     // "#t=0.5" makes the browser show a frame from the clip as its picture.
     media.appendChild(el("video", { src: `${encodeURI(clip.media_url)}#t=0.5`, controls: true,
                                     preload: "metadata", playsinline: true }));
   } else if (clip.media_url) {
-    media.appendChild(el("div", { className: "clip-audio-only" }, "Sound only (X-roll)"));
+    media.appendChild(el("div", { className: "detail-audio-only" }, "Sound only (X-roll)"));
     media.appendChild(el("audio", { src: encodeURI(clip.media_url), controls: true, preload: "none" }));
   }
-  media.appendChild(el("div", { className: "clip-meta" },
-    `${clip.filename || ""}${clip.duration_seconds ? ` · ${formatSeconds(clip.duration_seconds)}` : ""}`));
-  card.appendChild(media);
+  grid.appendChild(media);
 
-  const body = el("div", { className: "clip-body" });
-  const head = el("div", { className: "clip-head" });
-  head.appendChild(el("span", { className: `type-badge ${typeClass(clip.artifact_type)}` }, clip.artifact_type || ""));
-  const title = el("h3", {}, clip.fields.title || clip.artifact_id);
-  head.appendChild(title);
-  const state = el("span", { className: `label-state${clip.labelled ? " done" : ""}` },
-                   clip.labelled ? "Labelled" : "Needs labels");
-  head.appendChild(state);
-  body.appendChild(head);
-
-  const groups = el("div", { className: "clip-groups" });
-  for (const group of GROUPS) {
-    const fs = el("fieldset", { className: `clip-group${group.wide ? " clip-group-wide" : ""}` });
-    fs.appendChild(el("legend", {}, group.legend + (group.hint ? ` · ${group.hint}` : "")));
-    const fields = el("div", { className: "clip-group-fields" });
-    for (const def of group.fields) fields.appendChild(buildField(def, clip));
-    fs.appendChild(fields);
-    groups.appendChild(fs);
+  const fields = el("div", { className: "detail-fields" });
+  for (const def of DETAILS) {
+    const wrap = el("label", { className: `detail-field${def.span === 3 ? " span-3" : ""}` });
+    wrap.appendChild(el("span", {}, def.label));
+    const input = buildInput(def, clip, null);
+    input.addEventListener("change", () => saveField(clip, def, input, wrap));
+    wrap.appendChild(input);
+    fields.appendChild(wrap);
   }
-  body.appendChild(groups);
-  card.appendChild(body);
-  return card;
+  grid.appendChild(fields);
+
+  td.appendChild(grid);
+  detail.appendChild(td);
+  tr.after(detail);
 }
 
 /* ---------------------------------------------------------------------------
  * Saving
  * ------------------------------------------------------------------------ */
 
-async function saveField(clip, def, input, wrap, status) {
+function showError(container, input, message) {
+  input.classList.add("invalid");
+  let err = container.querySelector(".cell-error");
+  if (!err) {
+    err = el("div", { className: "cell-error", role: "alert" });
+    container.appendChild(err);
+  }
+  err.textContent = message;
+}
+
+function clearError(container, input) {
+  input.classList.remove("invalid");
+  const err = container.querySelector(".cell-error");
+  if (err) err.remove();
+}
+
+async function saveField(clip, def, input, container) {
   let value = input.value;
   if (def.field === "tags") {
-    // Keep the auto-detected colour tags the form doesn't show.
+    // Keep the auto-detected colour tags the table doesn't show.
     value = [...value.split(","), ...hiddenTags(clip)].join(",");
   }
-  status.className = "field-status";
-  status.textContent = "Saving…";
   try {
     const res = await fetch(
       `/api/library/${encodeURIComponent(library.collection.id)}/${encodeURIComponent(clip.artifact_id)}`,
@@ -223,30 +277,19 @@ async function saveField(clip, def, input, wrap, status) {
     );
     const data = await res.json();
     if (!res.ok) {
-      const message = (data.errors && data.errors[def.field]) || data.error || `Not saved (${res.status}).`;
-      wrap.classList.add("invalid");
-      status.className = "field-status error";
-      status.textContent = message;
+      showError(container, input,
+        (data.errors && data.errors[def.field]) || data.error || `Not saved (${res.status}).`);
       return;
     }
     // Show the value as stored (dates tidied, duplicates removed).
     Object.assign(clip, data);
     input.value = def.kind === "weight" ? String(clip.fields.weight ?? 0.5) : displayValue(def, clip.fields[def.field]);
-    wrap.classList.remove("invalid");
-    status.className = "field-status saved";
-    status.textContent = "Saved";
-    setTimeout(() => { if (status.textContent === "Saved") status.textContent = ""; }, 2500);
-
-    const card = wrap.closest(".clip-card");
-    card.querySelector("h3").textContent = clip.fields.title || clip.artifact_id;
-    const state = card.querySelector(".label-state");
-    state.className = `label-state${clip.labelled ? " done" : ""}`;
-    state.textContent = clip.labelled ? "Labelled" : "Needs labels";
+    clearError(container, input);
+    input.classList.add("saved");
+    setTimeout(() => input.classList.remove("saved"), 900);
     updateSummary();
   } catch (e) {
-    wrap.classList.add("invalid");
-    status.className = "field-status error";
-    status.textContent = "Not saved — is the engine still running?";
+    showError(container, input, "Not saved — is the engine still running?");
   }
 }
 
@@ -258,6 +301,7 @@ function visibleClips() {
   const q = searchInput.value.trim().toLowerCase();
   const filter = filterSelect.value;
   return library.clips.filter((c) => {
+    if (filter === "undated" && c.dated) return false;
     if (filter === "labelled" && !c.labelled) return false;
     if (filter === "unlabelled" && c.labelled) return false;
     if (!q) return true;
@@ -267,9 +311,10 @@ function visibleClips() {
 
 function updateSummary() {
   const total = library.clips.length;
+  const dated = library.clips.filter((c) => c.dated).length;
   const done = library.clips.filter((c) => c.labelled).length;
   summaryEl.textContent = total
-    ? `${library.collection.name}: ${total} clip${total === 1 ? "" : "s"}, ${done} labelled, ${total - done} still need labels.`
+    ? `${library.collection.name}: ${total} clip${total === 1 ? "" : "s"} · ${dated} with a date or season · ${done} labelled.`
     : `${library.collection.name} has no clips yet. Drop video or audio into its assets folders, then reload this page.`;
 }
 
@@ -283,19 +328,21 @@ function renderSuggestions() {
 }
 
 function render() {
-  clipList.innerHTML = "";
+  rowsEl.innerHTML = "";
   const clips = visibleClips();
   if (!clips.length) {
-    clipList.appendChild(el("p", { className: "clip-empty" },
-      library.clips.length ? "No clips match this search." : "No clips in this topic yet."));
+    const tr = el("tr", { className: "table-empty" });
+    tr.appendChild(el("td", { colspan: COLUMN_COUNT },
+      library.clips.length ? "No clips match." : "No clips in this topic yet."));
+    rowsEl.appendChild(tr);
     return;
   }
-  for (const clip of clips) clipList.appendChild(buildCard(clip));
+  for (const clip of clips) rowsEl.appendChild(buildRow(clip));
 }
 
 async function loadLibrary(topicId) {
   summaryEl.textContent = "Loading clips…";
-  clipList.innerHTML = "";
+  rowsEl.innerHTML = "";
   try {
     const res = await fetch(`/api/library/${encodeURIComponent(topicId)}`);
     library = await res.json();

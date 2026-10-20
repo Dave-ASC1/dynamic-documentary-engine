@@ -64,7 +64,7 @@ for _p in (REPO_ROOT, SCRIPTS_DIR):
 import clip_library  # noqa: E402
 import dde_runtime  # noqa: E402
 from engine.cancellation import CancellationToken, GenerationCancelled  # noqa: E402
-from engine.context import SEASONS, WEATHER_TERMS, ScreeningContext  # noqa: E402
+from engine.context import SEASONS, ScreeningContext  # noqa: E402
 from flask import Flask, abort, jsonify, request, send_from_directory  # noqa: E402
 
 app = Flask(__name__, static_folder=None)
@@ -276,7 +276,6 @@ def context_options():
     today = ScreeningContext()
     return jsonify({
         "seasons": list(SEASONS),
-        "weather": list(WEATHER_TERMS),
         "today": today.date.isoformat(),
         "today_season": today.season,
     })
@@ -336,10 +335,10 @@ def generate():
     else:
         audio_fade = bool(body.get("audio_fade", True))
 
-    # Screening context ("memory triggers"): {"date", "season", "weather"},
-    # all optional. A missing date or "today" means this computer's own date
-    # — the engine runs offline, so the weather is always set by a person.
-    # No context key at all leaves generation exactly as before.
+    # Screening context ("memory triggers"): {"date", "season", "cue"}, all
+    # optional. A missing date or "today" means this computer's own date —
+    # the engine runs offline. No context key at all leaves generation
+    # exactly as before.
     context = body.get("context")
     if context is not None:
         if not isinstance(context, dict):

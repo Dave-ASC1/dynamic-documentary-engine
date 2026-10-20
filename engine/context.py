@@ -3,11 +3,11 @@ context.py
 ----------
 Dynamic Documentary Engine — Screening Context ("Memory Triggers")
 
-Lets the circumstances of a screening — the date, the season, the weather,
-or any word someone types as a cue — influence which artifacts surface, the way a cold, snowy December day can
-bring a veteran's own December back. A person sets the context (the engine
-runs offline, so it cannot look up the weather), and artifacts carry
-optional context metadata saying when they happened and in what conditions.
+Lets the circumstances of a screening — its date and season, or any word
+someone types as a cue — influence which artifacts surface, the way a
+December day can bring a veteran's own December back. The date comes from
+the computer's own clock (the engine runs offline), the season follows from
+it, and artifacts carry optional context metadata saying when they happened.
 
 The context never replaces juxtaposition. It works in two ways:
 
@@ -25,42 +25,35 @@ Artifact metadata (optional, in a collection index entry):
 
     "context": {
         "date": "1944-12-18",      # YYYY-MM-DD, YYYY-MM, or YYYY
-        "season": "winter",        # inferred from the date's month if omitted
-        "weather": ["snow", "cold"]
+        "season": "winter"         # inferred from the date's month if omitted
     }
 
 A cue (e.g. "Camp Swift") matches an artifact when it is exactly equal —
 ignoring capitals and surrounding punctuation — to one of its labels: the
-title, a tag, a theme, a person, the place, the mood or a weather word.
+title, a tag, a theme, a person, the place or the mood.
 
 Author: Oluwafemisola David Ademoye
 Supporting: Omotola Ajibike Ajao
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import datetime
 
 SEASONS = ("winter", "spring", "summer", "autumn")
 
-# Suggested vocabulary for the console and exhibit pickers. Artifact weather
-# is matched case-insensitively against whatever words are used, so a
-# collection can add its own.
-WEATHER_TERMS = ("clear", "cloudy", "rain", "snow", "fog", "storm", "wind", "cold", "hot")
-
 # Points an artifact earns for each way it matches the screening context.
 # Dates match on month and day only — an anniversary, whatever the year.
 ANNIVERSARY_POINTS = 3     # same month and day
 SAME_MONTH_POINTS = 2      # same month, different or unknown day
 SEASON_POINTS = 1          # same season
-WEATHER_POINTS = 2         # at least one weather word in common
 CUE_POINTS = 4             # per cue that exactly equals one of the artifact's labels
 
 # Selection weight is multiplied by (1 + WEIGHT_BOOST_PER_POINT * points),
-# so an anniversary in matching weather (6 points) is four times as likely
-# to be picked among the top-contrast candidates as an unmatched clip.
+# so an anniversary in its season (4 points) is three times as likely to be
+# picked among the top-contrast candidates as an unmatched clip.
 WEIGHT_BOOST_PER_POINT = 0.5
 
 # The guaranteed memory is placed at a random point between these fractions
@@ -182,7 +175,6 @@ def _artifact_labels(artifact):
         if isinstance(values, str):
             values = [values]
         labels.update(_normalize_label(v) for v in values)
-    labels.update(_normalize_label(w) for w in _weather_set(_artifact_context(artifact).get("weather")))
     labels.discard("")
     return labels
 
@@ -200,26 +192,19 @@ def _artifact_context(artifact):
     return artifact.get("context") or artifact.get("content", {}).get("context") or {}
 
 
-def _weather_set(value):
-    if isinstance(value, str):
-        value = [value]
-    return {str(w).strip().lower() for w in (value or []) if str(w).strip()}
-
-
 class ScreeningContext:
     """
-    The circumstances of one screening: a date, a season and the weather.
+    The circumstances of one screening: its date and season, plus any cues.
 
     Attributes:
         date (datetime.date): The screening date.
         season (str):         The season — given explicitly, or inferred
                               from the date.
-        weather (set):        Lower-case weather words; may be empty.
         cues (list):          Words or phrases to match exactly against
                               artifact labels; may be empty.
     """
 
-    def __init__(self, date=None, season=None, weather=None, cue=None):
+    def __init__(self, date=None, season=None, cue=None):
         """
         Initializes a screening context.
 
@@ -228,7 +213,6 @@ class ScreeningContext:
                 "YYYY-MM-DD" string. None or "today" means the computer's
                 own date — no internet needed.
             season (str): Overrides the season inferred from the date.
-            weather (str | list): The weather, e.g. "snow" or ["rain", "cold"].
             cue (str | list): Words or phrases, e.g. "Camp Swift, 1252nd".
 
         Raises:
@@ -248,7 +232,6 @@ class ScreeningContext:
             if season not in SEASONS:
                 raise ValueError(f"Context season must be one of {', '.join(SEASONS)}; got {season!r}.")
         self.season = season or season_for_month(date.month)
-        self.weather = _weather_set(weather)
         self.cues = _cue_list(cue)
 
     @classmethod
@@ -256,7 +239,8 @@ class ScreeningContext:
         """Builds a context from a request or manifest dict.
 
         Args:
-            data (dict): Keys "date", "season", "weather", "cue" (all optional).
+            data (dict): Keys "date", "season", "cue" (all optional). Any
+                other key, such as the retired "weather", is ignored.
 
         Returns:
             ScreeningContext: The context.
@@ -268,7 +252,6 @@ class ScreeningContext:
         return cls(
             date=data.get("date"),
             season=data.get("season") or None,
-            weather=data.get("weather"),
             cue=data.get("cue"),
         )
 
@@ -277,18 +260,15 @@ class ScreeningContext:
         return {
             "date": self.date.isoformat(),
             "season": self.season,
-            "weather": sorted(self.weather),
             "cue": list(self.cues),
             "label": self.describe(),
         }
 
     def describe(self):
-        """Short human-readable label, e.g. "18 December · winter · snow"."""
+        """Short human-readable label, e.g. "18 December · winter · “Camp Swift”"."""
         parts = [f"{self.date.day} {_MONTH_NAMES[self.date.month - 1]}", self.season]
-        if self.weather:
-            parts.append(", ".join(sorted(self.weather)))
         if self.cues:
-            parts.append(", ".join(f"\u201c{c}\u201d" for c in self.cues))
+            parts.append(", ".join(f"“{c}”" for c in self.cues))
         return " · ".join(parts)
 
     def match(self, artifact):
@@ -300,7 +280,7 @@ class ScreeningContext:
         Returns:
             tuple: (points, reasons) — points is 0 when nothing matches;
                    reasons are short phrases for the trace, e.g.
-                   ["anniversary (18 December)", "weather (snow)"].
+                   ["anniversary (18 December)", "season (winter)"].
         """
         points, reasons = 0, []
 
@@ -309,7 +289,7 @@ class ScreeningContext:
             for cue in self.cues:
                 if _normalize_label(cue) in labels:
                     points += CUE_POINTS
-                    reasons.append(f"cue (\u201c{cue}\u201d)")
+                    reasons.append(f"cue (“{cue}”)")
 
         ctx = _artifact_context(artifact)
         if not ctx:
@@ -334,10 +314,5 @@ class ScreeningContext:
         if season and season == self.season:
             points += SEASON_POINTS
             reasons.append(f"season ({season})")
-
-        shared = self.weather & _weather_set(ctx.get("weather"))
-        if shared:
-            points += WEATHER_POINTS
-            reasons.append(f"weather ({', '.join(sorted(shared))})")
 
         return points, reasons

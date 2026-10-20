@@ -32,7 +32,7 @@
     <div class="hero-inner">
       <p class="eyebrow">Dynamic Documentary Engine</p>
       <h1>Clip library</h1>
-      <p class="tagline">Label each clip so the engine can contrast it and bring it up as a memory. Changes save as you type.</p>
+      <p class="tagline">Every clip in a topic, one row each. Type a date or season into the table and it saves by itself.</p>
     </div>
     <div class="sprockets" aria-hidden="true"></div>
   </header>
@@ -51,6 +51,7 @@
         <span>Show</span>
         <select id="filter-select">
           <option value="all">All clips</option>
+          <option value="undated">No date or season yet</option>
           <option value="unlabelled">Needs labels</option>
           <option value="labelled">Labelled</option>
         </select>
@@ -59,16 +60,35 @@
 
     <p id="summary" class="library-summary" role="status"></p>
     <p class="library-help">
-      A <strong>cue</strong> typed in the console's Memory triggers brings up clips whose title, tag,
-      theme, person, place, mood or weather is exactly that word or phrase (capitals don't matter).
-      <strong>Dates</strong> can be typed as 18 December 1944, December 1944 or 1944.
+      <strong>Dates</strong> can be typed as 18 December 1944, December 1944 or 1944; leave Season on
+      <em>Auto</em> to take it from the date, or pick one when only the season is known.
+      Press <strong>Enter</strong> to save and move down to the next clip.
+      A <strong>cue</strong> in the console brings up clips whose title, tag, theme, person, place or mood is
+      exactly that word or phrase.
     </p>
     <p id="readonly-note" class="library-note hidden">
       View only. Labels can be changed on the computer running the engine,
       so a shared link can never alter the tagging.
     </p>
 
-    <section id="clip-list" class="clip-list" aria-label="Clips"></section>
+    <div class="table-wrap">
+      <table class="clip-table" aria-label="Clips and their labels">
+        <thead>
+          <tr>
+            <th class="col-clip" scope="col">Clip</th>
+            <th class="col-title" scope="col">Title</th>
+            <th class="col-date" scope="col">Date</th>
+            <th class="col-season" scope="col">Season</th>
+            <th class="col-mood" scope="col">Mood</th>
+            <th class="col-tags" scope="col">Tags</th>
+            <th class="col-people" scope="col">People</th>
+            <th class="col-place" scope="col">Place</th>
+            <th class="col-more" scope="col"><span class="visually-hidden">Details</span></th>
+          </tr>
+        </thead>
+        <tbody id="clip-rows"></tbody>
+      </table>
+    </div>
   </main>
 
   <footer class="foot">

@@ -40,7 +40,7 @@ X-roll adds sound, not screen time.
 | `engine/collection_loader.py` | Reads a collection index JSON, checks required fields, hands out artifacts. |
 | `engine/rules.py` | Yes/no eligibility: no-repeat, duration budget, must-not-follow. Tracks running length. |
 | `engine/artifact_selector.py` | Picks the next clip: scores how *different* each candidate is from the last one, then weighted-random picks from the top few. Also picks X-rolls for B-rolls. |
-| `engine/context.py` | Memory triggers (draft): scores how well each clip's date/season/weather tags match the screening's. |
+| `engine/context.py` | Memory triggers (draft): scores how well each clip's date/season labels (and any typed cue) match the screening. |
 | `engine/sequencer.py` | The coordinator. Builds the ordered sequence: opening pair → body → closing pair. |
 | `engine/assembler.py` | Turns the sequence into an MP4 with FFmpeg: one normalized segment per slot, then joins them. |
 | `engine/cancellation.py` | Lets the web UI kill a render mid-flight (including the running FFmpeg process). |
@@ -201,22 +201,23 @@ mid-shot. The exhibit view keeps this off.
 
 ### Memory triggers (draft, October 2026)
 
-Dr. Campbell's idea: memories are triggered by surroundings — a date, the
-season, the weather — the way veterans' journals open each entry with the
-date and the weather. So a screening can carry a **context** (date, season,
-weather), and clips can carry matching **context tags** (when it happened,
-in what conditions). It is all in `engine/context.py`.
+Dr. Campbell's idea: memories are triggered by surroundings — a date, a
+season — the way veterans' journals open each entry with the date. So a
+screening carries a **context** (its date and season), and clips carry
+matching **context labels** (when it happened), entered by people from
+archival knowledge in the Clip library. It is all in `engine/context.py`.
 
-- **A person sets the weather.** The engine is offline by design, so it
-  can't look anything up. The date defaults to the computer's own clock
-  ("today"); the season is inferred from the date; the weather is picked in
-  the console or on the exhibit setup screen.
+- **The date comes from the computer's own clock.** The engine is offline
+  by design, so it looks nothing up; the season is inferred from the date.
+  (A weather picker existed briefly and was removed at Dr. Campbell's
+  request in October 2026; old requests that still send weather are
+  accepted and the weather is ignored.) The console can pick another date
+  to rehearse, e.g. 11 November; the exhibit always uses today.
 - **Matching is points, not rules:** same month and day (an anniversary,
-  any year) 3, same month 2, same season 1, shared weather word 2, and a
-  **cue** 4 per match.
+  any year) 3, same month 2, same season 1, and a **cue** 4 per match.
 - **A cue is any word or phrase someone types** ("Camp Swift", a veteran's
   name). It matches a clip only when it *exactly equals* one of its labels —
-  title, a tag, a theme, a person, the place, the mood or a weather word —
+  title, a tag, a theme, a person, the place or the mood —
   ignoring capitals and surrounding punctuation. "camp" does not match
   "Camp Swift"; a long title does not match a word inside it. That keeps
   results predictable: what was labelled is what comes up.
@@ -322,15 +323,17 @@ bookends and generation fails.
 
 ### Tag clips for memory triggers, or tune them
 
-- **Tag a clip:** use the Clip library (`/library`). Under the hood it writes
-  the same fields to the topic's index, e.g. `"people": ["G. Moore"]`,
-  `"geography": "Camp Swift"`, `"context": {"date": "1944-12-18", "weather":
-  ["snow"]}`. `date` is stored as `YYYY-MM-DD`, `YYYY-MM` or `YYYY`; `season`
-  is optional (inferred from the date's month, northern hemisphere).
+- **Tag a clip:** use the Clip library (`/library`) — a table, one row per
+  clip, with Date and Season up front; Enter saves a cell and moves down.
+  Under the hood it writes the topic's index, e.g. `"people": ["G. Moore"]`,
+  `"geography": "Camp Swift"`, `"context": {"date": "1944-12-18"}`. `date` is
+  stored as `YYYY-MM-DD`, `YYYY-MM` or `YYYY`; `season` is optional (inferred
+  from the date's month, northern hemisphere). The table's columns and the
+  Details fields are the `COLUMNS` / `DETAILS` lists in
+  `web/frontend/library.js`; what is editable and how it is checked is
+  `FIELDS` in `scripts/clip_library.py`.
 - **After labelling,** the topic's index file shows as changed in git — that
   is the labelling itself; commit it like any other change.
-- **Weather words offered in the pickers:** `WEATHER_TERMS` in
-  `engine/context.py` (the UI loads them from `/api/context-options`).
 - **How strong the pull is:** the point values, `WEIGHT_BOOST_PER_POINT` and
   `MEMORY_WINDOW` at the top of `engine/context.py`. The guaranteed memory
   is chosen and placed in `Sequencer._select_context_memory()` /
@@ -457,9 +460,8 @@ None of these have been started unless it says otherwise.
   labelled yet, and these questions
   are open with Dr. Campbell: is a clip's date *when it happened* or *when it
   was filmed*; anniversary vs. month vs. season; how strong the pull should
-  be (gentle, guaranteed — the draft — or anchoring the opening); the weather
-  vocabulary; and who sets the context at the exhibit. Reacting to *live*
-  weather would need an internet connection, which the local design avoids.
+  be (gentle, guaranteed — the draft — or anchoring the opening). Dates and
+  seasons come from people's archival knowledge, entered in the Clip library.
 - **A-roll as bookends — undecided.** Should A-roll be allowed to open or
   close a film? Currently only B-roll + X-roll can. Needs David / Dr. Campbell.
 - **Live webcam / stream input — not started beyond the plumbing.** The
