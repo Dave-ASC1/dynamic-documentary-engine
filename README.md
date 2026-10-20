@@ -130,6 +130,12 @@ Two views onto the same engine:
 
 ---
 
+## Sharing a copy
+
+`python3 scripts/make_package.py` builds one `.zip` next to the project folder with the engine, the guides, every topic's clip list and labels, and the footage (`--no-footage` for a small one) — leaving out test films, backups and local settings. Unzip it on another Mac or Windows machine and follow `SETUP-GUIDE.md`. Step-by-step: *Making a package for someone else* in the setup guide.
+
+---
+
 ## Project structure
 
 ```
@@ -145,6 +151,7 @@ dynamic-documentary-engine/
 ├── scripts/
 │   ├── dde_runtime.py          # shared pipeline used by both CLI and web
 │   ├── clip_library.py         # Clip library: validate + save clip labels
+│   ├── make_package.py         # one .zip to share: engine + guides + labels + footage
 │   └── run_first_film.py       # command-line film generation
 ├── web/
 │   ├── backend/app.py          # Flask API

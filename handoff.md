@@ -47,6 +47,7 @@ X-roll adds sound, not screen time.
 | `scripts/dde_runtime.py` | The layer both the CLI and the web backend call. Topic discovery, media auto-sync, the "why this cut" trace, exact-duration trim, title cards, usage stats, manifests. |
 | `scripts/run_first_film.py` | Command-line runner. |
 | `scripts/clip_library.py` | Backs the Clip library page: checks and saves clip labels to a topic's index, with backups. |
+| `scripts/make_package.py` | Builds the shareable `.zip` (engine + guides + labels + footage, no test films or local leftovers). Works with or without git. |
 | `web/backend/app.py` | Flask API + serves the two frontends. |
 | `web/frontend/` | Plain HTML/CSS/JS. `index.html`/`app.js` = researcher console; `library.*` = Clip library; `exhibit.*` = gallery kiosk. |
 

@@ -122,8 +122,9 @@ you'll paste a line of text. It's safe, and you only do it once.
 
 ## Step 3 — Put the project on your computer
 
-David will send you the project folder (as a `.zip` file, or on a USB
-drive).
+You'll receive the project as a single `.zip` file (or on a USB drive). It
+is made with the packaging step at the end of this guide, and usually
+already contains the film clips.
 
 1. If it's a `.zip`, double-click it to unzip it.
 2. Move the resulting **`dynamic-documentary-engine`** folder somewhere
@@ -136,9 +137,13 @@ out will stop the engine from working.
 
 ## Step 4 — Add the film clips
 
-**Don't skip this.** The project folder arrives with the engine but *without*
-the video and audio clips — they're too large to travel with it. Without
-them the engine starts fine but says a topic has no footage.
+**If your package already includes the clips** (the usual case), they're
+already in place — look inside `local-media/WWII/assets/b-roll` to check,
+then skip to Step 5. Read on only to add more clips.
+
+A package made *without* footage (or a copy downloaded from GitHub) has the
+engine but not the video and audio clips. Without them the engine starts
+fine but says a topic has no footage.
 
 Inside the project folder, open **`local-media`**. You'll see a folder for
 each film topic, for example:
@@ -237,6 +242,34 @@ can go back to any of them.
   Off by default, because it trims the final clip mid-shot to hit the
   number. Left off, films use whole clips and land a few seconds short.
 
+**Memory triggers** (optional) — switch this on and the film favours clips
+whose date or season matches today's (taken from the computer's clock), and
+always brings the best match in partway through. Type a word or phrase in
+**Cue** (say, *Camp Swift*) to also bring up clips labelled with exactly
+that. It only has an effect once clips are labelled — see the next step.
+
+---
+
+## Step 6½ — Label your clips (Clip library)
+
+Click **Clip library** at the top-right of the main page. You'll see a
+table with one row per clip in the chosen topic — the clips are found from
+the folders by themselves.
+
+1. Choose the **Film topic** at the top.
+2. In a clip's row, click the **Date** cell and type the date, e.g.
+   *8 May 1945*, *December 1944* or just *1944*. Press **Enter**: it saves
+   and moves down to the next clip, so you can work down the column.
+3. If only the season is known, choose it in **Season** (leave it on *Auto*
+   when there's a date).
+4. Optionally add a **Title**, **Mood**, **Tags**, **People** and **Place**.
+   **Details** on each row shows the clip itself and a few more labels.
+
+Everything saves by itself — a cell flashes green when it's saved, and a
+red note appears if something can't be understood (nothing is saved then).
+Set **Show** to *No date or season yet* to see only the clips left to do.
+Labels can only be changed on the computer running the engine.
+
 ---
 
 ## Step 7 — Exhibit mode (for the gallery)
@@ -308,4 +341,34 @@ message in that window says what went wrong.
 | Add a topic | New folder in `local-media` with `assets` + `artifacts` inside |
 | Give a topic its own opening | Drop a video in `local-media/<topic>/titles/opening/` |
 | Run it in the gallery | Click **Exhibit mode**, top-right |
+| Label clips (dates, seasons…) | Click **Clip library**, top-right |
 | Find finished films | `local-media/<topic>/artifacts/` |
+| Make a copy for someone else | See *Making a package for someone else* |
+
+---
+
+## Making a package for someone else
+
+To give the engine — with its clips and all the labels you've typed — to
+someone else, or to move it to another computer, make a package. It takes
+a minute or two.
+
+**On a Mac:** open **Terminal** (press ⌘ + Space, type *Terminal*, press
+Return). **On Windows:** open **Command Prompt** from the Start menu.
+
+1. Type `cd ` (with a space after it), drag the project folder into the
+   window, and press Return/Enter.
+2. Type the line below and press Return/Enter (on Windows, type `py`
+   instead of `python3` — or `python` if `py` isn't found):
+
+   ```
+   python3 scripts/make_package.py
+   ```
+
+3. When it says **Done**, the package is next to the project folder, named
+   like `DDE-package-2026-10-19.zip`. Send or copy that one file.
+
+It includes the engine, the guides, every topic's clips and labels, and
+leaves out films made while testing. Add `--no-footage` to the end of the
+line in step 2 for a small package without the clips.
+

@@ -85,6 +85,7 @@ dynamic-documentary-engine/
 │   ├── build_validation_collection.py     # generator for the ORIGINAL placeholder set (guarded)
 │   ├── dde_runtime.py                      # shared engine-driving helpers (CLI + backend); INDEX_LOCK + atomic write_index
 │   ├── clip_library.py                     # Clip library backend: validate/save clip labels, backups
+│   ├── make_package.py                     # shareable .zip: tracked files (or folder walk w/o git) + footage; no films/leftovers
 │   └── run_first_film.py                   # end-to-end CLI: generate → render + trace
 ├── web/
 │   ├── backend/app.py                      # Flask API (see below)
