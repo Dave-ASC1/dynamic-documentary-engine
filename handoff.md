@@ -47,6 +47,7 @@ X-roll adds sound, not screen time.
 | `scripts/dde_runtime.py` | The layer both the CLI and the web backend call. Topic discovery, media auto-sync, the "why this cut" trace, exact-duration trim, title cards, usage stats, manifests. |
 | `scripts/run_first_film.py` | Command-line runner. |
 | `scripts/clip_library.py` | Backs the Clip library page: checks and saves clip labels to a topic's index, with backups. |
+| `scripts/clip_previews.py` | Makes each clip's thumbnail and small browser-playable preview with FFmpeg, once, cached in the topic's `.previews/`. |
 | `scripts/make_package.py` | Builds the shareable `.zip` (engine + guides + labels + footage, no test films or local leftovers). Works with or without git. |
 | `web/backend/app.py` | Flask API + serves the two frontends. |
 | `web/frontend/` | Plain HTML/CSS/JS. `index.html`/`app.js` = researcher console; `library.*` = Clip library; `exhibit.*` = gallery kiosk. |
@@ -254,6 +255,13 @@ form per clip; each field saves when the person moves on (`PATCH
   (`dde_runtime.INDEX_LOCK`), every write is atomic (temp file + swap), and
   the previous index is kept in `metadata/collections/.backups/<topic>/`
   (newest 30, gitignored). Auto-detected `color-*` tags are kept but hidden.
+- **Thumbnails and ▶ previews** come from `scripts/clip_previews.py`, not the
+  original files: footage can be 4K or iPhone HEVC, which many browsers
+  (Chrome on Windows, Firefox) can't play. FFmpeg makes a 320×180 JPEG and a
+  640-px H.264 MP4 the first time each is asked for, keyed by the clip's
+  name, size and date, in `local-media/<Topic>/.previews/` (gitignored, not
+  packaged, safe to delete — it is remade). At most two FFmpeg jobs run at
+  once. First play of a clip takes a few seconds; after that it's instant.
 - **Edit only on the engine's computer.** Requests through a tunnel or from
   another machine get a read-only library (forwarding headers give a tunnel
   away). `DDE_ALLOW_REMOTE_EDITS=1` lifts this, e.g. on a trusted Penn State

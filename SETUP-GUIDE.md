@@ -254,7 +254,9 @@ that. It only has an effect once clips are labelled — see the next step.
 
 Click **Clip library** at the top-right of the main page. You'll see a
 table with one row per clip in the chosen topic — the clips are found from
-the folders by themselves.
+the folders by themselves. Each row starts with a small picture of the
+clip; click it (or its ▶) to watch the clip. The very first time a clip is
+played it takes a few seconds to prepare.
 
 1. Choose the **Film topic** at the top.
 2. In a clip's row, click the **Date** cell and type the date, e.g.
@@ -263,7 +265,7 @@ the folders by themselves.
 3. If only the season is known, choose it in **Season** (leave it on *Auto*
    when there's a date).
 4. Optionally add a **Title**, **Mood**, **Tags**, **People** and **Place**.
-   **Details** on each row shows the clip itself and a few more labels.
+   **Details** on each row shows a few more labels.
 
 Everything saves by itself — a cell flashes green when it's saved, and a
 red note appears if something can't be understood (nothing is saved then).

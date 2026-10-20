@@ -241,6 +241,17 @@ def list_clips(index_path):
     }
 
 
+def get_clip(index_path, artifact_id):
+    """One clip's index entry, or None if it isn't in the index."""
+    with dde_runtime.INDEX_LOCK:
+        with open(index_path) as f:
+            data = json.load(f)
+    return next(
+        (a for a in data.get("artifacts", []) if a.get("artifact_id") == artifact_id),
+        None,
+    )
+
+
 def _backup(index_path):
     """Copies the index as it stands into .backups/<index name>/ and keeps
     only the newest BACKUPS_KEPT copies."""

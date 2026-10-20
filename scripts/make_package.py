@@ -9,7 +9,8 @@ its guides, every topic's clip list (with the labels typed in the Clip
 library) and, unless told otherwise, the footage itself.
 
 Left out on purpose: films generated while testing, the per-machine usage
-history, Clip library backups, local tool settings and other leftovers.
+history, Clip library backups and thumbnails, local tool settings and other
+leftovers.
 
 Works in a GitHub copy (packages exactly the project's tracked files, and
 warns about unsaved changes) and in a plain unzipped copy without git
@@ -45,6 +46,7 @@ EXCLUDE = (
     ".git/*", ".claude/*", "demo/*", "*/__pycache__/*", "*.pyc", "*.DS_Store",
     "metadata/collections/.backups/*", "metadata/collections/.index-*",
     "local-media/*/artifacts/*",            # generated films, manifests, usage stats
+    "local-media/*/.previews/*",            # Clip library thumbnails/previews (remade on demand)
 )
 # ...except these placeholders, which make each topic folder exist on unzip.
 KEEP = ("local-media/*/artifacts/.gitkeep",)

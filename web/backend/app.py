@@ -62,6 +62,7 @@ for _p in (REPO_ROOT, SCRIPTS_DIR):
         sys.path.insert(0, _p)
 
 import clip_library  # noqa: E402
+import clip_previews  # noqa: E402
 import dde_runtime  # noqa: E402
 from engine.cancellation import CancellationToken, GenerationCancelled  # noqa: E402
 from engine.context import SEASONS, ScreeningContext  # noqa: E402
@@ -227,10 +228,14 @@ def library_clips(collection_id):
     # Synced first, so clips just dropped into the folders show up to label.
     collection = _synced_collection(collection)
     data = clip_library.list_clips(collection["index_path"])
+    base = f"/api/library/{collection['id']}"
     for clip in data["clips"]:
         clip["media_url"] = (
             f"/media/{collection['id']}/{clip['filename']}" if clip.get("filename") else None
         )
+        if clip.get("filename") and clip.get("artifact_type") != "X-roll":
+            clip["thumbnail_url"] = f"{base}/{clip['artifact_id']}/thumbnail"
+            clip["preview_url"] = f"{base}/{clip['artifact_id']}/preview"
     return jsonify({
         "collection": {"id": collection["id"], "name": collection["name"]},
         "editable": _edits_allowed(),
@@ -257,6 +262,34 @@ def library_update(collection_id, artifact_id):
     except KeyError:
         return jsonify({"error": f"No clip '{artifact_id}' in this topic."}), 404
     return jsonify(clip)
+
+
+def _clip_preview_file(collection_id, artifact_id, make):
+    """Serves a clip's thumbnail or preview, making it on first request."""
+    collection = dde_runtime.get_collection(collection_id)
+    if collection is None:
+        abort(404)
+    entry = clip_library.get_clip(collection["index_path"], artifact_id)
+    if entry is None:
+        abort(404)
+    try:
+        path = make(collection["assets_path"], entry)
+    except clip_previews.PreviewUnavailable:
+        abort(404)
+    response = send_from_directory(os.path.dirname(path), os.path.basename(path), conditional=True)
+    # Keyed by the clip's size and date, so a browser may keep it a while.
+    response.cache_control.max_age = 3600
+    return response
+
+
+@app.route("/api/library/<collection_id>/<artifact_id>/thumbnail")
+def clip_thumbnail(collection_id, artifact_id):
+    return _clip_preview_file(collection_id, artifact_id, clip_previews.thumbnail)
+
+
+@app.route("/api/library/<collection_id>/<artifact_id>/preview")
+def clip_preview(collection_id, artifact_id):
+    return _clip_preview_file(collection_id, artifact_id, clip_previews.preview)
 
 
 @app.route("/media/<collection_id>/<path:filename>")

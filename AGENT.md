@@ -85,6 +85,7 @@ dynamic-documentary-engine/
 │   ├── build_validation_collection.py     # generator for the ORIGINAL placeholder set (guarded)
 │   ├── dde_runtime.py                      # shared engine-driving helpers (CLI + backend); INDEX_LOCK + atomic write_index
 │   ├── clip_library.py                     # Clip library backend: validate/save clip labels, backups
+│   ├── clip_previews.py                    # Clip library thumbnails + browser-playable previews (FFmpeg, cached)
 │   ├── make_package.py                     # shareable .zip: tracked files (or folder walk w/o git) + footage; no films/leftovers
 │   └── run_first_film.py                   # end-to-end CLI: generate → render + trace
 ├── web/
@@ -124,7 +125,7 @@ dynamic-documentary-engine/
 **Web layer (web/backend/app.py + scripts/dde_runtime.py):**
 - Auto-discovers every topic folder under `local-media/` (currently WWII, SWISS, Validation) — no hardcoded media path.
 - **Media auto-sync:** drop clips into `local-media/<Topic>/assets/{a-roll,b-roll,x-roll}/` and they're detected on the next request without regenerating anything.
-- Endpoints: `GET /` (console), `GET /exhibit` (kiosk), `GET /<path>` (frontend static files), `GET /api/collections`, `POST /api/generate` (accepts `collection`, `target_duration`, `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `context` {date|"today", season, cue}, `job_id`), `GET /api/context-options` (seasons, server's today), `GET /library` + `GET /api/library/<topic>` + `PATCH /api/library/<topic>/<clip>` (Clip library; edits only from the engine's own machine — tunnel/LAN read-only unless `DDE_ALLOW_REMOTE_EDITS=1`), `GET /media/<topic>/<file>` (clip previews), `POST /api/generate/cancel`, `GET /api/generate/progress?job_id=`, `GET /api/films?collection=` (history), `DELETE /api/films/<collection>/<file>`, `GET /films/<collection>/<file>`.
+- Endpoints: `GET /` (console), `GET /exhibit` (kiosk), `GET /<path>` (frontend static files), `GET /api/collections`, `POST /api/generate` (accepts `collection`, `target_duration`, `diversity_mode`, `exact_duration`, `audio_fade`, `audio_fade_seconds`, `context` {date|"today", season, cue}, `job_id`), `GET /api/context-options` (seasons, server's today), `GET /library` + `GET /api/library/<topic>` + `PATCH /api/library/<topic>/<clip>` (Clip library; edits only from the engine's own machine — tunnel/LAN read-only unless `DDE_ALLOW_REMOTE_EDITS=1`), `GET /api/library/<topic>/<clip>/thumbnail|preview` (FFmpeg-made JPEG / small H.264 MP4, cached in `local-media/<Topic>/.previews/`, gitignored), `GET /media/<topic>/<file>` (raw source, used for audio), `POST /api/generate/cancel`, `GET /api/generate/progress?job_id=`, `GET /api/films?collection=` (history), `DELETE /api/films/<collection>/<file>`, `GET /films/<collection>/<file>`.
 - **Cancel:** the client makes a `job_id`, sends it with generate, and can POST it to cancel — the running FFmpeg process is killed via the `CancellationToken`.
 - **Exact duration:** trims the final file to exactly `target_duration` (minus title-card length). Title cards wrap every film's open/close.
 - Each film writes a **manifest** (`.json` beside the `.mp4`) recording `generated_at`, target/actual duration, and the slot list.

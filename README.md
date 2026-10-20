@@ -116,7 +116,7 @@ local-media/
 
 Drop a file into an `assets` subfolder and it's auto-tagged (duration, dominant colour, pacing) and enters rotation on the next run; delete one to retire it. Leave `titles/` empty and a generated text card is used instead.
 
-**Label clips in the Clip library** (`/library`, linked from the console): a table with one row per clip — the clips are detected from the topic's folders — where you type each clip's **date** and **season**, plus title, mood, tags, people and place (more under *Details*, with a preview player). Each cell saves itself as you move on (Enter saves and moves down a row), is checked first (e.g. dates like *18 December 1944*), and is used by the very next film; the previous version is kept as a backup in `metadata/collections/.backups/`. Labels can only be changed on the computer running the engine — a shared link shows the library read-only.
+**Label clips in the Clip library** (`/library`, linked from the console): a table with one row per clip — the clips are detected from the topic's folders, each shown with a small picture you can click to play it — where you type each clip's **date** and **season**, plus title, mood, tags, people and place (more under *Details*). Each cell saves itself as you move on (Enter saves and moves down a row), is checked first (e.g. dates like *18 December 1944*), and is used by the very next film; the previous version is kept as a backup in `metadata/collections/.backups/`. Labels can only be changed on the computer running the engine — a shared link shows the library read-only.
 
 ---
 

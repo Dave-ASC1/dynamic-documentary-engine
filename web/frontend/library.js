@@ -18,6 +18,10 @@ const summaryEl = document.getElementById("summary");
 const readonlyNote = document.getElementById("readonly-note");
 const rowsEl = document.getElementById("clip-rows");
 const themeToggle = document.getElementById("theme-toggle");
+const previewDialog = document.getElementById("preview-dialog");
+const previewTitle = document.getElementById("preview-title");
+const previewBody = document.getElementById("preview-body");
+const previewStatus = document.getElementById("preview-status");
 
 const TOPIC_KEY = "dde-library-topic";
 const COLUMN_COUNT = 9;
@@ -175,11 +179,17 @@ function buildRow(clip) {
   const tr = el("tr", { className: "clip-row", "data-id": clip.artifact_id });
 
   const nameCell = el("td", { className: "clip-name" });
-  nameCell.appendChild(el("div", { className: "file" }, (clip.filename || clip.artifact_id).split("/").pop()));
+  const cell = el("div", { className: "clip-cell" });
+  cell.appendChild(buildThumb(clip));
+  const text = el("div");
+  const fileName = (clip.filename || clip.artifact_id).split("/").pop();
+  text.appendChild(el("div", { className: "file", title: fileName }, fileName));
   const sub = el("div", { className: "sub" });
   sub.appendChild(el("span", { className: `type-badge ${typeClass(clip.artifact_type)}` }, clip.artifact_type || ""));
   sub.appendChild(el("span", {}, formatSeconds(clip.duration_seconds)));
-  nameCell.appendChild(sub);
+  text.appendChild(sub);
+  cell.appendChild(text);
+  nameCell.appendChild(cell);
   tr.appendChild(nameCell);
 
   for (const def of COLUMNS) {
@@ -199,6 +209,67 @@ function buildRow(clip) {
   return tr;
 }
 
+// A still from the clip that is also its play button. Sound-only clips get
+// a note symbol instead of a picture.
+function buildThumb(clip) {
+  const name = clip.fields.title || clip.artifact_id;
+  const audio = !clip.thumbnail_url;
+  const button = el("button", { type: "button", className: `thumb${audio ? " thumb-audio" : ""}`,
+                                "aria-label": `Play ${name}`, title: `Play ${name}` });
+  if (!audio) {
+    const img = el("img", { src: clip.thumbnail_url, alt: "", loading: "lazy", decoding: "async" });
+    img.addEventListener("error", () => img.remove());   // dark tile + play button remain
+    button.appendChild(img);
+  }
+  button.appendChild(el("span", { className: "play", "aria-hidden": "true" }, "\u25B6"));
+  button.addEventListener("click", () => openPreview(clip));
+  return button;
+}
+
+/* ---------------------------------------------------------------------------
+ * Preview player (opens over the table)
+ * ------------------------------------------------------------------------ */
+
+function openPreview(clip) {
+  previewTitle.textContent = clip.fields.title || clip.artifact_id;
+  previewBody.innerHTML = "";
+  previewStatus.textContent = "";
+  let media;
+  if (clip.preview_url) {
+    // The first play of a clip makes its small preview copy, which can take
+    // a few seconds for long or 4K footage; it's instant after that.
+    media = el("video", { src: clip.preview_url, controls: true, autoplay: true, playsinline: true,
+                          poster: clip.thumbnail_url || null });
+    previewStatus.textContent = "Preparing preview…";
+  } else if (clip.media_url) {
+    media = el("audio", { src: encodeURI(clip.media_url), controls: true, autoplay: true });
+  } else {
+    previewStatus.textContent = "This clip has no file to play.";
+  }
+  if (media) {
+    media.addEventListener("canplay", () => {
+      previewStatus.textContent = `${clip.filename || ""}${clip.duration_seconds ? ` · ${formatSeconds(clip.duration_seconds)}` : ""}`;
+    });
+    media.addEventListener("error", () => {
+      previewStatus.textContent = "This clip couldn't be played. The engine may not be able to read its file.";
+    });
+    previewBody.appendChild(media);
+  }
+  previewDialog.showModal();
+}
+
+function closePreview() {
+  if (previewDialog.open) previewDialog.close();
+}
+
+// Closing stops playback (also on Esc, which closes the dialog by itself).
+previewDialog.addEventListener("close", () => { previewBody.innerHTML = ""; });
+document.getElementById("preview-close").addEventListener("click", closePreview);
+// A click on the dimmed area outside the player closes it.
+previewDialog.addEventListener("click", (event) => {
+  if (event.target === previewDialog) closePreview();
+});
+
 function toggleDetails(clip, tr, button) {
   const open = tr.nextElementSibling && tr.nextElementSibling.classList.contains("detail-row");
   if (open) {
@@ -217,10 +288,9 @@ function toggleDetails(clip, tr, button) {
   const grid = el("div", { className: "detail-grid" });
 
   const media = el("div", { className: "detail-media" });
-  if (clip.media_url && clip.artifact_type !== "X-roll") {
-    // "#t=0.5" makes the browser show a frame from the clip as its picture.
-    media.appendChild(el("video", { src: `${encodeURI(clip.media_url)}#t=0.5`, controls: true,
-                                    preload: "metadata", playsinline: true }));
+  if (clip.preview_url) {
+    media.appendChild(el("video", { src: clip.preview_url, controls: true, preload: "none",
+                                    playsinline: true, poster: clip.thumbnail_url || null }));
   } else if (clip.media_url) {
     media.appendChild(el("div", { className: "detail-audio-only" }, "Sound only (X-roll)"));
     media.appendChild(el("audio", { src: encodeURI(clip.media_url), controls: true, preload: "none" }));

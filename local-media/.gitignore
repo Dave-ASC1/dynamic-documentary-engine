@@ -5,6 +5,8 @@
 */assets/*/*
 */titles/*/*
 */artifacts/*
+# Clip library thumbnails and previews — remade automatically when needed.
+*/.previews/
 
 # Keep the folder structure and the plain-language READMEs in the repo.
 # A topic is only discovered if its assets/ and artifacts/ folders exist.
