@@ -16,10 +16,15 @@ Two settings combine:
                     own clock) picks the opening clip — an anniversary (same
                     day and month, any year) first, then the same month,
                     then the same season. The other matching clips follow,
-                    strongest first; after that each clip leads to one
-                    sharing a person, place, tag, theme or mood with it, and
-                    only when nothing shares a label does the engine cut to
-                    something different by contrast. See Sequencer.generate.
+                    strongest first; then the other dated clips, following
+                    the calendar onward from the screening date and wrapping
+                    past December into January, whatever the year. After
+                    that each undated clip leads to one sharing a person,
+                    place, tag, theme or mood with it, and only when nothing
+                    shares a label does the engine cut to something
+                    different by contrast. When nothing matches today, the
+                    film opens on the next date in the calendar instead.
+                    See Sequencer.generate.
         "oldest"    Timeline, oldest first.
         "newest"    Timeline, newest first.
         "calendar"  Through the year, January to December, whatever the year.
@@ -356,6 +361,26 @@ class TimeSpan:
             return None
         return (self.month, self.day or 0)
 
+    def days_ahead_key(self, today):
+        """Sort key for following the calendar onward from the screening
+        date, whatever the year: how many days after today this span next
+        begins, wrapping past December into January. A month or season sits
+        at its start, before the exact days in it — as on a timeline.
+
+        Args:
+            today (datetime.date): The screening date.
+
+        Returns:
+            tuple: (days ahead, 0 for a month or season / 1 for a day), or
+                   None for a span that is only a year.
+        """
+        if self.month is None:
+            return None
+        # 2000 is a leap year, so 29 February has a place.
+        start = datetime.date(2000, self.month, self.day or 1)
+        ahead = (start - datetime.date(2000, today.month, today.day)).days % 366
+        return ahead, 0 if self.day is None else 1
+
     def describe(self):
         """Plain words, e.g. "9 May 1950", "December 1944",
         "winter 1944 (December 1944 – February 1945)", "26 October"."""
@@ -477,10 +502,15 @@ class ScreeningContext:
         """
         data = data or {}
         labels = data.get("labels")
+        order = data.get("order") or None
+        if order == "from_today":
+            # Briefly a separate order on 9 November 2026; it is now part of
+            # "today", so settings saved then still work.
+            order = "today"
         return cls(
             date=data.get("date"),
             season=data.get("season") or None,
-            order=data.get("order") or None,
+            order=order,
             years=data.get("years") or data.get("year") or None,
             only_season=data.get("only_season") or None,
             labels=labels if labels is not None else data.get("cue"),

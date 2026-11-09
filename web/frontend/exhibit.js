@@ -136,7 +136,7 @@ function yearsValid() {
 // long-running exhibit rolls over by itself.
 const ORDER_HINTS = {
   today: "Each film opens on the clip labelled closest to today's date or season; other matching " +
-    "clips follow, then clips sharing a person, place, tag, theme or mood.",
+    "clips follow, then the next dates in the calendar, then clips sharing a person, place, tag or mood.",
   oldest: "Clips with a dated year play from the earliest to the latest.",
   newest: "Clips with a dated year play from the latest to the earliest.",
   calendar: "Clips play from January to December, whatever the year.",

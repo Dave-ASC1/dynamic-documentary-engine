@@ -253,19 +253,25 @@ she expected the 26 October clip to open it and the autumn clip to follow):
 
 1. **It opens on the best match** — the highest-scoring A- or B-roll
    (`Sequencer._best_context_match()`), straight after the title piece. An
-   A-roll may open a memory film; otherwise the opener is a B-roll + X-roll
-   pair as before.
+   A-roll may open a memory film. When nothing matches today, it opens on
+   the next date the calendar comes round to (`Sequencer._next_date_clip()`).
 2. **The other matches follow, strongest first.** Among equally strong ones,
    the one sharing the most labels with the clip before goes first.
-3. **Then the film follows a thread:** each next clip is the one sharing the
-   most labels — tags, themes, people, place, mood, compared like cues;
-   never the title or the auto-detected `color-` tags — with the clip just
-   shown (`Sequencer._select_memory_film_next()`). Only when nothing shares a
-   label does the usual contrast pick take over.
-4. **Audio matches mood:** a B-roll with a mood is paired with an X-roll of
+3. **Then the next dates in the calendar** (added 9 November 2026 at
+   David's request): the other dated clips, onward from the screening date,
+   wrapping past December into January, whatever the year —
+   `TimeSpan.days_ahead_key()`; a month or season sits at its start, before
+   the exact days in it. Clips known only by a year have no place here.
+4. **Then the film follows a thread:** each remaining clip is the one
+   sharing the most labels — tags, themes, people, place, mood, compared
+   like label filters; never the title or the auto-detected `color-` tags —
+   with the clip just shown (`Sequencer._select_memory_film_next()`). Only
+   when nothing shares a label does the usual contrast pick take over.
+5. **Audio matches mood:** a B-roll with a mood is paired with an X-roll of
    the same mood word when there is one (`ArtifactSelector.same_mood()`).
-5. The closing pair is drawn from clips that *don't* match when possible, so
-   the matches are free to follow the opening.
+6. The closing pair is drawn from an undated clip that doesn't match when
+   possible; with every clip dated, from the dated clip the calendar reaches
+   last, so the calendar order holds to the end.
 
 It is the default order in the console and the exhibit; a saved choice on
 a computer is respected.

@@ -148,7 +148,8 @@ function renderTraceEvent(ev, step) {
   const parsed = parseLabel(ev.chosen);
   const isPairing = ev.kind === "pairing";
   const marker = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
-  const why = { memory: " · Memory trigger", flow: " · Follows on", dated: " · In date order" }[ev.kind] || "";
+  const why = { memory: " · Memory trigger", next_date: " · Next date", flow: " · Follows on",
+                dated: " · In date order" }[ev.kind] || "";
   const badgeLabel = isPairing ? "Audio pairing" : `Cut ${step}${why} · ${badgeText(parsed.type)}`;
   traceList.appendChild(buildCutCard(marker, marker, badgeLabel, parsed.title, ev.contrast));
 }
@@ -176,7 +177,12 @@ function renderTrace(result) {
     }
   }
 
-  const why = opening ? (opening.kind === "dated" ? "Open · In date order" : "Open · Memory trigger") : "Open";
+  // A memory film opens on today's best match, or — when nothing matches —
+  // on the next date in the calendar.
+  const why = !opening ? "Open"
+    : opening.kind === "dated" ? "Open · In date order"
+    : String((opening.contrast || [])[0] || "").startsWith("memory trigger") ? "Open · Memory trigger"
+    : "Open · Next date";
   traceList.appendChild(
     buildCutCard("type-open", "type-open", why, parseLabel(result.opening).title, opening ? opening.contrast : null)
   );
@@ -351,7 +357,8 @@ const ORDER_HINTS = {
     const season = date ? SEASON_BY_MONTH[parseInt(date.slice(5, 7), 10) - 1] : "";
     return `Opens on the clip labelled closest to ${date ? formatContextDate(date) : "today"} ` +
       `(same day and month, then month, then ${season || "season"}). Other matching clips follow, ` +
-      "then clips that share a person, place, tag, theme or mood.";
+      "then the next dates in the calendar, into January and round again, whatever the year. " +
+      "Clips without a day or month follow by shared people, places, tags and moods.";
   },
   oldest: () => "Clips with a dated year play from the earliest to the latest. Clips without a year are left out.",
   newest: () => "Clips with a dated year play from the latest to the earliest. Clips without a year are left out.",

@@ -247,8 +247,11 @@ can go back to any of them.
 - **Today's date leads** (the usual choice) — the film opens on the clip
   labelled closest to today's date (taken from the computer's clock): the
   same day and month first, then the same month, then the same season.
-  Other matching clips follow, and after them each clip leads to one that
-  shares a person, place, tag, theme or mood with it.
+  Other matching clips follow, then the next dates in the calendar from
+  today — on 9 November: 10 December, then 1 January, then 7 May, and so
+  on, whatever the year. Clips with no day or month come last, each leading
+  to one that shares a person, place, tag, theme or mood with it. If no clip
+  matches today, the film opens on the next date coming up.
 - **Timeline, oldest first** or **newest first** — the dated clips in date
   order. A clip needs a year to have a place on a timeline.
 - **Through the year** — January to December, whatever the year. A clip

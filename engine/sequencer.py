@@ -61,10 +61,12 @@ class Sequencer:
 
         - "today" (a memory film): the clips' labels drive the film instead
           of chance. It opens on the best match for the screening's date or
-          season, the other matches follow strongest first, and from then
-          on each clip leads to one sharing a person, place, tag, theme or
-          mood with it. Contrast takes over only where nothing shares a
-          label.
+          season (or, when nothing matches, the next date in the calendar),
+          the other matches follow strongest first, then the other dated
+          clips follow the calendar onward from the screening date, wrapping
+          into January. After that each undated clip leads to one sharing a
+          person, place, tag, theme or mood with it. Contrast takes over
+          only where nothing shares a label.
         - "oldest" / "newest" / "calendar": the dated clips play in date
           order — a timeline, or January to December — with no generated
           bookends; the first and last clips are the first and last dates.
@@ -122,6 +124,8 @@ class Sequencer:
         # Screening-context results of the last generate() call.
         self.memory = None
         self.context_matches = {}
+        # The screening date while a memory film is being built, else None.
+        self.screening_date = None
 
         self.loader = CollectionLoader(collection_path)
         self.collection = self.loader.load()
@@ -234,6 +238,7 @@ class Sequencer:
         # front. The selector also boosts matching clips' weights wherever a
         # choice is still drawn by weight (bookends, audio, ties).
         memory_film = order == "today"
+        self.screening_date = context.date if memory_film else None
         if memory_film:
             for a in body_artifacts:
                 points, reasons = context.match(a)
@@ -272,6 +277,16 @@ class Sequencer:
             opener = self._best_context_match(body_artifacts, x_roll_artifacts)
             if opener is not None:
                 self._place_opener(opener, sequence, body_artifacts)
+            else:
+                # Nothing matches today: open on the next date the calendar
+                # comes round to instead, when any clip is dated.
+                opener = self._next_date_clip(body_artifacts, x_roll_artifacts)
+                if opener is not None:
+                    span = TimeSpan.of(opener)
+                    self._place_opener(
+                        opener, sequence, body_artifacts,
+                        reasons=[f"next date after today — {span.describe()}"],
+                    )
 
         opening_pair = None
         if opener is None and can_pair:
@@ -301,7 +316,28 @@ class Sequencer:
         # ones that don't if it can be, so the matches stay free to follow
         # the opening rather than being held back for the last shot.
         closing_pair = None
-        if self.context_matches:
+        if memory_film:
+            # The dated clips follow the calendar, so the close comes from an
+            # undated clip when there is one; otherwise from the dated clip
+            # the calendar reaches last, so the order still holds.
+            unmatched = [
+                a for a in b_roll_artifacts
+                if a.get("artifact_id") not in self.context_matches
+            ]
+            undated = [a for a in unmatched if self._days_ahead(a) is None]
+            closing_pair = self._select_random_broll_xroll_pair(undated, x_roll_artifacts)
+            if closing_pair is None:
+                dated = [
+                    a for a in unmatched
+                    if self._days_ahead(a) is not None and self.rules.is_eligible(a)
+                ]
+                if dated:
+                    last = max(self._days_ahead(a) for a in dated)
+                    closing_pair = self._select_random_broll_xroll_pair(
+                        [a for a in dated if self._days_ahead(a) == last],
+                        x_roll_artifacts,
+                    )
+        if closing_pair is None and self.context_matches:
             closing_pair = self._select_random_broll_xroll_pair(
                 [a for a in b_roll_artifacts
                  if a.get("artifact_id") not in self.context_matches],
@@ -628,19 +664,22 @@ class Sequencer:
         ]
         return self.selector.weighted_random_choice(strongest)
 
-    def _place_opener(self, opener, sequence, body_artifacts):
+    def _place_opener(self, opener, sequence, body_artifacts, reasons=None):
         """
-        Places the best-matching clip as the first shot of a memory film,
-        pairing it with an X-roll if it is a B-roll, and records it in
-        self.memory.
+        Places the opening clip of a memory film — the best match, or the
+        next date when nothing matches — pairing it with an X-roll if it is
+        a B-roll, and records it in self.memory.
 
         Args:
-            opener (dict):          The clip from _best_context_match().
+            opener (dict):          The clip to open on.
             sequence (list):        The (empty) sequence being built.
             body_artifacts (list):  All body artifacts (for the X-roll pool).
+            reasons (list):         Why it opens, when it isn't a match
+                                    (e.g. "next date after today — …").
         """
         opener_id = opener.get("artifact_id")
-        points, reasons = self.context_matches[opener_id]
+        points, match_reasons = self.context_matches.get(opener_id, (0, []))
+        reasons = list(reasons) if reasons else list(match_reasons)
         self.selector.place(opener, kind="opening", reasons=list(reasons))
         self._record_generated_usage(opener)
 
@@ -672,9 +711,13 @@ class Sequencer:
             1. A clip that matches the screening and hasn't played yet —
                strongest match first; among equally strong ones, the one
                sharing the most labels with the clip just shown.
-            2. A clip sharing a label (person, place, tag, theme or mood)
+            2. The next dated clip in the calendar, onward from the
+               screening date and wrapping into January, whatever the year;
+               among clips on the same date, the one sharing the most labels
+               with the clip just shown.
+            3. A clip sharing a label (person, place, tag, theme or mood)
                with the clip just shown — the most shared labels first.
-            3. Nothing shares a label: the usual pick by contrast.
+            4. Nothing shares a label: the usual pick by contrast.
 
         Ties are drawn by weight. Clips chosen by 1 or 2 are placed through
         the selector with the reason, so the trace can show why.
@@ -701,11 +744,63 @@ class Sequencer:
             reasons = self.context_matches[pick.get("artifact_id")][1]
             return self.selector.place(pick, kind="memory", reasons=list(reasons))
 
+        dated = [a for a in eligible if self._days_ahead(a) is not None]
+        if dated:
+            soonest = min(self._days_ahead(a) for a in dated)
+            pick, _shared = self._most_linked(
+                previous, [a for a in dated if self._days_ahead(a) == soonest]
+            )
+            return self.selector.place(
+                pick, kind="next_date", reasons=[TimeSpan.of(pick).describe()]
+            )
+
         pick, shared = self._most_linked(previous, eligible)
         if shared:
             return self.selector.place(pick, kind="flow", reasons=shared)
 
         return self.selector.select_next(candidates)
+
+    def _days_ahead(self, artifact):
+        """How soon after the screening date a clip's date comes round in
+        the calendar (TimeSpan.days_ahead_key), or None when it has no day,
+        month or season — or this is not a memory film."""
+        if self.screening_date is None:
+            return None
+        span = TimeSpan.of(artifact)
+        return span.days_ahead_key(self.screening_date) if span else None
+
+    def _next_date_clip(self, body_artifacts, x_roll_artifacts):
+        """
+        The clip whose date the calendar comes round to soonest after the
+        screening date, for a memory film to open on when nothing matches
+        today. Drawn by weight among clips on the same date. A B-roll is
+        only chosen if at least one X-roll may sit under it.
+
+        Args:
+            body_artifacts (list):   All allowed body artifacts.
+            x_roll_artifacts (list): The X-roll pool, for the pairing check.
+
+        Returns:
+            dict: The clip, or None when no clip has a day, month or season.
+        """
+        candidates = []
+        for a in body_artifacts:
+            if a.get("artifact_type") not in ("A-roll", "B-roll"):
+                continue
+            if self._days_ahead(a) is None or not self.rules.is_available(a):
+                continue
+            if a.get("artifact_type") == "B-roll" and not any(
+                a.get("artifact_id") not in x.get("must_not_follow", [])
+                for x in x_roll_artifacts
+            ):
+                continue
+            candidates.append(a)
+        if not candidates:
+            return None
+        soonest = min(self._days_ahead(a) for a in candidates)
+        return self.selector.weighted_random_choice(
+            [a for a in candidates if self._days_ahead(a) == soonest]
+        )
 
     def _most_linked(self, previous, pool):
         """
