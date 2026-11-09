@@ -8,12 +8,13 @@ const audioFadeSelect = document.getElementById("audio-fade-select");
 const savedFade = localStorage.getItem("dde-audio-fade");
 if (savedFade !== null) audioFadeSelect.value = savedFade;
 audioFadeSelect.addEventListener("change", () => localStorage.setItem("dde-audio-fade", audioFadeSelect.value));
-const contextToggle = document.getElementById("context-toggle");
-const contextFields = document.getElementById("context-fields");
+const filmOrder = document.getElementById("film-order");
+const contextDateField = document.getElementById("context-date-field");
 const contextDateMode = document.getElementById("context-date-mode");
 const contextDate = document.getElementById("context-date");
-const contextSeason = document.getElementById("context-season");
-const contextCue = document.getElementById("context-cue");
+const filterYears = document.getElementById("filter-years");
+const filterSeason = document.getElementById("filter-season");
+const filterLabels = document.getElementById("filter-labels");
 const contextHint = document.getElementById("context-hint");
 const CONTEXT_KEY = "dde-context";
 let contextOptions = null;
@@ -143,39 +144,56 @@ function buildCutCard(markerClass, badgeClass, badgeLabel, title, contrast) {
   return li;
 }
 
+function renderTraceEvent(ev, step) {
+  const parsed = parseLabel(ev.chosen);
+  const isPairing = ev.kind === "pairing";
+  const marker = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
+  const why = { memory: " · Memory trigger", flow: " · Follows on", dated: " · In date order" }[ev.kind] || "";
+  const badgeLabel = isPairing ? "Audio pairing" : `Cut ${step}${why} · ${badgeText(parsed.type)}`;
+  traceList.appendChild(buildCutCard(marker, marker, badgeLabel, parsed.title, ev.contrast));
+}
+
 function renderTrace(result) {
   traceList.innerHTML = "";
 
-  // A memory film opens on its best-matching clip: the first trace entry
-  // is that clip, so its reason goes on the Open card instead of a cut.
+  // A memory film's first trace entry is the clip it opens on, and a film
+  // in date order has no generated bookends — its first and last clips are
+  // its first and last dates. Those entries go on the Open/Close cards
+  // instead of being listed twice.
   const events = result.trace.slice();
-  const opening = events.length && events[0].kind === "opening" ? events.shift() : null;
-  const open = parseLabel(result.opening);
+  const dated = Boolean(result.date_order);
+  const first = events[0];
+  const opening = first && (first.kind === "opening" || (dated && first.kind === "dated"))
+    ? events.shift() : null;
+  let closing = null;
+  let tail = [];
+  if (dated) {
+    let last = -1;
+    events.forEach((ev, i) => { if (ev.kind !== "pairing") last = i; });
+    if (last >= 0) {
+      closing = events[last];
+      tail = events.splice(last).slice(1);   // the close's own audio pairing
+    }
+  }
+
+  const why = opening ? (opening.kind === "dated" ? "Open · In date order" : "Open · Memory trigger") : "Open";
   traceList.appendChild(
-    buildCutCard("type-open", "type-open", opening ? "Open · Memory trigger" : "Open",
-                 open.title, opening ? opening.contrast : null)
+    buildCutCard("type-open", "type-open", why, parseLabel(result.opening).title, opening ? opening.contrast : null)
   );
 
   let step = 0;
   for (const ev of events) {
-    const parsed = parseLabel(ev.chosen);
-    const isPairing = ev.kind === "pairing";
-    if (!isPairing) step += 1;
-    const marker = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
-    const badgeCls = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
-    const why = { memory: " · Memory trigger", flow: " · Follows on" }[ev.kind] || "";
-    const badgeLabel = isPairing
-      ? "Audio pairing"
-      : `Cut ${step}${why} · ${badgeText(parsed.type)}`;
-    traceList.appendChild(
-      buildCutCard(marker, badgeCls, badgeLabel, parsed.title, ev.contrast)
-    );
+    if (ev.kind !== "pairing") step += 1;
+    renderTraceEvent(ev, step);
   }
 
-  const close = parseLabel(result.closing);
-  traceList.appendChild(
-    buildCutCard("type-close", "type-close", "Close", close.title, null)
-  );
+  if (!dated || closing) {
+    traceList.appendChild(
+      buildCutCard("type-close", "type-close", closing ? "Close · In date order" : "Close",
+                   parseLabel(result.closing).title, closing ? closing.contrast : null)
+    );
+  }
+  for (const ev of tail) renderTraceEvent(ev, step);
 
   traceSection.classList.remove("hidden");
 }
@@ -235,7 +253,16 @@ function renderMeta(result) {
     );
   }
   if (result.context) {
-    metaEl.appendChild(textChip("Context", result.context.label));
+    const plan = result.context;
+    metaEl.appendChild(textChip("Order", plan.order_label || "Today's date leads"));
+    if (plan.filters) metaEl.appendChild(textChip("Only", plan.filters));
+  }
+  if (result.date_order) {
+    const d = result.date_order;
+    metaEl.appendChild(textChip("Dated clips",
+      d.played === d.dated_clips ? `all ${d.played} played` : `${d.played} of ${d.dated_clips} fit this length`));
+  } else if (result.context && (result.context.order || "today") === "today") {
+    metaEl.appendChild(textChip("Screening", `${formatContextDate(result.context.date)} · ${result.context.season}`));
     const memory = result.memory;
     if (memory) {
       metaEl.appendChild(textChip("Opened on", `${memory.title} — ${memory.reasons.join(", ")}`));
@@ -244,7 +271,7 @@ function renderMeta(result) {
         metaEl.appendChild(textChip("Then", later.map((t) => t.title).join(", ")));
       }
     } else {
-      metaEl.appendChild(textChip("Opened on", "a random clip — none is labelled for this date, season or cue yet"));
+      metaEl.appendChild(textChip("Opened on", "a random clip — none is labelled for this date or season yet"));
     }
   }
   // Who owns what played, from the Clip library's Ownership column.
@@ -269,7 +296,8 @@ function textChip(label, value) {
 }
 
 /* ---------------------------------------------------------------------------
- * Memory triggers (screening context)
+ * Film plan: order, screening date and "Only clips from" filters
+ * (sent as the request's "context"; see engine/context.py)
  * ------------------------------------------------------------------------ */
 
 const SEASON_BY_MONTH = ["winter", "winter", "spring", "spring", "spring", "summer",
@@ -277,12 +305,6 @@ const SEASON_BY_MONTH = ["winter", "winter", "spring", "spring", "spring", "summ
 
 function contextDateValue() {
   return contextDateMode.value === "custom" && contextDate.value ? contextDate.value : null;
-}
-
-function inferredSeason() {
-  const custom = contextDateValue();
-  if (custom) return SEASON_BY_MONTH[parseInt(custom.slice(5, 7), 10) - 1];
-  return contextOptions ? contextOptions.today_season : "";
 }
 
 function formatContextDate(iso) {
@@ -293,11 +315,12 @@ function formatContextDate(iso) {
 function saveContextPrefs() {
   try {
     localStorage.setItem(CONTEXT_KEY, JSON.stringify({
-      enabled: contextToggle.checked,
+      order: filmOrder.value,
       dateMode: contextDateMode.value,
       date: contextDate.value,
-      season: contextSeason.value,
-      cue: contextCue.value,
+      years: filterYears.value,
+      onlySeason: filterSeason.value,
+      labels: filterLabels.value,
     }));
   } catch (e) {
     /* Private browsing or a full quota — the pickers still work. */
@@ -312,26 +335,37 @@ function loadContextPrefs() {
   }
 }
 
+// "Only clips from …" in words, or "" when every clip may appear.
+function filtersText() {
+  const parts = [];
+  if (filterYears.value.trim()) parts.push(filterYears.value.trim());
+  if (filterSeason.value) parts.push(filterSeason.value);
+  const labels = filterLabels.value.split(",").map((c) => c.trim()).filter(Boolean);
+  if (labels.length) parts.push(`labelled “${labels.join("” or “")}”`);
+  return parts.join(", ");
+}
+
+const ORDER_HINTS = {
+  today: () => {
+    const date = contextDateValue() || (contextOptions && contextOptions.today);
+    const season = date ? SEASON_BY_MONTH[parseInt(date.slice(5, 7), 10) - 1] : "";
+    return `Opens on the clip labelled closest to ${date ? formatContextDate(date) : "today"} ` +
+      `(same day and month, then month, then ${season || "season"}). Other matching clips follow, ` +
+      "then clips that share a person, place, tag, theme or mood.";
+  },
+  oldest: () => "Clips with a dated year play from the earliest to the latest. Clips without a year are left out.",
+  newest: () => "Clips with a dated year play from the latest to the earliest. Clips without a year are left out.",
+  calendar: () => "Clips play from January to December, whatever the year; a season-only clip sits at the start " +
+    "of its season (winter at 1 December). Clips dated only by a year are left out.",
+  contrast: () => "Every cut chosen to be as different as possible from the one before — the original engine.",
+};
+
 function updateContextUI() {
-  const on = contextToggle.checked;
-  contextFields.classList.toggle("hidden", !on);
-  contextHint.classList.toggle("hidden", !on);
+  contextDateField.classList.toggle("hidden", filmOrder.value !== "today");
   contextDate.classList.toggle("hidden", contextDateMode.value !== "custom");
-
-  // Keep the "Auto" label honest about which season it will use.
-  const autoOption = contextSeason.querySelector('option[value=""]');
-  if (autoOption) autoOption.textContent = `Auto (${inferredSeason()})`;
-
-  if (on && contextOptions) {
-    const date = contextDateValue() || contextOptions.today;
-    const season = contextSeason.value || inferredSeason();
-    const cue = contextCue.value.trim();
-    contextHint.textContent =
-      `Films open on the clip best matching ${formatContextDate(date)} — ${season}` +
-      (cue ? `, or labelled exactly “${cue.split(",").map((c) => c.trim()).filter(Boolean).join("” or “")}”` : "") +
-      `. Other matching clips follow, then clips that share a person, place, tag, theme or mood. ` +
-      `Label clips in the Clip library.`;
-  }
+  const filters = filtersText();
+  const hint = ORDER_HINTS[filmOrder.value] || (() => "");
+  contextHint.textContent = hint() + (filters ? ` Only clips from ${filters}.` : "");
   saveContextPrefs();
 }
 
@@ -340,35 +374,72 @@ async function loadContextOptions() {
     const res = await fetch("/api/context-options");
     contextOptions = await res.json();
   } catch (e) {
-    return; // Older backend: leave memory triggers off.
+    contextOptions = null;
   }
 
-  contextSeason.innerHTML = '<option value="">Auto</option>' +
-    contextOptions.seasons.map((s) => `<option value="${s}">${s[0].toUpperCase()}${s.slice(1)}</option>`).join("");
+  // The orders and seasons come from the engine, so the page and the
+  // engine always agree on them.
+  if (contextOptions && contextOptions.orders) {
+    filmOrder.innerHTML = "";
+    for (const o of contextOptions.orders) {
+      const opt = document.createElement("option");
+      opt.value = o.id;
+      opt.textContent = o.label;
+      filmOrder.appendChild(opt);
+    }
+  }
+  if (contextOptions && contextOptions.seasons) {
+    for (const season of contextOptions.seasons) {
+      const opt = document.createElement("option");
+      opt.value = season;
+      opt.textContent = season[0].toUpperCase() + season.slice(1);
+      filterSeason.appendChild(opt);
+    }
+  }
 
+  // Older saved choices had an on/off switch and a "cue": off meant the
+  // random contrast film, and a cue is now the "Labelled" filter.
   const prefs = loadContextPrefs();
-  // On unless someone has switched it off on this computer.
-  contextToggle.checked = prefs.enabled === undefined ? true : Boolean(prefs.enabled);
+  filmOrder.value = prefs.order || (prefs.enabled === false ? "contrast" : "today");
+  if (!filmOrder.value) filmOrder.value = "today";
   if (prefs.dateMode) contextDateMode.value = prefs.dateMode;
-  contextDate.value = prefs.date || contextOptions.today;
-  if (prefs.season !== undefined) contextSeason.value = prefs.season;
-  if (prefs.cue !== undefined) contextCue.value = prefs.cue;
+  contextDate.value = prefs.date || (contextOptions ? contextOptions.today : "");
+  filterYears.value = prefs.years || "";
+  filterSeason.value = prefs.onlySeason || "";
+  filterLabels.value = prefs.labels !== undefined ? prefs.labels : (prefs.cue || "");
   updateContextUI();
 }
 
-// The request's "context", or undefined (dropped from the JSON) when off.
+// The request's film plan, or undefined (dropped from the JSON) for the
+// plain random-contrast film, which is the engine exactly as it always was.
 function contextPayload() {
-  if (!contextToggle.checked || !contextOptions) return undefined;
+  const years = filterYears.value.trim();
+  const labels = filterLabels.value.trim();
+  if (filmOrder.value === "contrast" && !years && !filterSeason.value && !labels) return undefined;
   return {
+    order: filmOrder.value,
     date: contextDateValue() || "today",
-    season: contextSeason.value || null,
-    cue: contextCue.value.trim() || null,
+    years: years || null,
+    only_season: filterSeason.value || null,
+    labels: labels || null,
   };
 }
 
-for (const el of [contextToggle, contextDateMode, contextDate, contextSeason, contextCue]) {
+for (const el of [filmOrder, contextDateMode, contextDate, filterSeason]) {
   el.addEventListener("change", updateContextUI);
 }
+for (const el of [filterYears, filterLabels]) {
+  el.addEventListener("input", updateContextUI);
+}
+// Asking for a year usually means "show me that year in order", so typing
+// one switches "Today's date leads" to the timeline; any other order the
+// person picked stays.
+filterYears.addEventListener("change", () => {
+  if (filterYears.value.trim() && filmOrder.value === "today") {
+    filmOrder.value = "oldest";
+    updateContextUI();
+  }
+});
 
 function renderHistoryItem(entry) {
   const li = document.createElement("li");

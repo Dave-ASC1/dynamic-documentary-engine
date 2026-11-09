@@ -105,18 +105,19 @@
       </div>
       <p class="field-hint">Fades the music across each cut. Longer is softer; short clips shorten the fade automatically.</p>
 
-      <div class="toggle-row">
-        <label class="toggle-field has-tooltip" for="context-toggle">
-          <input type="checkbox" id="context-toggle" />
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-label">Memory triggers</span>
-          <span class="tooltip" role="tooltip">Lets the clips' labels shape the film. It opens on the clip best matching this screening's date or season — taken from the computer's clock — the way an anniversary can bring a memory back. Other matching clips follow, then clips that share a person, place, tag, theme or mood. Switch off for a fully random film.</span>
-        </label>
+      <div class="field field-centered">
+        <label for="film-order">Order</label>
+        <div class="field-input">
+          <select id="film-order" aria-label="Film order">
+            <option value="today">Today's date leads</option>
+            <option value="contrast">Random contrast</option>
+          </select>
+        </div>
       </div>
 
-      <div id="context-fields" class="context-fields hidden">
-        <div class="field field-centered">
-          <label for="context-date-mode">Date</label>
+      <div id="context-fields" class="context-fields">
+        <div id="context-date-field" class="field field-centered">
+          <label for="context-date-mode">Screening date</label>
           <div class="field-input context-date-input">
             <select id="context-date-mode" aria-label="Screening date">
               <option value="today">Today</option>
@@ -125,20 +126,29 @@
             <input type="date" id="context-date" class="hidden" aria-label="Custom screening date" />
           </div>
         </div>
+        <p class="context-group-label">Only clips from — leave blank for all clips</p>
         <div class="field field-centered">
-          <label for="context-season">Season</label>
+          <label for="filter-years">Year</label>
           <div class="field-input">
-            <select id="context-season"></select>
+            <input type="text" id="filter-years" placeholder="any — e.g. 1944 or 1942–1945" autocomplete="off" />
           </div>
         </div>
         <div class="field field-centered">
-          <label for="context-cue">Cue — any word or phrase</label>
+          <label for="filter-season">Season</label>
           <div class="field-input">
-            <input type="text" id="context-cue" placeholder="e.g. Camp Swift, 1252nd" autocomplete="off" />
+            <select id="filter-season" aria-label="Only clips from this season">
+              <option value="">Any</option>
+            </select>
+          </div>
+        </div>
+        <div class="field field-centered">
+          <label for="filter-labels">Labelled</label>
+          <div class="field-input">
+            <input type="text" id="filter-labels" placeholder="any — e.g. Camp Swift, G. Moore" autocomplete="off" />
           </div>
         </div>
       </div>
-      <p id="context-hint" class="field-hint hidden"></p>
+      <p id="context-hint" class="field-hint"></p>
 
       <div id="status" class="status" role="status">
         <span class="status-dot"></span>

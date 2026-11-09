@@ -29,9 +29,15 @@ Version: 1.1.0
 import random
 
 from engine.collection_loader import CollectionLoader
-from engine.context import ScreeningContext, shared_labels
+from engine.context import DATE_ORDERS, ScreeningContext, TimeSpan, shared_labels
 from engine.rules import SequencingRules
 from engine.artifact_selector import ArtifactSelector
+
+
+class NothingToPlay(ValueError):
+    """A film plan leaves nothing to show — no clip passes its filters or
+    has a place in its order. The message says what to do, in plain words,
+    so the pages can show it as it is."""
 
 
 class Sequencer:
@@ -49,13 +55,20 @@ class Sequencer:
         6. Closes with a generated B-roll + X-roll pair
         7. Returns the complete ordered film sequence
 
-    Memory films:
-        When generate() is given a screening context (memory triggers), the
-        clips' labels drive the film instead of chance: it opens on the
-        best match for the screening's date, season or cue, the other
-        matches follow strongest first, and from then on each clip leads to
-        one sharing a person, place, tag, theme or mood with it. Contrast
-        takes over only where nothing shares a label. See engine/context.py.
+    Film plans:
+        generate() may be given a film plan (a ScreeningContext — see
+        engine/context.py) saying which clips may appear and in what order:
+
+        - "today" (a memory film): the clips' labels drive the film instead
+          of chance. It opens on the best match for the screening's date or
+          season, the other matches follow strongest first, and from then
+          on each clip leads to one sharing a person, place, tag, theme or
+          mood with it. Contrast takes over only where nothing shares a
+          label.
+        - "oldest" / "newest" / "calendar": the dated clips play in date
+          order — a timeline, or January to December — with no generated
+          bookends; the first and last clips are the first and last dates.
+        - "contrast": the engine as without a plan, on the allowed clips.
 
     Runtime Control:
         target_duration accepts values from 1 to 9999 seconds, supporting
@@ -158,18 +171,21 @@ class Sequencer:
                                              length afterward, where having
                                              real footage past the target to
                                              cut is the point.
-            context (ScreeningContext | dict, optional): The screening's
-                                             date, season and any cues — turns
-                                             the run into a memory film. After
-                                             the call, self.memory describes
-                                             the clip the film opened on (or
-                                             is None when nothing matched),
-                                             self.triggered lists every
+            context (ScreeningContext | dict, optional): The film plan —
+                                             order, screening date and which
+                                             clips may appear (see the class
+                                             docstring). After the call,
+                                             self.memory describes the clip a
+                                             memory film opened on (or is
+                                             None), self.triggered lists every
                                              matching clip that played, in
-                                             order, and self.context_matches
-                                             maps each matching artifact ID to
-                                             (points, reasons). None leaves
-                                             generation exactly as without it.
+                                             order, self.context_matches maps
+                                             each matching artifact ID to
+                                             (points, reasons), and
+                                             self.date_order counts a
+                                             date-ordered film's clips. None
+                                             leaves generation exactly as
+                                             without it.
 
         Returns:
             list: An ordered list of artifact ID strings and paired tuples.
@@ -178,7 +194,9 @@ class Sequencer:
 
         Raises:
             ValueError: If target_duration is outside the 1–9999 second range.
-            RuntimeError: If the collection cannot produce generated bookends.
+            RuntimeError: If the collection cannot produce generated bookends
+                          (only without a film plan).
+            NothingToPlay: If the film plan leaves nothing to show.
         """
         if target_duration is not None:
             if not (self.MIN_DURATION <= target_duration <= self.MAX_DURATION):
@@ -198,15 +216,24 @@ class Sequencer:
                 "Collection has no body artifacts available for selection."
             )
 
-        # Score every artifact against the screening context up front. The
-        # selector also boosts matching artifacts' weights wherever a choice
-        # is still drawn by weight (bookends, audio, ties).
+        # A film plan decides which clips may appear and the order they come
+        # in. Without one, nothing below differs from the engine as it was.
         if isinstance(context, dict):
             context = ScreeningContext.from_dict(context)
-        memory_film = context is not None
+        order = context.order if context is not None else None
         self.memory = None
         self.triggered = []
         self.context_matches = {}
+        self.date_order = None
+        if context is not None:
+            body_artifacts = self._apply_filters(body_artifacts, context)
+        if order in DATE_ORDERS:
+            return self._generate_in_date_order(body_artifacts, context)
+
+        # Today's date leads: score every clip against the screening date up
+        # front. The selector also boosts matching clips' weights wherever a
+        # choice is still drawn by weight (bookends, audio, ties).
+        memory_film = order == "today"
         if memory_film:
             for a in body_artifacts:
                 points, reasons = context.match(a)
@@ -226,7 +253,12 @@ class Sequencer:
             a for a in body_artifacts if a.get("artifact_type") == "X-roll"
         ]
 
-        if not b_roll_artifacts or not x_roll_artifacts:
+        # With a film plan, the allowed clips may hold no B-roll or no audio
+        # for the generated bookends; the film then goes without them.
+        # Without a plan they are required, as they always were.
+        bookends_optional = context is not None
+        can_pair = bool(b_roll_artifacts and x_roll_artifacts)
+        if not can_pair and not bookends_optional:
             raise RuntimeError(
                 "Generated bookends require at least one B-roll artifact and "
                 "one X-roll artifact in the body pool."
@@ -241,14 +273,16 @@ class Sequencer:
             if opener is not None:
                 self._place_opener(opener, sequence, body_artifacts)
 
-        if opener is None:
+        opening_pair = None
+        if opener is None and can_pair:
             opening_pair = self._select_random_broll_xroll_pair(
                 b_roll_artifacts,
                 x_roll_artifacts,
             )
-            if opening_pair is None:
-                raise RuntimeError("Could not generate an opening B-roll/X-roll pair.")
+        if opener is None and opening_pair is None and not bookends_optional:
+            raise RuntimeError("Could not generate an opening B-roll/X-roll pair.")
 
+        if opening_pair is not None:
             opening_broll, opening_xroll = opening_pair
             sequence.append((
                 opening_broll.get("artifact_id"),
@@ -273,15 +307,17 @@ class Sequencer:
                  if a.get("artifact_id") not in self.context_matches],
                 x_roll_artifacts,
             )
-        if closing_pair is None:
+        if closing_pair is None and can_pair:
             closing_pair = self._select_random_broll_xroll_pair(
                 b_roll_artifacts,
                 x_roll_artifacts,
             )
-        if closing_pair is None:
+        if closing_pair is None and not bookends_optional:
             raise RuntimeError("Could not generate a closing B-roll/X-roll pair.")
 
-        reserved_closing_ids = {a.get("artifact_id") for a in closing_pair}
+        reserved_closing_ids = (
+            {a.get("artifact_id") for a in closing_pair} if closing_pair else set()
+        )
 
         # Reserve the closing B-roll's screen time in the duration budget so
         # the body loop leaves room for it. Without this, the loop only
@@ -290,9 +326,9 @@ class Sequencer:
         # overshoots target_duration by however long the closing clip is.
         # Skipped entirely in allow_overshoot mode, where landing at or
         # past target_duration using whole clips is the intended behavior.
-        closing_broll, _closing_xroll_for_budget = closing_pair
         requested_max = self.rules.runtime_rules.get("max_duration_seconds", float("inf"))
-        if not allow_overshoot:
+        if closing_pair is not None and not allow_overshoot:
+            closing_broll, _closing_xroll_for_budget = closing_pair
             self.rules.runtime_rules["max_duration_seconds"] = max(
                 0, requested_max - closing_broll.get("duration_seconds", 0)
             )
@@ -306,7 +342,7 @@ class Sequencer:
             )
         ]
 
-        current_mood = opener.get("mood")
+        current_mood = opener.get("mood") if opener is not None else None
 
         while not self.rules.has_reached_maximum_duration():
 
@@ -361,17 +397,132 @@ class Sequencer:
         self.rules.runtime_rules["max_duration_seconds"] = requested_max
 
         # Step 3 — Close with the reserved generated B-roll + X-roll pair.
-        closing_broll, closing_xroll = closing_pair
-        sequence.append((
-            closing_broll.get("artifact_id"),
-            closing_xroll.get("artifact_id"),
-        ))
-        self.rules.register_selection(closing_broll)
-        self.rules.register_pairing_selection(closing_xroll)
-        self._record_generated_usage(closing_broll)
-        self._record_generated_usage(closing_xroll)
-        self._record_triggered(closing_broll, len(sequence) - 1)
+        if closing_pair is not None:
+            closing_broll, closing_xroll = closing_pair
+            sequence.append((
+                closing_broll.get("artifact_id"),
+                closing_xroll.get("artifact_id"),
+            ))
+            self.rules.register_selection(closing_broll)
+            self.rules.register_pairing_selection(closing_xroll)
+            self._record_generated_usage(closing_broll)
+            self._record_generated_usage(closing_xroll)
+            self._record_triggered(closing_broll, len(sequence) - 1)
 
+        if not sequence:
+            raise NothingToPlay(
+                "None of the allowed clips fit in a film this short — "
+                "ask for a longer film, or allow more clips."
+            )
+        return sequence
+
+    def _apply_filters(self, body_artifacts, context):
+        """
+        The clips a film plan allows (see ScreeningContext.allows). Audio
+        always stays available.
+
+        Args:
+            body_artifacts (list): All body artifacts.
+            context (ScreeningContext): The film plan.
+
+        Returns:
+            list: The allowed artifacts.
+
+        Raises:
+            NothingToPlay: If the filters leave no picture clips.
+        """
+        allowed = [a for a in body_artifacts if context.allows(a)]
+        if context.has_filters() and not any(
+            a.get("artifact_type") in ("A-roll", "B-roll") for a in allowed
+        ):
+            raise NothingToPlay(
+                f"No clips match {context.describe_filters()} yet. "
+                "Add dates, seasons or labels in the Clip library, or choose fewer limits."
+            )
+        return allowed
+
+    def _generate_in_date_order(self, body_artifacts, context):
+        """
+        Builds a film from the dated clips in date order: a timeline
+        (oldest or newest first) or January to December (whatever the
+        year). Each clip's labels give it a span of time (TimeSpan); a clip
+        with no place in this order — no year for a timeline, only a year
+        for January to December — is left out. Clips with the same date
+        come in a different order each film. There are no generated
+        bookends: the first and last clips are the first and last dates.
+
+        Args:
+            body_artifacts (list):       The allowed body artifacts.
+            context (ScreeningContext): The film plan.
+
+        Returns:
+            list: The sequence, as generate() returns it.
+
+        Raises:
+            NothingToPlay: If no clip has a place in this order, or none fits.
+        """
+        calendar = context.order == "calendar"
+        x_roll_artifacts = [
+            a for a in body_artifacts if a.get("artifact_type") == "X-roll"
+        ]
+        self.selector.context_scores = {}
+        self.selector.match_audio_mood = True
+
+        dated = []
+        for a in body_artifacts:
+            if a.get("artifact_type") not in ("A-roll", "B-roll"):
+                continue
+            span = TimeSpan.of(a)
+            if span is None:
+                continue
+            key = span.calendar_key() if calendar else span.timeline_key()
+            if key is not None:
+                dated.append((key, a, span))
+
+        if not dated:
+            raise NothingToPlay(
+                "No clips have a month or season yet, so there is nothing to place "
+                "through the year. Add dates or seasons in the Clip library."
+                if calendar else
+                "No clips have a date with a year yet, so there is nothing to place on "
+                "a timeline. Add dates such as 9 May 1950, December 1944 or 1944 in "
+                "the Clip library."
+            )
+
+        # Shuffle first so clips sharing a date come in a different order
+        # each film; the sort is stable, so that order survives it.
+        random.shuffle(dated)
+        dated.sort(key=lambda item: item[0], reverse=context.order == "newest")
+
+        sequence = []
+        for _key, artifact, span in dated:
+            if self.rules.has_reached_maximum_duration():
+                break
+            if not self.rules.is_eligible(artifact):
+                continue
+            is_broll = artifact.get("artifact_type") == "B-roll"
+            if is_broll and not x_roll_artifacts:
+                continue
+            self.selector.place(artifact, kind="dated", reasons=[span.describe()])
+            self._record_generated_usage(artifact)
+            if is_broll:
+                x_roll = self.selector.select_pairing(x_roll_artifacts)
+                if x_roll is None:
+                    continue
+                sequence.append((artifact.get("artifact_id"), x_roll.get("artifact_id")))
+                self._record_generated_usage(x_roll)
+            else:
+                sequence.append(artifact.get("artifact_id"))
+
+        if not sequence:
+            raise NothingToPlay(
+                "None of the dated clips fit in a film this short — ask for a longer film."
+            )
+        self.date_order = {
+            "order": context.order,
+            "dated_clips": len(dated),
+            "played": len(sequence),
+        }
         return sequence
 
     def _record_generated_usage(self, artifact):

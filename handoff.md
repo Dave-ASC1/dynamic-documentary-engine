@@ -40,7 +40,7 @@ X-roll adds sound, not screen time.
 | `engine/collection_loader.py` | Reads a collection index JSON, checks required fields, hands out artifacts. |
 | `engine/rules.py` | Yes/no eligibility: no-repeat, duration budget, must-not-follow. Tracks running length. |
 | `engine/artifact_selector.py` | Picks the next clip: scores how *different* each candidate is from the last one, then weighted-random picks from the top few. Also picks X-rolls for B-rolls. |
-| `engine/context.py` | Memory triggers (draft): scores how well each clip's date/season labels (and any typed cue) match the screening. |
+| `engine/context.py` | The film plan: each clip's date label as a span of time (`TimeSpan`), the orders, the year/season/label filters, and how well a clip matches the screening date. |
 | `engine/sequencer.py` | The coordinator. Builds the ordered sequence: opening pair → body → closing pair. |
 | `engine/assembler.py` | Turns the sequence into an MP4 with FFmpeg: one normalized segment per slot, then joins them. |
 | `engine/cancellation.py` | Lets the web UI kill a render mid-flight (including the running FFmpeg process). |
@@ -201,7 +201,44 @@ Re-encoding (not stream-copy) is what makes the cut frame-accurate instead of
 snapping to a keyframe. The price: whatever was playing gets cut off
 mid-shot. The exhibit view keeps this off.
 
-### Memory triggers (October–November 2026)
+### Order, filters and memory triggers (October–November 2026)
+
+A film can be given a **film plan** (`ScreeningContext` in
+`engine/context.py`; the request's `context`). It has two parts that combine:
+
+- **Order** (`ORDERS`): `today` (today's date leads — the memory film
+  below), `oldest` / `newest` (timeline), `calendar` (through the year,
+  January to December whatever the year), `contrast` (the original engine).
+- **Only clips from** (filters on the pictures; audio is never filtered):
+  `years` (1944 or 1942–1945, matched on the year a clip's span starts in),
+  `only_season` (the clip's labelled season, or its date's), and `labels`
+  (exact label match, the rule cues used to follow — the old `cue` key is
+  read as `labels`). A year given without an order means `oldest`.
+
+**Every date label is a span of time** (`TimeSpan.of()`): a day, a month, a
+year, a season in any year ("winter" = December–February), or a season in a
+year ("winter" + 1944 = December 1944 – February 1945). A season-only span
+is placed at the start of its season for ordering (spring 1 March, summer
+1 June, autumn 1 September, winter 1 December). Timeline orders need a year
+(`timeline_key()`); through the year needs a month or season
+(`calendar_key()`); clips without one are left out of that film.
+Same-date clips are shuffled before the (stable) sort so films still vary.
+
+**Date-ordered films** (`Sequencer._generate_in_date_order()`) have no
+generated bookends — the first and last clips are the first and last dates —
+and pair B-roll with same-mood audio. When a plan leaves nothing to show
+(say, a year no clip is dated in), the engine raises `NothingToPlay` with a
+plain message; the backend answers 422 and the page shows it. Filters can
+also leave a `today` or `contrast` film without a B-roll for its bookends;
+with a plan, the film then simply goes without them. Without any plan, the
+engine is byte-for-byte what it was (600 seeded films compared).
+
+The console's Order picker and filters, and the same choices in the exhibit
+setup, replaced the on/off memory-triggers switch and the Cue box in November
+2026; choices saved on a computer under the old switch are carried over
+(off = Random contrast, a cue = Labelled).
+
+#### Today's date leads (memory films)
 
 Dr. Campbell's idea: memories are triggered by surroundings — a date, a
 season — the way veterans' journals open each entry with the date. So a
@@ -230,10 +267,8 @@ she expected the 26 October clip to open it and the autumn clip to follow):
 5. The closing pair is drawn from clips that *don't* match when possible, so
    the matches are free to follow the opening.
 
-With memory triggers **off**, nothing above applies — verified to produce
-identical films to the engine before this change, seed for seed (600 films
-across both collections). They are **on by default** in the console and the
-exhibit; a saved choice on a computer is respected.
+It is the default order in the console and the exhibit; a saved choice on
+a computer is respected.
 
 - **The date comes from the computer's own clock.** The engine is offline
   by design, so it looks nothing up; the season is inferred from the date.
@@ -242,24 +277,28 @@ exhibit; a saved choice on a computer is respected.
   accepted and the weather is ignored.) The console can pick another date
   to rehearse, e.g. 11 November; the exhibit always uses today.
 - **Matching is points:** same month and day (an anniversary,
-  any year) 3, same month 2, same season 1, and a **cue** 4 per match. The
-  points rank the matches; the year is never compared, so a date can be
-  entered without one (*26 October*, stored as `--10-26`).
-- **A cue is any word or phrase someone types** ("Camp Swift", a veteran's
-  name). It matches a clip only when it *exactly equals* one of its labels —
-  title, a tag, a theme, a person, the place or the mood —
+  any year) 3, same month 2, same season 1 (a season-only label matches any
+  date in its months). The points rank the matches; the year is never
+  compared, so a date can be entered without one (*26 October*, stored as
+  `--10-26`).
+- **A label filter is any word or phrase someone types** ("Camp Swift", a
+  veteran's name). It matches a clip only when it *exactly equals* one of its
+  labels — title, a tag, a theme, a person, the place or the mood —
   ignoring capitals and surrounding punctuation. "camp" does not match
   "Camp Swift"; a long title does not match a word inside it. That keeps
-  results predictable: what was labelled is what comes up.
+  results predictable: what was labelled is what comes up. (Until November
+  2026 this was a "cue" that ranked clips first instead of filtering.)
 - **Where a choice is still drawn by weight** (ties, bookends, audio),
   matching clips get a boost (×1.5 per point).
 - **Nothing matching** still makes a memory film: it opens on a random pair
   and follows shared labels from there.
 - The trace says why each clip came: "Open · Memory trigger", "Memory
-  trigger", "Follows on — shares Camp Swift", or the usual contrast
-  dimensions; audio pairings note "same mood". The result and manifest
-  record the context, `memory` (the opener), `triggered` (every matching
-  clip that played, in order) and the film's `sources`.
+  trigger", "Follows on — shares Camp Swift", "In date order — 9 May 1950",
+  or the usual contrast dimensions; audio pairings note "same mood". The
+  result and manifest record the plan (`context`), `memory` (the opener),
+  `triggered` (every matching clip that played, in order), `date_order`
+  (how many dated clips had a place and how many fit) and the film's
+  `sources`.
 - **Superseded:** the first draft (October 2026) gave matches only a gentle
   boost inside the top-3 contrast pool and placed one guaranteed match
   25–75% through the film. In tests that opened on the anniversary clip in
@@ -381,6 +420,9 @@ bookends and generation fails.
   The opener is chosen in `Sequencer._best_context_match()`, each later clip
   in `Sequencer._select_memory_film_next()`; which labels link clips is
   `link_labels()` in `engine/context.py`.
+- **Where a label sits in date order:** `TimeSpan` in `engine/context.py`
+  (`SEASON_START_MONTH` for season-only labels); the orders are `ORDERS`,
+  and the pages read them from `/api/context-options`.
 
 ### Tune the dissimilarity scoring
 
@@ -498,15 +540,18 @@ None of these have been started unless it says otherwise.
   volumes. FFmpeg's `loudnorm` per segment (in `assembler.py`) would even them
   out. It's a separate change from the fade and shouldn't be mixed into it.
   Two-pass `loudnorm` is more accurate but doubles audio analysis time.
-- **Memory triggers and cues — built, needs labels.** Built as described in
-  §2: a memory film opens on the best match and follows shared labels, as Dr.
-  Campbell described after the late-October test. It needs real clips
-  labelled (dates, seasons, people, places, moods, ownership) in the Clip
-  library. Still open with her: is a clip's date *when it happened* or *when
-  it was filmed*.
+- **Order, filters and memory triggers — built, needs labels.** Built as
+  described in §2: today's date leads, timeline, through the year and random
+  contrast, with year/season/label filters, as Dr. Campbell described after
+  the late-October test. It needs real clips labelled (dates, seasons,
+  people, places, moods, ownership) in the Clip library. Still open with
+  her: is a clip's date *when it happened* or *when it was filmed*; and
+  whether a season with a year ("winter 1944") should mean December 1944 –
+  February 1945, as it does now.
 - **A-roll as bookends — partly settled.** In a memory film the best match
-  opens the film whatever its type, so an A-roll can open it. Otherwise
-  only B-roll + X-roll pairs open and close.
+  opens the film whatever its type, and a film in date order opens and
+  closes on its first and last dates, so an A-roll can do either. Random
+  contrast films still open and close on B-roll + X-roll pairs.
 - **Live webcam / stream input — not started beyond the plumbing.** The
   assembler can read a `stream` source type from a per-artifact JSON file,
   but there's no UI or workflow for adding one.

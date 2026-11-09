@@ -19,7 +19,7 @@ Editable labels and where they matter:
     ownership                      — who owns the clip or holds its rights
                                      (provenance/copyright); listed as the
                                      film's sources, never used for selection
-    people, geography (place)      — matched by cues, and link clips in a
+    people, geography (place)      — matched by label filters, and link clips in a
                                      memory film
     mood, tags, theme              — link clips in a memory film (and mood
                                      picks matching audio); contrast

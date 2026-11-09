@@ -22,10 +22,12 @@ const setupDuration = document.getElementById("setup-duration");
 const setupUnit = document.getElementById("setup-unit");
 const setupDurationHint = document.getElementById("setup-duration-hint");
 const setupStart = document.getElementById("setup-start");
-const setupContext = document.getElementById("setup-context");
-const setupContextHint = document.getElementById("setup-context-hint");
-const setupCue = document.getElementById("setup-cue");
-const setupCueField = document.getElementById("setup-cue-field");
+const setupOrder = document.getElementById("setup-order");
+const setupOrderHint = document.getElementById("setup-order-hint");
+const setupYears = document.getElementById("setup-years");
+const setupYearsHint = document.getElementById("setup-years-hint");
+const setupSeason = document.getElementById("setup-season");
+const setupLabels = document.getElementById("setup-labels");
 
 const panels = {
   attract: document.getElementById("attract"),
@@ -119,12 +121,28 @@ function refreshStartButton() {
     setupCollectionHint.textContent =
       `"${collection.name}" has no footage yet. Add clips to its assets folder first.`;
   }
-  setupStart.disabled = !collection || empty || setupSeconds() === null;
+  setupStart.disabled = !collection || empty || setupSeconds() === null || !yearsValid();
 }
 
-// Memory triggers: the date always follows the calendar (the server's own
-// clock, so a long-running exhibit rolls over by itself); staff may add a
-// cue. Hidden entirely if the backend predates the feature.
+// A year (1944) or a range (1942–1945), or blank for any year. Checked here
+// so a mistyped year can't reach the gallery wall as an error.
+function yearsValid() {
+  const value = setupYears.value.trim();
+  return !value || /^\d{4}(\s*[-–]\s*\d{4})?$/.test(value);
+}
+
+// Film plan: the order, and which clips may appear (see engine/context.py).
+// "Today's date leads" always uses today — the server's own clock — so a
+// long-running exhibit rolls over by itself.
+const ORDER_HINTS = {
+  today: "Each film opens on the clip labelled closest to today's date or season; other matching " +
+    "clips follow, then clips sharing a person, place, tag, theme or mood.",
+  oldest: "Clips with a dated year play from the earliest to the latest.",
+  newest: "Clips with a dated year play from the latest to the earliest.",
+  calendar: "Clips play from January to December, whatever the year.",
+  contrast: "Every cut is as different as possible from the one before.",
+};
+
 async function loadContextOptions(saved) {
   let options = null;
   try {
@@ -133,27 +151,49 @@ async function loadContextOptions(saved) {
   } catch (e) {
     options = null;
   }
-  if (!options) {
-    for (const el of [setupContext.closest(".setup-field"), setupCueField, setupContextHint]) {
-      el.classList.add("hidden");
+  if (options && options.orders) {
+    setupOrder.innerHTML = "";
+    for (const o of options.orders) {
+      const opt = document.createElement("option");
+      opt.value = o.id;
+      opt.textContent = o.label;
+      setupOrder.appendChild(opt);
     }
-    setupContext.value = "off";
-    return;
   }
-  if (saved && saved.context) {
-    setupContext.value = saved.context.enabled ? "on" : "off";
-    setupCue.value = saved.context.cue || "";
+  if (options && options.seasons) {
+    for (const season of options.seasons) {
+      const opt = document.createElement("option");
+      opt.value = season;
+      opt.textContent = season[0].toUpperCase() + season.slice(1);
+      setupSeason.appendChild(opt);
+    }
   }
+  // Older saved settings had an on/off switch and a cue: off meant the
+  // random contrast film, and a cue is now "Only clips labelled".
+  const plan = (saved && saved.context) || {};
+  setupOrder.value = plan.order || (plan.enabled === false ? "contrast" : "today");
+  if (!setupOrder.value) setupOrder.value = "today";
+  setupYears.value = plan.years || "";
+  setupSeason.value = plan.only_season || "";
+  setupLabels.value = plan.labels || plan.cue || "";
   refreshContextFields();
 }
 
 function refreshContextFields() {
-  const on = setupContext.value === "on";
-  setupCueField.classList.toggle("hidden", !on);
-  setupContextHint.classList.toggle("hidden", !on);
+  setupOrderHint.textContent = ORDER_HINTS[setupOrder.value] || "";
+  setupYearsHint.classList.toggle("hidden", yearsValid());
+  refreshStartButton();
 }
 
-setupContext.addEventListener("change", refreshContextFields);
+setupOrder.addEventListener("change", refreshContextFields);
+setupYears.addEventListener("input", refreshContextFields);
+// Asking for a year usually means "show me that year in order".
+setupYears.addEventListener("change", () => {
+  if (setupYears.value.trim() && setupOrder.value === "today") {
+    setupOrder.value = "oldest";
+    refreshContextFields();
+  }
+});
 
 async function loadCollections() {
   try {
@@ -221,13 +261,26 @@ setupStart.addEventListener("click", () => {
     seconds,
     mode: currentMode(),
     context: {
-      enabled: setupContext.value === "on",
-      cue: setupCue.value.trim() || null,
+      order: setupOrder.value,
+      years: setupYears.value.trim() || null,
+      only_season: setupSeason.value || null,
+      labels: setupLabels.value.trim() || null,
     },
   };
   saveSettings(settings);
   enterExhibit();
 });
+
+// The request's film plan, or undefined for the plain random-contrast film
+// (the engine exactly as it always was). Settings saved before the Order
+// choice existed are read the old way: on/off and a cue.
+function exhibitPlan(plan) {
+  if (!plan) return undefined;
+  const order = plan.order || (plan.enabled === false ? "contrast" : "today");
+  const labels = plan.labels || plan.cue || null;
+  if (order === "contrast" && !plan.years && !plan.only_season && !labels) return undefined;
+  return { date: "today", order, years: plan.years || null, only_season: plan.only_season || null, labels };
+}
 
 /* ---------------------------------------------------------------------------
  * Entering and leaving the exhibit
@@ -356,11 +409,9 @@ async function generate() {
         // cut mid-shot on a gallery wall.
         diversity_mode: true,
         exact_duration: false,
-        // "today" is resolved by the server each time, so the context
+        // "today" is resolved by the server each time, so the film plan
         // follows the calendar through a long-running day.
-        context: settings.context && settings.context.enabled
-          ? { date: "today", cue: settings.context.cue }
-          : undefined,
+        context: exhibitPlan(settings.context),
       }),
     });
     const result = await res.json();

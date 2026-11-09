@@ -71,13 +71,22 @@ Each run, the engine:
 
 Two optional modes: **Diversity mode** (boosts underused clips so favourites don't dominate) and **Exact duration** (trims the final render to the exact requested length; off by default so whole clips are preserved).
 
-**Memory triggers** (on by default): the clips' labels shape the film, the way an anniversary can bring a memory back. The film **opens on the clip that best matches the screening's date** — taken from the computer's own clock — an anniversary (same day and month, any year) first, then the same month, then the same season. **The other matching clips follow**, strongest first. After that **each clip leads to one that shares a label with it** — a person, place, tag, theme or mood — and only when nothing shares one does the engine cut to something different by contrast. B-roll with a mood is paired with audio of the same mood. A **cue** (any word or phrase typed in, e.g. "Camp Swift") counts as the strongest match for clips whose title, tag, theme, person, place or mood is exactly that (capitals ignored). Clips carry the context in their index entry:
+**Order and which clips** (the clips' labels shape the film). Two settings combine:
+
+- **Order** —
+  - *Today's date leads* (default): the film **opens on the clip that best matches the screening's date** — taken from the computer's own clock — an anniversary (same day and month, any year) first, then the same month, then the same season. **The other matching clips follow**, strongest first. After that **each clip leads to one that shares a label with it** — a person, place, tag, theme or mood — and only when nothing shares one does the engine cut to something different by contrast.
+  - *Timeline, oldest first* / *newest first*: dated clips in date order across the years.
+  - *Through the year*: January to December, whatever the year — clips from the same month in different years sit together.
+  - *Random contrast*: the original engine — fully random between the bookends, chosen for contrast. Exactly as before.
+- **Only clips from** (optional): a **year** or range (1944, 1942–1945), a **season**, and/or clips **labelled** exactly with a word or phrase (Camp Swift, G. Moore; capitals ignored). Choosing a year switches the order to the timeline unless you pick another.
+
+Every date label is a **stretch of time**: *9 May 1950* is that day, *December 1944* the month, *1944* the year, *winter* December to February in any year, and *winter* with the year 1944 December 1944 to February 1945. A season-only label counts for all of its months when matching the screening date, and sits at the start of its season on a timeline (winter at 1 December). Clips with nothing placing them in the chosen order — no year for a timeline, only a year for *Through the year* — are left out of that film. In every order but *Random contrast*, B-roll with a mood is paired with audio of the same mood. Clips carry the labels in their index entry:
 
 ```json
 "context": { "date": "1944-12-18", "season": "winter" }
 ```
 
-A date may leave out the year (`"--10-26"`, typed as *26 October* in the Clip library) — matching never uses it. The season is inferred from the date when left out. With memory triggers off, the engine works exactly as before: fully random between the bookends, chosen for contrast.
+A date may leave out the year (`"--10-26"`, typed as *26 October* in the Clip library). The season is inferred from the date when left out.
 
 Each clip can also record its **ownership** (who owns it or holds its rights) in the Clip library; every film lists the owners of what played under **Sources**, for credits and copyright.
 
@@ -126,9 +135,9 @@ Drop a file into an `assets` subfolder and it's auto-tagged (duration, dominant 
 
 Two views onto the same engine:
 
-- **Director's console (`/`)** — the working instrument: topic and length pickers, the generate/cancel controls, the audio/diversity/exact-duration options, the **Memory triggers** pickers (date, season, cue), the **sequence trace** (why each cut was chosen), and a replayable **film history** with the date and time each was made.
+- **Director's console (`/`)** — the working instrument: topic and length pickers, the generate/cancel controls, the audio/diversity/exact-duration options, the **Order** picker and **Only clips from** filters (year, season, label), the **sequence trace** (why each cut was chosen), and a replayable **film history** with the date and time each was made.
 - **Clip library (`/library`)** — a table of every clip to label in the browser (date, season, title, mood, tags, people, place); saves automatically.
-- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic, length and (optionally) memory triggers and a cue once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
+- **Exhibit view (`/exhibit`)** — the gallery installation: staff set topic, length, order and (optionally) which clips once, visitors see a single button, films play full screen with a plain-language progress readout. Can also run unattended, making a new film whenever one finishes.
 
 ---
 
@@ -146,7 +155,7 @@ dynamic-documentary-engine/
 │   ├── sequencer.py            #   coordinates a run: bookends + body
 │   ├── rules.py                #   no-repeat, duration budget, pairing
 │   ├── artifact_selector.py    #   dissimilarity scoring + weighted selection
-│   ├── context.py              #   memory triggers: date/season/cue matching
+│   ├── context.py              #   film plan: date spans, order, filters, memory triggers
 │   ├── collection_loader.py    #   loads/validates a collection index
 │   ├── assembler.py            #   FFmpeg rendering, audio layering + fades
 │   └── cancellation.py         #   stops a render in progress
@@ -181,7 +190,7 @@ New to the code? Read **[AGENT.md](AGENT.md)** — it's the developer's orientat
 
 ## Status
 
-**The core engine is complete and validated end to end on real media.** Done: the metadata schema, the rule-based sequencing engine, the FFmpeg pipeline, multi-topic auto-discovered collections, the web console and exhibit view, saved film manifests, turnkey setup (guide + launchers), and audio polish (eased transitions with a per-run, per-clip varying fade). In draft: **memory triggers** (date/season context and cues) with the Clip library table for entering dates and seasons, pending dates and seasons on real clips on real clips.
+**The core engine is complete and validated end to end on real media.** Done: the metadata schema, the rule-based sequencing engine, the FFmpeg pipeline, multi-topic auto-discovered collections, the web console and exhibit view, saved film manifests, turnkey setup (guide + launchers), and audio polish (eased transitions with a per-run, per-clip varying fade). Built, waiting on labelled clips: **order and filters** (today's date leads, timeline, through the year; year/season/label filters) and the Clip library table for entering dates, seasons, labels and ownership.
 
 Remaining / future directions: loading the full real WWII and Swiss footage, the gallery installation, and the technical documentation report. Memory triggers use the computer's date and human-entered labels; reacting to live outside signals would need an internet connection and is beyond the current local system.
 

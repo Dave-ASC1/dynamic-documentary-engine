@@ -1,29 +1,39 @@
 """
 context.py
 ----------
-Dynamic Documentary Engine — Screening Context ("Memory Triggers")
+Dynamic Documentary Engine — Film Plan ("Memory Triggers", dates and order)
 
-Lets the circumstances of a screening — its date and season, or any word
-someone types as a cue — decide how a film begins and where it goes next,
-the way a December day can bring a veteran's own December back. The date
-comes from the computer's own clock (the engine runs offline), the season
-follows from it, and clips carry optional labels saying when they happened.
+Lets the clips' labels shape a film: what it includes and in what order.
+Two settings combine:
 
-With memory triggers on, a film is built from its labels (see
-Sequencer.generate):
+    Which clips — all of them, or only clips from a year or range of years
+                  (1944, 1942–1945), from a season, or labelled with a word
+                  or phrase (Camp Swift, G. Moore). Filters apply to the
+                  pictures (A-roll and B-roll); audio is always free to pair.
 
-    1. It opens on the clip that best matches the screening — an
-       anniversary (same month and day, any year) first, then the same
-       month, then the same season; a cue that matches a label counts most.
-    2. The other matching clips follow, strongest match first.
-    3. After that, each clip leads to one that shares a label with it — a
-       person, a place, a tag, a theme or a mood — so the film follows a
-       thread. Only when nothing shares a label does it cut to something
-       different, by contrast, as it always has.
-    4. B-roll with a mood is paired with audio of the same mood.
+    What order  — one of ORDERS:
+        "today"     Today's date leads. The screening's date (the computer's
+                    own clock) picks the opening clip — an anniversary (same
+                    day and month, any year) first, then the same month,
+                    then the same season. The other matching clips follow,
+                    strongest first; after that each clip leads to one
+                    sharing a person, place, tag, theme or mood with it, and
+                    only when nothing shares a label does the engine cut to
+                    something different by contrast. See Sequencer.generate.
+        "oldest"    Timeline, oldest first.
+        "newest"    Timeline, newest first.
+        "calendar"  Through the year, January to December, whatever the year.
+        "contrast"  Random contrast — the engine as it always was.
 
-With memory triggers off, the engine works exactly as it does without this
-module: fully random between the bookends, chosen for contrast.
+In every order but "contrast", B-roll with a mood is paired with audio of
+the same mood. With no film plan at all the engine works exactly as before.
+
+Every date label is a stretch of time (see TimeSpan): "9 May 1950" is that
+day, "December 1944" the month, "1944" the year, "winter" December to
+February in any year, and "winter" with the year 1944 December 1944 to
+February 1945. A season on its own is placed at the start of its months for
+ordering — spring 1 March, summer 1 June, autumn 1 September, winter
+1 December — so give the month when it is known.
 
 Clip metadata (optional, in a collection index entry):
 
@@ -33,28 +43,42 @@ Clip metadata (optional, in a collection index entry):
         "season": "winter"         # inferred from the date's month if omitted
     }
 
-A cue (e.g. "Camp Swift") matches a clip when it is exactly equal —
-ignoring capitals and surrounding punctuation — to one of its labels: the
-title, a tag, a theme, a person, the place or the mood.
+A label filter matches a clip when it is exactly equal — ignoring capitals
+and surrounding punctuation — to one of its labels: the title, a tag, a
+theme, a person, the place or the mood.
 
 Author: Oluwafemisola David Ademoye
 Supporting: Omotola Ajibike Ajao
 Project: Dynamic Documentary Engine
 Institution: Penn State University, College of IST
 Supervisor: Dr. Betsy Campbell, Associate Teaching Professor
-Version: 1.1.0
+Version: 2.0.0
 """
 
 import datetime
 
 SEASONS = ("winter", "spring", "summer", "autumn")
 
-# Points an artifact earns for each way it matches the screening context.
-# Dates match on month and day only — an anniversary, whatever the year.
+# The month each season starts in, for placing a season-only label in order.
+SEASON_START_MONTH = {"spring": 3, "summer": 6, "autumn": 9, "winter": 12}
+
+# What order a film is built in, with the words the pages show for each.
+ORDERS = {
+    "today": "Today's date leads",
+    "oldest": "Timeline, oldest first",
+    "newest": "Timeline, newest first",
+    "calendar": "Through the year",
+    "contrast": "Random contrast",
+}
+# The orders that place clips by their dates rather than choosing them.
+DATE_ORDERS = ("oldest", "newest", "calendar")
+
+# Points a clip earns for each way it matches the screening date, in the
+# "today" order. Dates match on month and day only — an anniversary,
+# whatever the year.
 ANNIVERSARY_POINTS = 3     # same month and day
 SAME_MONTH_POINTS = 2      # same month, different or unknown day
 SEASON_POINTS = 1          # same season
-CUE_POINTS = 4             # per cue that exactly equals one of the artifact's labels
 
 # Where a choice is still made by weight — between equally strong matches,
 # for the bookends and for audio — the weight is multiplied by
@@ -185,12 +209,12 @@ def normalize_date_input(value):
 
 def normalize_label(value):
     """Lower-case, single-spaced, without surrounding punctuation — the form
-    labels and cues are compared in, so "Camp Swift." matches "camp swift"."""
+    labels and label filters are compared in, so "Camp Swift." matches "camp swift"."""
     return " ".join(str(value).lower().split()).strip(" .,;:!?\"'()[]")
 
 
 def _artifact_labels(artifact):
-    """Every label on an artifact that a cue may match exactly."""
+    """Every label on an artifact that a label filter may match exactly."""
     content = artifact.get("content", {})
     labels = set()
     for key in ("title", "mood", "geography"):
@@ -250,8 +274,8 @@ def shared_labels(first, second):
     return sorted((written[label] for label in common), key=str.lower)
 
 
-def _cue_list(value):
-    """A cue as typed ("Camp Swift, 1252nd") -> ["Camp Swift", "1252nd"]."""
+def _label_list(value):
+    """Labels as typed ("Camp Swift, 1252nd") -> ["Camp Swift", "1252nd"]."""
     if isinstance(value, str):
         value = value.split(",")
     return [c.strip() for c in (value or []) if str(c).strip()]
@@ -263,67 +287,203 @@ def _artifact_context(artifact):
     return artifact.get("context") or artifact.get("content", {}).get("context") or {}
 
 
+def _clip_season(artifact):
+    """A clip's season: the one labelled, or the one its date's month falls
+    in. None when neither is known."""
+    ctx = _artifact_context(artifact)
+    season = str(ctx.get("season") or "").strip().lower()
+    if season in SEASONS:
+        return season
+    parsed = parse_partial_date(ctx.get("date"))
+    return season_for_month(parsed[1]) if parsed and parsed[1] else None
+
+
+class TimeSpan:
+    """
+    The stretch of time a clip's date label covers.
+
+    Attributes:
+        year (int):       Year it starts in, or None for a label that holds
+                          in any year ("winter", "26 October").
+        month (int):      Month it starts in, or None for a whole year.
+        day (int):        Day it starts on, or None for a whole month,
+                          season or year.
+        precision (str):  "day", "month", "season" or "year".
+        season (str):     The season, for a season label; else None.
+    """
+
+    def __init__(self, year, month, day, precision, season=None):
+        self.year, self.month, self.day = year, month, day
+        self.precision, self.season = precision, season
+
+    @classmethod
+    def of(cls, artifact):
+        """The span a clip's labels describe, or None when it has no date
+        and no season.
+
+        Args:
+            artifact (dict): Artifact summary dictionary.
+
+        Returns:
+            TimeSpan: The span, or None.
+        """
+        ctx = _artifact_context(artifact)
+        parsed = parse_partial_date(ctx.get("date"))
+        season = str(ctx.get("season") or "").strip().lower()
+        season = season if season in SEASONS else None
+        year, month, day = parsed if parsed else (None, None, None)
+        if day is not None:
+            return cls(year, month, day, "day")
+        if month is not None:
+            return cls(year, month, None, "month")
+        if season is not None:
+            return cls(year, SEASON_START_MONTH[season], None, "season", season)
+        if year is not None:
+            return cls(year, None, None, "year")
+        return None
+
+    def timeline_key(self):
+        """Sort key for a timeline (oldest first), or None when the span
+        has no year and so no place on one."""
+        if self.year is None:
+            return None
+        return (self.year, self.month or 0, self.day or 0)
+
+    def calendar_key(self):
+        """Sort key for "through the year" (January to December, any year),
+        or None for a span that is only a year."""
+        if self.month is None:
+            return None
+        return (self.month, self.day or 0)
+
+    def describe(self):
+        """Plain words, e.g. "9 May 1950", "December 1944",
+        "winter 1944 (December 1944 – February 1945)", "26 October"."""
+        year = f" {self.year}" if self.year is not None else ""
+        if self.precision == "day":
+            return f"{self.day} {_MONTH_NAMES[self.month - 1]}{year}"
+        if self.precision == "month":
+            return f"{_MONTH_NAMES[self.month - 1]}{year}"
+        if self.precision == "season":
+            start = SEASON_START_MONTH[self.season]
+            end = (start + 1) % 12 + 1
+            if self.year is None:
+                return f"{self.season} ({_MONTH_NAMES[start - 1]} – {_MONTH_NAMES[end - 1]})"
+            end_year = self.year + (1 if end < start else 0)
+            return (f"{self.season} {self.year} ({_MONTH_NAMES[start - 1]} {self.year} – "
+                    f"{_MONTH_NAMES[end - 1]} {end_year})")
+        return str(self.year)
+
+
+def parse_years(value):
+    """Turns "1944", "1942-1945" or "1942–1945" into (first, last).
+
+    Args:
+        value (str | int): The year or range as typed; empty means any.
+
+    Returns:
+        tuple: (first, last), or None for any year.
+
+    Raises:
+        ValueError: If it isn't a year or a range of years.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().replace("–", "-").replace("—", "-").replace(" to ", "-")
+    if not text:
+        return None
+    parts = [p.strip() for p in text.split("-")]
+    if not 1 <= len(parts) <= 2 or not all(p.isdigit() and len(p) == 4 for p in parts):
+        raise ValueError(f"{value!r} isn't a year — try 1944 or 1942–1945.")
+    first, last = int(parts[0]), int(parts[-1])
+    if first > last:
+        first, last = last, first
+    return first, last
+
+
 class ScreeningContext:
     """
-    The circumstances of one screening: its date and season, plus any cues.
+    The plan for one film: the screening's date and season, which clips may
+    appear, and the order they come in. (The name dates from when this only
+    held the screening's circumstances.)
 
     Attributes:
         date (datetime.date): The screening date.
-        season (str):         The season — given explicitly, or inferred
-                              from the date.
-        cues (list):          Words or phrases to match exactly against
-                              artifact labels; may be empty.
+        season (str):         The screening's season — given explicitly, or
+                              inferred from the date.
+        order (str):          One of ORDERS.
+        years (tuple):        (first, last) year a clip's date must start
+                              in, or None for any.
+        only_season (str):    A season a clip must belong to, or None.
+        labels (list):        Words or phrases; a clip must carry one of
+                              them exactly. Empty for any clip.
     """
 
-    def __init__(self, date=None, season=None, cue=None):
+    def __init__(self, date=None, season=None, order=None, years=None,
+                 only_season=None, labels=None):
         """
-        Initializes a screening context.
+        Initializes a film plan.
 
         Args:
             date (datetime.date | str): The screening date, as a date or a
                 "YYYY-MM-DD" string. None or "today" means the computer's
                 own date — no internet needed.
             season (str): Overrides the season inferred from the date.
-            cue (str | list): Words or phrases, e.g. "Camp Swift, 1252nd".
+            order (str): One of ORDERS. Defaults to "oldest" when years are
+                given and "today" otherwise.
+            years (str | tuple): Only clips dated in this year or range,
+                e.g. "1944" or "1942-1945".
+            only_season (str): Only clips from this season.
+            labels (str | list): Only clips labelled with one of these,
+                e.g. "Camp Swift, 1252nd".
 
         Raises:
-            ValueError: If the date or season is not recognised.
+            ValueError: If a value is not recognised.
         """
         if date is None or (isinstance(date, str) and date.strip().lower() in ("", "today")):
             date = datetime.date.today()
         elif isinstance(date, str):
             parsed = parse_partial_date(date)
-            if parsed is None or parsed[2] is None:
-                raise ValueError(f"Context date must be YYYY-MM-DD or 'today', got {date!r}.")
+            if parsed is None or parsed[0] is None or parsed[2] is None:
+                raise ValueError(f"Screening date must be YYYY-MM-DD or 'today', got {date!r}.")
             date = datetime.date(*parsed)
         self.date = date
 
-        if season:
-            season = str(season).strip().lower()
-            if season not in SEASONS:
-                raise ValueError(f"Context season must be one of {', '.join(SEASONS)}; got {season!r}.")
-        self.season = season or season_for_month(date.month)
-        self.cues = _cue_list(cue)
+        self.season = _check_season(season) or season_for_month(date.month)
+        self.years = tuple(years) if isinstance(years, (tuple, list)) else parse_years(years)
+        self.only_season = _check_season(only_season)
+        self.labels = _label_list(labels)
+
+        order = str(order or "").strip().lower() or ("oldest" if self.years else "today")
+        if order not in ORDERS:
+            raise ValueError(f"Order must be one of {', '.join(ORDERS)}; got {order!r}.")
+        self.order = order
 
     @classmethod
     def from_dict(cls, data):
-        """Builds a context from a request or manifest dict.
+        """Builds a plan from a request or manifest dict.
 
         Args:
-            data (dict): Keys "date", "season", "cue" (all optional). Any
-                other key, such as the retired "weather", is ignored.
+            data (dict): Keys "date", "season", "order", "years",
+                "only_season", "labels" (all optional). "year" is read as
+                "years" and "cue" — its earlier name — as "labels". Any other
+                key, such as the retired "weather", is ignored.
 
         Returns:
-            ScreeningContext: The context.
+            ScreeningContext: The plan.
 
         Raises:
             ValueError: If a value is not recognised.
         """
         data = data or {}
+        labels = data.get("labels")
         return cls(
             date=data.get("date"),
             season=data.get("season") or None,
-            cue=data.get("cue"),
+            order=data.get("order") or None,
+            years=data.get("years") or data.get("year") or None,
+            only_season=data.get("only_season") or None,
+            labels=labels if labels is not None else data.get("cue"),
         )
 
     def as_dict(self):
@@ -331,19 +491,72 @@ class ScreeningContext:
         return {
             "date": self.date.isoformat(),
             "season": self.season,
-            "cue": list(self.cues),
+            "order": self.order,
+            "order_label": ORDERS[self.order],
+            "years": list(self.years) if self.years else None,
+            "only_season": self.only_season,
+            "labels": list(self.labels),
+            "filters": self.describe_filters(),
             "label": self.describe(),
         }
 
-    def describe(self):
-        """Short human-readable label, e.g. "18 December · winter · “Camp Swift”"."""
-        parts = [f"{self.date.day} {_MONTH_NAMES[self.date.month - 1]}", self.season]
-        if self.cues:
-            parts.append(", ".join(f"“{c}”" for c in self.cues))
+    def describe_filters(self):
+        """Which clips may appear, in plain words, e.g. "1944 · winter ·
+        “Camp Swift”" — or "" when every clip may."""
+        parts = []
+        if self.years:
+            first, last = self.years
+            parts.append(str(first) if first == last else f"{first}–{last}")
+        if self.only_season:
+            parts.append(self.only_season)
+        if self.labels:
+            parts.append(" or ".join(f"“{c}”" for c in self.labels))
         return " · ".join(parts)
 
+    def describe(self):
+        """Short human-readable label, e.g. "18 December · winter" or
+        "Timeline, oldest first · 1944"."""
+        if self.order == "today":
+            parts = [f"{self.date.day} {_MONTH_NAMES[self.date.month - 1]}", self.season]
+        else:
+            parts = [ORDERS[self.order]]
+        filters = self.describe_filters()
+        if filters:
+            parts.append(f"only {filters}")
+        return " · ".join(parts)
+
+    def has_filters(self):
+        """True when only some clips may appear."""
+        return bool(self.years or self.only_season or self.labels)
+
+    def allows(self, artifact):
+        """Whether a clip may appear in this film. Audio (X-roll) always
+        may; the filters are about what is on screen.
+
+        Args:
+            artifact (dict): Artifact summary dictionary.
+
+        Returns:
+            bool: True if it passes every filter that is set.
+        """
+        if artifact.get("artifact_type") == "X-roll":
+            return True
+        if self.years:
+            span = TimeSpan.of(artifact)
+            if span is None or span.year is None:
+                return False
+            if not self.years[0] <= span.year <= self.years[1]:
+                return False
+        if self.only_season and _clip_season(artifact) != self.only_season:
+            return False
+        if self.labels:
+            labels = _artifact_labels(artifact)
+            if not any(normalize_label(c) in labels for c in self.labels):
+                return False
+        return True
+
     def match(self, artifact):
-        """Scores how strongly an artifact matches this context.
+        """Scores how strongly a clip matches the screening date.
 
         Args:
             artifact (dict): Artifact summary dictionary.
@@ -354,14 +567,6 @@ class ScreeningContext:
                    ["anniversary (18 December)", "season (winter)"].
         """
         points, reasons = 0, []
-
-        if self.cues:
-            labels = _artifact_labels(artifact)
-            for cue in self.cues:
-                if normalize_label(cue) in labels:
-                    points += CUE_POINTS
-                    reasons.append(f"cue (“{cue}”)")
-
         ctx = _artifact_context(artifact)
         if not ctx:
             return points, reasons
@@ -379,11 +584,20 @@ class ScreeningContext:
                 points += SAME_MONTH_POINTS
                 reasons.append(f"same month ({month_name})")
 
-        season = str(ctx.get("season") or "").strip().lower() or (
-            season_for_month(month) if month else None
-        )
+        season = _clip_season(artifact)
         if season and season == self.season:
             points += SEASON_POINTS
             reasons.append(f"season ({season})")
 
         return points, reasons
+
+
+def _check_season(value):
+    """A season name in lower case, or None for none; raises ValueError for
+    anything else."""
+    if not value:
+        return None
+    season = str(value).strip().lower()
+    if season not in SEASONS:
+        raise ValueError(f"Season must be one of {', '.join(SEASONS)}; got {value!r}.")
+    return season

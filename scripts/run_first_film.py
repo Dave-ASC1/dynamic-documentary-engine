@@ -30,8 +30,10 @@ Usage:
     python3 scripts/run_first_film.py --topic validation   # a topic's real footage
     python3 scripts/run_first_film.py --target 120    # aim for ~120s
     python3 scripts/run_first_film.py --fade 0        # hard cuts (default 0.8s fade center)
-    python3 scripts/run_first_film.py --date 2026-12-18   # memory triggers for that day
-    python3 scripts/run_first_film.py --cue "Camp Swift"   # clips labelled exactly that
+    python3 scripts/run_first_film.py --date 2026-12-18   # today's date leads, for that day
+    python3 scripts/run_first_film.py --years 1944        # only 1944's clips, oldest first
+    python3 scripts/run_first_film.py --order calendar --only-season winter
+    python3 scripts/run_first_film.py --labels "Camp Swift"   # only clips labelled exactly that
     python3 scripts/run_first_film.py --no-render      # trace only, skip FFmpeg
     python3 scripts/run_first_film.py --seed 7         # reproducible sequence
 
@@ -59,7 +61,8 @@ from dde_runtime import (  # noqa: E402
     sync_media_library,
 )
 from engine import Sequencer, Assembler  # noqa: E402
-from engine.context import ScreeningContext  # noqa: E402
+from engine.sequencer import NothingToPlay  # noqa: E402
+from engine.context import ORDERS, ScreeningContext  # noqa: E402
 
 BAR = "=" * 72
 
@@ -83,6 +86,7 @@ def print_trace(events):
             "opening": "memory trigger — opens the film",
             "memory": "memory trigger",
             "flow": "follows on — shares " + ", ".join(ev.get("reasons") or []),
+            "dated": "in date order — " + ", ".join(ev.get("reasons") or []),
         }.get(kind, "body pick")
         print(f"\nStep {step}  [{tag}]")
         print(f"  previous : {label(prev)}")
@@ -170,13 +174,21 @@ def main():
     ap.add_argument("--fade", type=float, default=0.8,
                     help="Audio-transition fade center in seconds, jittered per "
                          "clip like the web console (default: 0.8; 0 = hard cuts).")
+    ap.add_argument("--order", default=None, choices=list(ORDERS),
+                    help="Film order: today (today's date leads), oldest / newest "
+                         "(timeline), calendar (January to December) or contrast. "
+                         "Default: today, or oldest when --years is given.")
     ap.add_argument("--date", default=None,
-                    help="Memory triggers: screening date, YYYY-MM-DD or 'today'.")
+                    help="Screening date for --order today, YYYY-MM-DD or 'today'.")
     ap.add_argument("--season", default=None,
-                    help="Memory triggers: override the season inferred from the date.")
-    ap.add_argument("--cue", default=None,
-                    help="Memory triggers: words or phrases clips must be labelled with "
-                         "exactly (comma-separate several).")
+                    help="Override the season inferred from the screening date.")
+    ap.add_argument("--years", default=None,
+                    help="Only clips dated in this year or range, e.g. 1944 or 1942-1945.")
+    ap.add_argument("--only-season", default=None,
+                    help="Only clips from this season (winter, spring, summer, autumn).")
+    ap.add_argument("--labels", "--cue", dest="labels", default=None,
+                    help="Only clips labelled exactly with one of these words or "
+                         "phrases (comma-separate several).")
     ap.add_argument("--assets-path", default=None,
                     help="Advanced: media folder for the Validation index "
                          "(default: placeholder media in demo/). Prefer --topic.")
@@ -196,11 +208,11 @@ def main():
         args.assets_path, args.films_path = topic["assets_path"], topic["films_path"]
     args.assets_path = args.assets_path or DEFAULT_ASSETS
     context = None
-    if args.date or args.season or args.cue:
+    if args.order or args.date or args.season or args.years or args.only_season or args.labels:
         try:
             context = ScreeningContext(
-                date=args.date, season=args.season,
-                cue=args.cue,
+                date=args.date, season=args.season, order=args.order,
+                years=args.years, only_season=args.only_season, labels=args.labels,
             )
         except ValueError as e:
             ap.error(str(e))
@@ -266,8 +278,15 @@ def main():
     # Instrument, then generate through the real API.
     tracer = SelectionTracer(sequencer.selector)
     instrument_pairing(sequencer.selector, tracer)
-    sequence = sequencer.generate(target_duration=args.target, context=context)
-    if context is not None:
+    try:
+        sequence = sequencer.generate(target_duration=args.target, context=context)
+    except NothingToPlay as e:
+        print(f"\nNothing to play: {e}")
+        return 1
+    if sequencer.date_order:
+        d = sequencer.date_order
+        print(f"date order : {d['played']} of {d['dated_clips']} dated clip(s) played")
+    elif context is not None and context.order == "today":
         matched = len(sequencer.context_matches)
         if sequencer.memory:
             m = sequencer.memory
@@ -280,7 +299,7 @@ def main():
                     f"{label(amap.get(t['artifact_id'], {}))} (slot {t['slot_index'] + 1})"
                     for t in later))
         else:
-            print("opens on   : a random pair — no clip is labelled for this date, season or cue")
+            print("opens on   : a random pair — no clip is labelled for this date or season")
 
     print_trace(tracer.events)
     print_sequence(sequence, amap)

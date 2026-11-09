@@ -242,14 +242,27 @@ can go back to any of them.
   Off by default, because it trims the final clip mid-shot to hit the
   number. Left off, films use whole clips and land a few seconds short.
 
-**Memory triggers** (on unless you switch it off) — the film opens on the
-clip labelled closest to today's date (taken from the computer's clock): the
-same day and month first, then the same month, then the same season. Other
-matching clips follow, and after them each clip leads to one that shares a
-person, place, tag, theme or mood with it. Type a word or phrase in **Cue**
-(say, *Camp Swift*) to put clips labelled with exactly that first. Switch it
-off for a fully random film. It only has an effect once clips are labelled —
-see the next step.
+**Order** — how the film is put together:
+
+- **Today's date leads** (the usual choice) — the film opens on the clip
+  labelled closest to today's date (taken from the computer's clock): the
+  same day and month first, then the same month, then the same season.
+  Other matching clips follow, and after them each clip leads to one that
+  shares a person, place, tag, theme or mood with it.
+- **Timeline, oldest first** or **newest first** — the dated clips in date
+  order. A clip needs a year to have a place on a timeline.
+- **Through the year** — January to December, whatever the year. A clip
+  labelled only *Winter* plays at the start of winter (December).
+- **Random contrast** — every cut as different as possible from the one
+  before, the way the engine always worked.
+
+**Only clips from** (leave blank for every clip) — a **Year** (*1944*) or a
+range (*1942–1945*), a **Season**, or clips **Labelled** with exactly a word
+or phrase (*Camp Swift*, *G. Moore*). Typing a year switches the order to
+the timeline; pick another order afterwards if you want one. If nothing fits
+your choice, the page says so and what to label.
+
+All of this needs clips to be labelled first — see the next step.
 
 ---
 

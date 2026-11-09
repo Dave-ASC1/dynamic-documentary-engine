@@ -65,7 +65,8 @@ import clip_library  # noqa: E402
 import clip_previews  # noqa: E402
 import dde_runtime  # noqa: E402
 from engine.cancellation import CancellationToken, GenerationCancelled  # noqa: E402
-from engine.context import SEASONS, ScreeningContext  # noqa: E402
+from engine.context import ORDERS, SEASONS, ScreeningContext  # noqa: E402
+from engine.sequencer import NothingToPlay  # noqa: E402
 from flask import Flask, abort, jsonify, request, send_from_directory  # noqa: E402
 
 app = Flask(__name__, static_folder=None)
@@ -308,6 +309,7 @@ def context_options():
     # "Today" context will actually use, wherever the browser is.
     today = ScreeningContext()
     return jsonify({
+        "orders": [{"id": key, "label": label} for key, label in ORDERS.items()],
         "seasons": list(SEASONS),
         "today": today.date.isoformat(),
         "today_season": today.season,
@@ -368,10 +370,11 @@ def generate():
     else:
         audio_fade = bool(body.get("audio_fade", True))
 
-    # Screening context ("memory triggers"): {"date", "season", "cue"}, all
-    # optional. A missing date or "today" means this computer's own date —
-    # the engine runs offline. No context key at all leaves generation
-    # exactly as before.
+    # Film plan ("memory triggers"): {"order", "date", "years",
+    # "only_season", "labels"}, all optional (see engine/context.py). A
+    # missing date or "today" means this computer's own date — the engine
+    # runs offline. No context key at all leaves generation exactly as
+    # before.
     context = body.get("context")
     if context is not None:
         if not isinstance(context, dict):
@@ -407,6 +410,10 @@ def generate():
         # A deliberate stop, not a failure — 409 so the frontend can tell
         # "you cancelled this" apart from "the render broke".
         return jsonify({"cancelled": True, "job_id": job_id}), 409
+    except NothingToPlay as e:
+        # The film plan leaves nothing to show (say, a year no clip is
+        # dated in). The message says what to do, so show it as it is.
+        return jsonify({"error": str(e)}), 422
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

@@ -66,22 +66,28 @@
       </fieldset>
 
       <label class="setup-field">
-        <span class="setup-label">Memory triggers</span>
-        <select id="setup-context">
-          <option value="on" selected>On — use today's date and season</option>
-          <option value="off">Off — a fully random film</option>
+        <span class="setup-label">Order</span>
+        <select id="setup-order">
+          <option value="today" selected>Today's date leads</option>
+          <option value="contrast">Random contrast</option>
         </select>
       </label>
-      <label class="setup-field" id="setup-cue-field">
-        <span class="setup-label">Today's cue (optional)</span>
-        <input type="text" id="setup-cue" placeholder="e.g. 1252nd, Camp Swift" autocomplete="off" />
+      <p id="setup-order-hint" class="setup-hint muted"></p>
+      <label class="setup-field">
+        <span class="setup-label">Only clips from year (optional)</span>
+        <input type="text" id="setup-years" placeholder="any — e.g. 1944 or 1942–1945" autocomplete="off" />
       </label>
-      <p id="setup-context-hint" class="setup-hint muted">
-        Each film opens on the clip labelled closest to today's date or season;
-        other matching clips follow, then clips sharing a person, place, tag or
-        mood. The date follows the computer's calendar on its own, so a
-        long-running exhibit rolls over by itself.
-      </p>
+      <p id="setup-years-hint" class="setup-hint hidden">Type a year such as 1944, or a range such as 1942–1945.</p>
+      <label class="setup-field">
+        <span class="setup-label">Only clips from season (optional)</span>
+        <select id="setup-season">
+          <option value="">Any</option>
+        </select>
+      </label>
+      <label class="setup-field">
+        <span class="setup-label">Only clips labelled (optional)</span>
+        <input type="text" id="setup-labels" placeholder="any — e.g. Camp Swift, G. Moore" autocomplete="off" />
+      </label>
 
       <button id="setup-start" type="button" class="setup-start">Start exhibit</button>
 

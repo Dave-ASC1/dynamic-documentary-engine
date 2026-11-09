@@ -1104,12 +1104,13 @@ def generate_and_render(
         target_duration is given and the collection has enough footage to
         reach it in the first place.
 
-    context (ScreeningContext | dict): The screening's date, season and
-        cues ("memory triggers", see engine/context.py). The film opens on
-        the best-matching clip, the other matches follow, and the rest
-        follows the clips' shared labels; the result's "context", "memory"
-        and "triggered" keys record what happened, and the trace says why
-        each clip was chosen. None leaves the run exactly as without it.
+    context (ScreeningContext | dict): The film plan (see
+        engine/context.py): which clips may appear — a year or range, a
+        season, labels — and the order: today's date leads, a timeline,
+        through the year, or random contrast. The result's "context",
+        "memory", "triggered" and "date_order" keys record what happened,
+        and the trace says why each clip was chosen. None leaves the run
+        exactly as without it.
 
     title_cards (bool): Wraps the rendered film with an opening title
         piece and a closing one — per Dr. Campbell's request, every
@@ -1218,6 +1219,8 @@ def generate_and_render(
         if ev["kind"] in ("opening", "memory"):
             # Placed for its context match, not its contrast — say so.
             contrast = [f"memory trigger — {', '.join(match[1])}"] if match else []
+        elif ev["kind"] == "dated":
+            contrast = [f"in date order — {', '.join(ev.get('reasons') or [])}"]
         elif ev["kind"] == "flow":
             contrast = [f"follows on — shares {', '.join(ev.get('reasons') or [])}"]
         else:
@@ -1355,6 +1358,9 @@ def generate_and_render(
         "context": context.as_dict() if context is not None else None,
         "memory": memory,
         "triggered": triggered,
+        # For a film in date order: {"order", "dated_clips", "played"} —
+        # how many clips had a place in that order and how many fit.
+        "date_order": sequencer.date_order,
         "context_matches": len(sequencer.context_matches),
         # Who owns the footage and sound that played (the Clip library's
         # Ownership column), for credits and copyright, and how many of the
