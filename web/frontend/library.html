@@ -45,7 +45,7 @@
       </label>
       <label class="toolbar-field toolbar-grow">
         <span>Find a clip</span>
-        <input type="search" id="search" placeholder="Title or file name" />
+        <input type="search" id="search" placeholder="Title, file, tag, person, place…" />
       </label>
       <label class="toolbar-field">
         <span>Show</span>
@@ -60,8 +60,10 @@
 
     <p id="summary" class="library-summary" role="status"></p>
     <p class="library-help">
-      <strong>Dates</strong> can be typed as 18 December 1944, December 1944 or 1944; leave Season on
+      <strong>Dates</strong> can be typed as 18 December 1944, December 1944 or 1944 — or 26 October
+      when the year isn't known (films match the day and month, never the year). Leave Season on
       <em>Auto</em> to take it from the date, or pick one when only the season is known.
+      <strong>Ownership</strong> records who owns a clip or holds its rights; each film lists it under Sources.
       Press <strong>Enter</strong> to save and move down to the next clip.
       A <strong>cue</strong> in the console brings up clips whose title, tag, theme, person, place or mood is
       exactly that word or phrase.
@@ -83,6 +85,7 @@
             <th class="col-tags" scope="col">Tags</th>
             <th class="col-people" scope="col">People</th>
             <th class="col-place" scope="col">Place</th>
+            <th class="col-owner" scope="col">Ownership</th>
             <th class="col-more" scope="col"><span class="visually-hidden">Details</span></th>
           </tr>
         </thead>

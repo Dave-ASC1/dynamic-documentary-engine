@@ -78,7 +78,12 @@ def print_trace(events):
         if chosen is None:
             continue
         step += 1
-        tag = {"pairing": "B-roll audio pairing", "memory": "memory trigger"}.get(kind, "body pick")
+        tag = {
+            "pairing": "B-roll audio pairing",
+            "opening": "memory trigger — opens the film",
+            "memory": "memory trigger",
+            "flow": "follows on — shares " + ", ".join(ev.get("reasons") or []),
+        }.get(kind, "body pick")
         print(f"\nStep {step}  [{tag}]")
         print(f"  previous : {label(prev)}")
 
@@ -266,11 +271,16 @@ def main():
         matched = len(sequencer.context_matches)
         if sequencer.memory:
             m = sequencer.memory
-            print(f"memory     : {label(amap.get(m['artifact_id'], {}))} "
-                  f"({m['placement']}) — {', '.join(m['reasons'])}  "
+            print(f"opens on   : {label(amap.get(m['artifact_id'], {}))} "
+                  f"— {', '.join(m['reasons'])}  "
                   f"[{matched} clip(s) match this context]")
+            later = [t for t in sequencer.triggered if t["artifact_id"] != m["artifact_id"]]
+            if later:
+                print("then       : " + "; ".join(
+                    f"{label(amap.get(t['artifact_id'], {}))} (slot {t['slot_index'] + 1})"
+                    for t in later))
         else:
-            print("memory     : none — no clip is tagged with a matching context")
+            print("opens on   : a random pair — no clip is labelled for this date, season or cue")
 
     print_trace(tracer.events)
     print_sequence(sequence, amap)

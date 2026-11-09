@@ -140,14 +140,19 @@
             "type": "array",
             "items": { "type": "string" }
           },
+          "ownership": {
+            "type": "string",
+            "description": "Who owns this clip or holds its rights (provenance/copyright), as entered in the Clip library. Listed as a film's sources; never used for selection.",
+            "example": "National Archives (public domain)"
+          },
           "context": {
             "type": "object",
             "description": "Optional memory-trigger context: when this clip happened. Matched against the screening's date and season (engine/context.py).",
             "properties": {
               "date": {
                 "type": "string",
-                "description": "YYYY-MM-DD, YYYY-MM or YYYY. Matched on month and day (an anniversary), whatever the year.",
-                "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$",
+                "description": "YYYY-MM-DD, YYYY-MM or YYYY — or --MM-DD / --MM when the year isn't known. Matched on month and day (an anniversary), whatever the year.",
+                "pattern": "^(\\d{4}(-\\d{2}(-\\d{2})?)?|--\\d{2}(-\\d{2})?)$",
                 "example": "1944-12-18"
               },
               "season": {

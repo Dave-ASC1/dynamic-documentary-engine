@@ -242,11 +242,14 @@ can go back to any of them.
   Off by default, because it trims the final clip mid-shot to hit the
   number. Left off, films use whole clips and land a few seconds short.
 
-**Memory triggers** (optional) — switch this on and the film favours clips
-whose date or season matches today's (taken from the computer's clock), and
-always brings the best match in partway through. Type a word or phrase in
-**Cue** (say, *Camp Swift*) to also bring up clips labelled with exactly
-that. It only has an effect once clips are labelled — see the next step.
+**Memory triggers** (on unless you switch it off) — the film opens on the
+clip labelled closest to today's date (taken from the computer's clock): the
+same day and month first, then the same month, then the same season. Other
+matching clips follow, and after them each clip leads to one that shares a
+person, place, tag, theme or mood with it. Type a word or phrase in **Cue**
+(say, *Camp Swift*) to put clips labelled with exactly that first. Switch it
+off for a fully random film. It only has an effect once clips are labelled —
+see the next step.
 
 ---
 
@@ -261,12 +264,24 @@ played it takes a few seconds to prepare.
 
 1. Choose the **Film topic** at the top.
 2. In a clip's row, click the **Date** cell and type the date, e.g.
-   *8 May 1945*, *December 1944* or just *1944*. Press **Enter**: it saves
-   and moves down to the next clip, so you can work down the column.
+   *8 May 1945*, *December 1944* or just *1944* — or *26 October* when the
+   year isn't known (films only ever compare the day and month). Press
+   **Enter**: it saves and moves down to the next clip, so you can work down
+   the column.
 3. If only the season is known, choose it in **Season** (leave it on *Auto*
    when there's a date).
 4. Optionally add a **Title**, **Mood**, **Tags**, **People** and **Place**.
-   **Details** on each row shows a few more labels.
+   These are what lead one clip to the next in a film: clips that share a
+   person, place, tag or mood follow each other, and video with a mood gets
+   music or sound with the same mood word. **Details** on each row shows a
+   few more labels.
+5. In **Ownership**, note who owns the clip or holds its rights (say,
+   *National Archives* or *Moore family, used with permission*). It doesn't
+   change the film; each film lists the owners of what played under
+   **Sources**, so credits and permissions are easy to check.
+
+The **Find a clip** box searches every label, so typing a tag or a name
+shows the clips that will be linked by it.
 
 Everything saves by itself — a cell flashes green when it's saved, and a
 red note appears if something can't be understood (nothing is saved then).

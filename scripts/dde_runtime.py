@@ -306,17 +306,20 @@ class SelectionTracer:
         selector._weighted_random_select = self._weighted
         selector.place = self._place
 
-    def _place(self, artifact):
-        # The screening-context memory is placed directly rather than chosen
-        # by contrast, so it gets its own event (no candidate ranking).
+    def _place(self, artifact, kind="memory", reasons=None):
+        # Memory-film picks are placed directly rather than chosen by
+        # contrast, so each gets its own event (no candidate ranking) with
+        # the reason: "opening"/"memory" (matches the screening) or "flow"
+        # (shares a label with the clip before).
         prev = self.selector._last_selected
-        placed = self._orig_place(artifact)
+        placed = self._orig_place(artifact, kind=kind, reasons=reasons)
         self.events.append({
-            "kind": "memory",
+            "kind": kind,
             "prev": prev,
             "ranking": None,
             "pool": [artifact],
             "chosen": placed,
+            "reasons": list(reasons or []),
         })
         return placed
 
@@ -1030,6 +1033,37 @@ def _wrap_with_title_cards(film_path, output_width, output_height, output_fps,
 
 
 # ----------------------------------------------------------------------
+# Sources (ownership) of a film
+# ----------------------------------------------------------------------
+
+def film_sources(slots):
+    """The ownership recorded for the clips in a film.
+
+    Args:
+        slots (list): The film's slots, as built by generate_and_render().
+
+    Returns:
+        tuple: (sources, unsourced) — each distinct ownership once, in the
+               order first heard or seen, and how many distinct clips that
+               played have none recorded.
+    """
+    sources, seen, unsourced = [], set(), set()
+    for slot in slots:
+        if slot["kind"] == "broll_xroll":
+            pairs = [(slot["broll_id"], slot.get("broll_ownership")),
+                     (slot["xroll_id"], slot.get("xroll_ownership"))]
+        else:
+            pairs = [(slot["artifact_id"], slot.get("ownership"))]
+        for artifact_id, owner in pairs:
+            if not owner:
+                unsourced.add(artifact_id)
+            elif owner.lower() not in seen:
+                seen.add(owner.lower())
+                sources.append(owner)
+    return sources, len(unsourced)
+
+
+# ----------------------------------------------------------------------
 # High-level entry point
 # ----------------------------------------------------------------------
 
@@ -1071,11 +1105,11 @@ def generate_and_render(
         reach it in the first place.
 
     context (ScreeningContext | dict): The screening's date, season and
-        cues ("memory triggers", see engine/context.py). Matching clips
-        are favoured and the best match is placed partway through the film;
-        the result's "context" and "memory" keys record what happened, and
-        the trace marks each context-matched pick. None leaves the run
-        exactly as without it.
+        cues ("memory triggers", see engine/context.py). The film opens on
+        the best-matching clip, the other matches follow, and the rest
+        follows the clips' shared labels; the result's "context", "memory"
+        and "triggered" keys record what happened, and the trace says why
+        each clip was chosen. None leaves the run exactly as without it.
 
     title_cards (bool): Wraps the rendered film with an opening title
         piece and a closing one — per Dr. Campbell's request, every
@@ -1159,6 +1193,8 @@ def generate_and_render(
                 "xroll_title": xd.get("title", x),
                 "role": bd.get("role", "body"),
                 "duration_seconds": bd.get("duration_seconds", 0),
+                "broll_ownership": bd.get("ownership"),
+                "xroll_ownership": xd.get("ownership"),
             })
         else:
             d = amap.get(entry, {})
@@ -1169,6 +1205,7 @@ def generate_and_render(
                 "artifact_type": d.get("artifact_type"),
                 "role": d.get("role", "body"),
                 "duration_seconds": d.get("duration_seconds", 0),
+                "ownership": d.get("ownership"),
             })
 
     trace = []
@@ -1178,13 +1215,23 @@ def generate_and_render(
             continue
         ranking = ev["ranking"] or []
         match = sequencer.context_matches.get(chosen.get("artifact_id"))
-        if ev["kind"] == "memory":
+        if ev["kind"] in ("opening", "memory"):
             # Placed for its context match, not its contrast — say so.
             contrast = [f"memory trigger — {', '.join(match[1])}"] if match else []
+        elif ev["kind"] == "flow":
+            contrast = [f"follows on — shares {', '.join(ev.get('reasons') or [])}"]
         else:
             contrast = dims(ev["prev"], chosen)
             if match:
                 contrast.append(f"context: {', '.join(match[1])}")
+            if (
+                ev["kind"] == "pairing"
+                and sequencer.selector.match_audio_mood
+                and ev["prev"]
+                and ev["prev"].get("mood")
+                and str(ev["prev"].get("mood")).lower() == str(chosen.get("mood") or "").lower()
+            ):
+                contrast.insert(0, f"same mood ({chosen.get('mood')})")
         trace.append({
             "kind": ev["kind"],
             "previous": label(ev["prev"]),
@@ -1200,6 +1247,11 @@ def generate_and_render(
     if sequencer.memory:
         memory = dict(sequencer.memory)
         memory["title"] = amap.get(memory["artifact_id"], {}).get("title", memory["artifact_id"])
+    triggered = [
+        dict(t, title=amap.get(t["artifact_id"], {}).get("title", t["artifact_id"]))
+        for t in sequencer.triggered
+    ]
+    sources, unsourced = film_sources(slots)
 
     if is_demo_mode:
         ensure_assets(loader, assets_path)
@@ -1302,7 +1354,13 @@ def generate_and_render(
         # triggered (None when no context was set or nothing matched).
         "context": context.as_dict() if context is not None else None,
         "memory": memory,
+        "triggered": triggered,
         "context_matches": len(sequencer.context_matches),
+        # Who owns the footage and sound that played (the Clip library's
+        # Ownership column), for credits and copyright, and how many of the
+        # clips that played have no ownership recorded yet.
+        "sources": sources,
+        "clips_without_ownership": unsourced,
         "trimmed": trimmed,
         "title_cards": cards_added,
         # Which opening/closing actually wrapped this film — a filename

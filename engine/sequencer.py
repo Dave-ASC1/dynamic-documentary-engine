@@ -29,7 +29,7 @@ Version: 1.1.0
 import random
 
 from engine.collection_loader import CollectionLoader
-from engine.context import MEMORY_WINDOW, ScreeningContext
+from engine.context import ScreeningContext, shared_labels
 from engine.rules import SequencingRules
 from engine.artifact_selector import ArtifactSelector
 
@@ -41,13 +41,21 @@ class Sequencer:
     Coordinates the full film generation pipeline:
         1. Loads a collection index from disk
         2. Accepts a target runtime in seconds (4-digit max: 0001–9999)
-        3. Opens with a generated B-roll + X-roll pair
-        4. Selects body artifacts using rules, dissimilarity, and weights
-           (and, when a screening context is given, places one matching
-           "memory" partway through — see engine/context.py)
+        3. Opens with a generated B-roll + X-roll pair — or, with memory
+           triggers on, with the clip that best matches the screening
+        4. Selects body artifacts using rules, dissimilarity, and weights —
+           or, with memory triggers on, by their labels (see below)
         5. Enforces B-roll + X-roll pairing — B-roll is never placed alone
         6. Closes with a generated B-roll + X-roll pair
         7. Returns the complete ordered film sequence
+
+    Memory films:
+        When generate() is given a screening context (memory triggers), the
+        clips' labels drive the film instead of chance: it opens on the
+        best match for the screening's date, season or cue, the other
+        matches follow strongest first, and from then on each clip leads to
+        one sharing a person, place, tag, theme or mood with it. Contrast
+        takes over only where nothing shares a label. See engine/context.py.
 
     Runtime Control:
         target_duration accepts values from 1 to 9999 seconds, supporting
@@ -118,10 +126,15 @@ class Sequencer:
         """
         Generates a unique ordered film sequence from the loaded collection.
 
-        The sequence begins and ends with generated B-roll + X-roll pairs
-        drawn from the normal body artifact pool. Body artifacts between
-        those bookends are selected from any eligible A-roll or B-roll using
-        dissimilarity scoring and weighted random selection.
+        Without a screening context, the sequence begins and ends with
+        generated B-roll + X-roll pairs drawn from the normal body artifact
+        pool, and body artifacts between those bookends are selected from
+        any eligible A-roll or B-roll using dissimilarity scoring and
+        weighted random selection.
+
+        With a screening context it is a memory film (see the class
+        docstring): it opens on the best-matching clip, the other matches
+        follow, and the rest follows the clips' shared labels.
 
         B-roll artifacts are always paired with an X-roll artifact to provide
         an audio layer. A-roll artifacts stand alone.
@@ -146,17 +159,16 @@ class Sequencer:
                                              real footage past the target to
                                              cut is the point.
             context (ScreeningContext | dict, optional): The screening's
-                                             date, season and any cues. Clips
-                                             whose context metadata matches
-                                             get a selection-weight boost,
-                                             and the best match is placed
-                                             partway through the body. After
+                                             date, season and any cues — turns
+                                             the run into a memory film. After
                                              the call, self.memory describes
-                                             that placement (or is None) and
-                                             self.context_matches maps each
-                                             matching artifact ID to
-                                             (points, reasons). None, or
-                                             nothing matching, leaves
+                                             the clip the film opened on (or
+                                             is None when nothing matched),
+                                             self.triggered lists every
+                                             matching clip that played, in
+                                             order, and self.context_matches
+                                             maps each matching artifact ID to
+                                             (points, reasons). None leaves
                                              generation exactly as without it.
 
         Returns:
@@ -187,13 +199,15 @@ class Sequencer:
             )
 
         # Score every artifact against the screening context up front. The
-        # selector boosts matching artifacts' weights for the whole run,
-        # bookends included.
+        # selector also boosts matching artifacts' weights wherever a choice
+        # is still drawn by weight (bookends, audio, ties).
         if isinstance(context, dict):
             context = ScreeningContext.from_dict(context)
+        memory_film = context is not None
         self.memory = None
+        self.triggered = []
         self.context_matches = {}
-        if context is not None:
+        if memory_film:
             for a in body_artifacts:
                 points, reasons = context.match(a)
                 if points:
@@ -202,6 +216,8 @@ class Sequencer:
             artifact_id: points
             for artifact_id, (points, _reasons) in self.context_matches.items()
         }
+        # In a memory film, B-roll with a mood gets audio of the same mood.
+        self.selector.match_audio_mood = memory_film
 
         b_roll_artifacts = [
             a for a in body_artifacts if a.get("artifact_type") == "B-roll"
@@ -216,31 +232,52 @@ class Sequencer:
                 "one X-roll artifact in the body pool."
             )
 
-        # Step 1 — Open with a generated B-roll + X-roll pair from the body pool.
-        opening_pair = self._select_random_broll_xroll_pair(
-            b_roll_artifacts,
-            x_roll_artifacts,
-        )
-        if opening_pair is None:
-            raise RuntimeError("Could not generate an opening B-roll/X-roll pair.")
+        # Step 1 — Open. A memory film opens on the clip that best matches
+        # the screening. Otherwise, or when nothing matches, the film opens
+        # on a generated B-roll + X-roll pair from the body pool.
+        opener = None
+        if memory_film:
+            opener = self._best_context_match(body_artifacts, x_roll_artifacts)
+            if opener is not None:
+                self._place_opener(opener, sequence, body_artifacts)
 
-        opening_broll, opening_xroll = opening_pair
-        sequence.append((
-            opening_broll.get("artifact_id"),
-            opening_xroll.get("artifact_id"),
-        ))
-        self.rules.register_selection(opening_broll)
-        self.rules.register_pairing_selection(opening_xroll)
-        self._record_generated_usage(opening_broll)
-        self._record_generated_usage(opening_xroll)
-        self.selector.set_previous_artifact(opening_broll)
+        if opener is None:
+            opening_pair = self._select_random_broll_xroll_pair(
+                b_roll_artifacts,
+                x_roll_artifacts,
+            )
+            if opening_pair is None:
+                raise RuntimeError("Could not generate an opening B-roll/X-roll pair.")
+
+            opening_broll, opening_xroll = opening_pair
+            sequence.append((
+                opening_broll.get("artifact_id"),
+                opening_xroll.get("artifact_id"),
+            ))
+            self.rules.register_selection(opening_broll)
+            self.rules.register_pairing_selection(opening_xroll)
+            self._record_generated_usage(opening_broll)
+            self._record_generated_usage(opening_xroll)
+            self.selector.set_previous_artifact(opening_broll)
+            opener = opening_broll
 
         # Reserve the closing pair before body selection so the body cannot
         # consume every B-roll/X-roll and leave the film without an ending.
-        closing_pair = self._select_random_broll_xroll_pair(
-            b_roll_artifacts,
-            x_roll_artifacts,
-        )
+        # When some clips match the screening, the close is drawn from the
+        # ones that don't if it can be, so the matches stay free to follow
+        # the opening rather than being held back for the last shot.
+        closing_pair = None
+        if self.context_matches:
+            closing_pair = self._select_random_broll_xroll_pair(
+                [a for a in b_roll_artifacts
+                 if a.get("artifact_id") not in self.context_matches],
+                x_roll_artifacts,
+            )
+        if closing_pair is None:
+            closing_pair = self._select_random_broll_xroll_pair(
+                b_roll_artifacts,
+                x_roll_artifacts,
+            )
         if closing_pair is None:
             raise RuntimeError("Could not generate a closing B-roll/X-roll pair.")
 
@@ -260,61 +297,28 @@ class Sequencer:
                 0, requested_max - closing_broll.get("duration_seconds", 0)
             )
 
-        # Reserve the screening-context memory the same way: chosen now, its
-        # screen time held back, and placed at a random point in the middle
-        # of the body so the triggered memory always surfaces.
-        memory = self._select_context_memory(
-            body_artifacts, x_roll_artifacts, reserved_closing_ids
-        )
-        memory_reserved = 0
-        insert_at = None
-        if memory is not None:
-            body_start = self.rules.current_duration
-            if not allow_overshoot:
-                memory_reserved = memory.get("duration_seconds", 0)
-                self.rules.runtime_rules["max_duration_seconds"] = max(
-                    0, self.rules.runtime_rules["max_duration_seconds"] - memory_reserved
-                )
-            body_end = self.rules.runtime_rules.get("max_duration_seconds", body_start)
-            low, high = MEMORY_WINDOW
-            insert_at = body_start + random.uniform(low, high) * max(0, body_end - body_start)
-
-        held_back_ids = set(reserved_closing_ids)
-        if memory is not None:
-            held_back_ids.add(memory.get("artifact_id"))
-
         # Step 2 — Select body artifacts until target duration is reached.
         standalone_candidates = [
             a for a in body_artifacts
             if (
                 a.get("artifact_type") != "X-roll"
-                and a.get("artifact_id") not in held_back_ids
+                and a.get("artifact_id") not in reserved_closing_ids
             )
         ]
 
-        current_mood = opening_broll.get("mood")
+        current_mood = opener.get("mood")
 
         while not self.rules.has_reached_maximum_duration():
 
-            if (
-                memory is not None
-                and self.memory is None
-                and self.rules.current_duration >= insert_at
-                and self._place_context_memory(memory, sequence, body_artifacts)
-            ):
-                # Hand the held-back screen time back now that the memory's
-                # own duration has been registered against the budget.
-                self.rules.runtime_rules["max_duration_seconds"] += memory_reserved
-                current_mood = memory.get("mood")
-                continue
-
-            target_pacing = self.rules.get_target_pacing()
-
-            selected = self.selector.select_next(
-                standalone_candidates,
-                current_mood=current_mood,
-                target_pacing=target_pacing
-            )
+            if memory_film:
+                selected = self._select_memory_film_next(standalone_candidates)
+            else:
+                target_pacing = self.rules.get_target_pacing()
+                selected = self.selector.select_next(
+                    standalone_candidates,
+                    current_mood=current_mood,
+                    target_pacing=target_pacing
+                )
 
             if selected is None:
                 break
@@ -348,12 +352,8 @@ class Sequencer:
                 sequence.append(selected.get("artifact_id"))
                 self._record_generated_usage(selected)
 
+            self._record_triggered(selected, len(sequence) - 1)
             current_mood = selected.get("mood")
-
-        # A short film or a small collection can run out of body picks before
-        # reaching the memory's slot — place it now, ahead of the close.
-        if memory is not None and self.memory is None:
-            self._place_context_memory(memory, sequence, body_artifacts)
 
         # Restore the true requested max now that the reserved room has done
         # its job — register_selection() below doesn't consult the budget,
@@ -370,22 +370,7 @@ class Sequencer:
         self.rules.register_pairing_selection(closing_xroll)
         self._record_generated_usage(closing_broll)
         self._record_generated_usage(closing_xroll)
-
-        # The context boost also applies to the bookends, so when the only
-        # matching clips are B-roll one of them may open or close the film
-        # instead. That still surfaces the memory — record it as such.
-        if self.memory is None:
-            for slot_index, broll in ((0, opening_broll), (len(sequence) - 1, closing_broll)):
-                match = self.context_matches.get(broll.get("artifact_id"))
-                if match:
-                    self.memory = {
-                        "artifact_id": broll.get("artifact_id"),
-                        "points": match[0],
-                        "reasons": list(match[1]),
-                        "slot_index": slot_index,
-                        "placement": "opening" if slot_index == 0 else "closing",
-                    }
-                    break
+        self._record_triggered(closing_broll, len(sequence) - 1)
 
         return sequence
 
@@ -401,6 +386,24 @@ class Sequencer:
             self.generated_usage[artifact_id] = (
                 self.generated_usage.get(artifact_id, 0) + 1
             )
+
+    def _record_triggered(self, artifact, slot_index):
+        """
+        Notes a clip that matched the screening context, once it has a
+        place in the sequence, so the result can say what was triggered.
+
+        Args:
+            artifact (dict):  The clip just placed.
+            slot_index (int): Its position in the sequence.
+        """
+        match = self.context_matches.get(artifact.get("artifact_id"))
+        if match:
+            self.triggered.append({
+                "artifact_id": artifact.get("artifact_id"),
+                "points": match[0],
+                "reasons": list(match[1]),
+                "slot_index": slot_index,
+            })
 
     def _select_random_broll_xroll_pair(self, b_roll_artifacts, x_roll_artifacts):
         """
@@ -423,6 +426,8 @@ class Sequencer:
         ]
 
         b_roll = self.selector.weighted_random_choice(b_candidates)
+        if b_roll and self.selector.match_audio_mood:
+            x_candidates = self.selector.same_mood(b_roll, x_candidates)
         x_roll = self.selector.weighted_random_choice(x_candidates)
 
         if not b_roll or not x_roll:
@@ -430,10 +435,10 @@ class Sequencer:
 
         return b_roll, x_roll
 
-    def _select_context_memory(self, body_artifacts, x_roll_artifacts, excluded_ids):
+    def _best_context_match(self, body_artifacts, x_roll_artifacts):
         """
-        Chooses the artifact that best matches the screening context, to be
-        placed partway through the film as its triggered memory.
+        Chooses the clip that best matches the screening context, for a
+        memory film to open on.
 
         Only A-roll and B-roll qualify (X-roll can't stand alone, though a
         matching X-roll is still favoured as a B-roll's audio). Among the
@@ -443,11 +448,9 @@ class Sequencer:
         Args:
             body_artifacts (list):   All body artifacts.
             x_roll_artifacts (list): The X-roll pool, for the pairing check.
-            excluded_ids (set):      Artifact IDs already reserved (the
-                                     closing pair).
 
         Returns:
-            dict: The memory artifact, or None when nothing matches.
+            dict: The best-matching clip, or None when nothing matches.
         """
         if not self.context_matches:
             return None
@@ -455,7 +458,7 @@ class Sequencer:
         candidates = []
         for a in body_artifacts:
             artifact_id = a.get("artifact_id")
-            if artifact_id not in self.context_matches or artifact_id in excluded_ids:
+            if artifact_id not in self.context_matches:
                 continue
             if not self.rules.is_available(a):
                 continue
@@ -474,49 +477,103 @@ class Sequencer:
         ]
         return self.selector.weighted_random_choice(strongest)
 
-    def _place_context_memory(self, memory, sequence, body_artifacts):
+    def _place_opener(self, opener, sequence, body_artifacts):
         """
-        Appends the reserved memory to the sequence, pairing it with an
-        X-roll if it is a B-roll, and records it in self.memory.
+        Places the best-matching clip as the first shot of a memory film,
+        pairing it with an X-roll if it is a B-roll, and records it in
+        self.memory.
 
         Args:
-            memory (dict):          The memory artifact.
-            sequence (list):        The sequence being built.
+            opener (dict):          The clip from _best_context_match().
+            sequence (list):        The (empty) sequence being built.
             body_artifacts (list):  All body artifacts (for the X-roll pool).
-
-        Returns:
-            bool: True if placed; False if it may not directly follow the
-                  last shot (must-not-follow), in which case the caller
-                  tries again at the next slot.
         """
-        if not self.rules.can_follow_last_shot(memory):
-            return False
+        opener_id = opener.get("artifact_id")
+        points, reasons = self.context_matches[opener_id]
+        self.selector.place(opener, kind="opening", reasons=list(reasons))
+        self._record_generated_usage(opener)
 
-        memory_id = memory.get("artifact_id")
-        self.selector.place(memory)
-        self._record_generated_usage(memory)
-
-        if memory.get("artifact_type") == "B-roll":
+        if opener.get("artifact_type") == "B-roll":
             x_roll_pool = [
                 a for a in body_artifacts if a.get("artifact_type") == "X-roll"
             ]
-            # _select_context_memory only reserves a B-roll that some X-roll
-            # may sit under, so a pairing is always available here.
+            # _best_context_match only picks a B-roll that some X-roll may
+            # sit under, so a pairing is always available here.
             x_roll = self.selector.select_pairing(x_roll_pool)
-            sequence.append((memory_id, x_roll.get("artifact_id")))
+            sequence.append((opener_id, x_roll.get("artifact_id")))
             self._record_generated_usage(x_roll)
         else:
-            sequence.append(memory_id)
+            sequence.append(opener_id)
 
-        points, reasons = self.context_matches[memory_id]
         self.memory = {
-            "artifact_id": memory_id,
+            "artifact_id": opener_id,
             "points": points,
             "reasons": list(reasons),
             "slot_index": len(sequence) - 1,
-            "placement": "body",
+            "placement": "opening",
         }
-        return True
+        self._record_triggered(opener, len(sequence) - 1)
+
+    def _select_memory_film_next(self, candidates):
+        """
+        Chooses the next clip of a memory film, in order of preference:
+
+            1. A clip that matches the screening and hasn't played yet —
+               strongest match first; among equally strong ones, the one
+               sharing the most labels with the clip just shown.
+            2. A clip sharing a label (person, place, tag, theme or mood)
+               with the clip just shown — the most shared labels first.
+            3. Nothing shares a label: the usual pick by contrast.
+
+        Ties are drawn by weight. Clips chosen by 1 or 2 are placed through
+        the selector with the reason, so the trace can show why.
+
+        Args:
+            candidates (list): Standalone candidates (A-roll and B-roll).
+
+        Returns:
+            dict: The clip chosen and registered, or None if nothing fits.
+        """
+        eligible = [a for a in candidates if self.rules.is_eligible(a)]
+        if not eligible:
+            return None
+        previous = self.selector.previous
+
+        matched = [a for a in eligible if a.get("artifact_id") in self.context_matches]
+        if matched:
+            best = max(self.context_matches[a.get("artifact_id")][0] for a in matched)
+            tier = [
+                a for a in matched
+                if self.context_matches[a.get("artifact_id")][0] == best
+            ]
+            pick, _shared = self._most_linked(previous, tier)
+            reasons = self.context_matches[pick.get("artifact_id")][1]
+            return self.selector.place(pick, kind="memory", reasons=list(reasons))
+
+        pick, shared = self._most_linked(previous, eligible)
+        if shared:
+            return self.selector.place(pick, kind="flow", reasons=shared)
+
+        return self.selector.select_next(candidates)
+
+    def _most_linked(self, previous, pool):
+        """
+        The clip in pool sharing the most labels with previous, drawn by
+        weight among equals.
+
+        Args:
+            previous (dict): The clip just shown, or None.
+            pool (list):     Candidate clips (not empty).
+
+        Returns:
+            tuple: (clip, shared labels) — the labels are empty when
+                   nothing in the pool shares one.
+        """
+        links = [(a, shared_labels(previous, a)) for a in pool]
+        most = max(len(shared) for _a, shared in links)
+        strongest = [a for a, shared in links if len(shared) == most]
+        pick = self.selector.weighted_random_choice(strongest)
+        return pick, next(shared for a, shared in links if a is pick)
 
     def generate_multiple(self, count, target_duration=None, context=None):
         """

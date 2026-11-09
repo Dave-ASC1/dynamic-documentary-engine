@@ -68,8 +68,8 @@
       <label class="setup-field">
         <span class="setup-label">Memory triggers</span>
         <select id="setup-context">
-          <option value="off">Off</option>
-          <option value="on">On — use today's date and season</option>
+          <option value="on" selected>On — use today's date and season</option>
+          <option value="off">Off — a fully random film</option>
         </select>
       </label>
       <label class="setup-field" id="setup-cue-field">
@@ -77,9 +77,10 @@
         <input type="text" id="setup-cue" placeholder="e.g. 1252nd, Camp Swift" autocomplete="off" />
       </label>
       <p id="setup-context-hint" class="setup-hint muted">
-        Clips labelled with today's date or season are favoured, and the best
-        match always appears. The date follows the computer's calendar on its
-        own, so a long-running exhibit rolls over by itself.
+        Each film opens on the clip labelled closest to today's date or season;
+        other matching clips follow, then clips sharing a person, place, tag or
+        mood. The date follows the computer's calendar on its own, so a
+        long-running exhibit rolls over by itself.
       </p>
 
       <button id="setup-start" type="button" class="setup-start">Start exhibit</button>

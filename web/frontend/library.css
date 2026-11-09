@@ -85,7 +85,7 @@
 
 .clip-table {
   width: 100%;
-  min-width: 1250px;
+  min-width: 1400px;
   border-collapse: collapse;
   font-size: 0.86rem;
 }
@@ -114,6 +114,7 @@
 .col-tags { width: 170px; }
 .col-people { width: 140px; }
 .col-place { width: 130px; }
+.col-owner { width: 160px; }
 .col-more { width: 92px; }
 
 .clip-row > td {

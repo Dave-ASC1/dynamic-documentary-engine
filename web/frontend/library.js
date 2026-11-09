@@ -24,7 +24,7 @@ const previewBody = document.getElementById("preview-body");
 const previewStatus = document.getElementById("preview-status");
 
 const TOPIC_KEY = "dde-library-topic";
-const COLUMN_COUNT = 9;
+const COLUMN_COUNT = 10;
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
                 "August", "September", "October", "November", "December"];
 
@@ -34,12 +34,13 @@ const WEIGHTS = [[0.2, "Rarely"], [0.35, "Less often"], [0.5, "Normal"], [0.7, "
 // Table columns after the clip name. kind: text | list | enum | date
 const COLUMNS = [
   { field: "title", label: "Title", kind: "text" },
-  { field: "context.date", label: "Date", kind: "date", placeholder: "e.g. 18 Dec 1944", cell: "cell-date" },
+  { field: "context.date", label: "Date", kind: "date", placeholder: "e.g. 18 Dec 1944 or 26 Oct", cell: "cell-date" },
   { field: "context.season", label: "Season", kind: "enum", options: "seasons", empty: "Auto", cell: "cell-season" },
   { field: "mood", label: "Mood", kind: "text", placeholder: "e.g. somber", suggest: true },
   { field: "tags", label: "Tags", kind: "list", placeholder: "comma, separated" },
   { field: "people", label: "People", kind: "list", placeholder: "e.g. G. Moore", suggest: true },
   { field: "geography", label: "Place", kind: "text", placeholder: "e.g. Camp Swift", suggest: true },
+  { field: "ownership", label: "Ownership", kind: "text", placeholder: "e.g. National Archives", suggest: true },
 ];
 
 // Less-used labels, in the details row under each clip.
@@ -71,9 +72,15 @@ themeToggle.addEventListener("click", () => {
  * Display helpers
  * ------------------------------------------------------------------------ */
 
-// "1945-05-08" -> "8 May 1945"; "1944-12" -> "December 1944"; "1944" -> "1944".
+// "1945-05-08" -> "8 May 1945"; "1944-12" -> "December 1944"; "1944" -> "1944";
+// "--10-26" (year not known) -> "26 October"; "--10" -> "October".
 function friendlyDate(iso) {
   if (!iso) return "";
+  if (iso.startsWith("--")) {
+    const [m, d] = iso.slice(2).split("-");
+    const month = MONTHS[parseInt(m, 10) - 1];
+    return d ? `${parseInt(d, 10)} ${month}` : month;
+  }
   const [y, m, d] = iso.split("-");
   if (!m) return y;
   const month = MONTHS[parseInt(m, 10) - 1];
@@ -428,7 +435,10 @@ function visibleClips() {
     if (filter === "labelled" && !c.labelled) return false;
     if (filter === "unlabelled" && c.labelled) return false;
     if (!q) return true;
-    return `${c.fields.title || ""} ${c.filename || ""}`.toLowerCase().includes(q);
+    // Search covers every label, so typing a tag, person or place lists
+    // the clips the engine would link by it.
+    const labels = COLUMNS.concat(DETAILS).map((def) => displayValue(def, c.fields[def.field]));
+    return `${c.filename || ""} ${labels.join(" ")}`.toLowerCase().includes(q);
   });
 }
 

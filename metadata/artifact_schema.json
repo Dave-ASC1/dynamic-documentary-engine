@@ -112,6 +112,12 @@
         "copyright_cleared": {
           "type": "boolean",
           "description": "Whether this artifact is cleared for use in the project"
+        },
+
+        "ownership": {
+          "type": "string",
+          "description": "Who owns this artifact or holds its rights (provenance/copyright). In a collection index it sits on the artifact entry and is edited in the Clip library's Ownership column.",
+          "example": "National Archives (public domain)"
         }
 
       },
@@ -196,8 +202,8 @@
           "properties": {
             "date": {
               "type": "string",
-              "description": "YYYY-MM-DD, YYYY-MM or YYYY. Matched on month and day (an anniversary), whatever the year.",
-              "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$",
+              "description": "YYYY-MM-DD, YYYY-MM or YYYY — or --MM-DD / --MM when the year isn't known. Matched on month and day (an anniversary), whatever the year.",
+              "pattern": "^(\\d{4}(-\\d{2}(-\\d{2})?)?|--\\d{2}(-\\d{2})?)$",
               "example": "1944-12-18"
             },
             "season": {

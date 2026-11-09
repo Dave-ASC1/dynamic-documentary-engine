@@ -146,23 +146,27 @@ function buildCutCard(markerClass, badgeClass, badgeLabel, title, contrast) {
 function renderTrace(result) {
   traceList.innerHTML = "";
 
+  // A memory film opens on its best-matching clip: the first trace entry
+  // is that clip, so its reason goes on the Open card instead of a cut.
+  const events = result.trace.slice();
+  const opening = events.length && events[0].kind === "opening" ? events.shift() : null;
   const open = parseLabel(result.opening);
   traceList.appendChild(
-    buildCutCard("type-open", "type-open", "Open", open.title, null)
+    buildCutCard("type-open", "type-open", opening ? "Open · Memory trigger" : "Open",
+                 open.title, opening ? opening.contrast : null)
   );
 
   let step = 0;
-  for (const ev of result.trace) {
-    step += 1;
+  for (const ev of events) {
     const parsed = parseLabel(ev.chosen);
     const isPairing = ev.kind === "pairing";
+    if (!isPairing) step += 1;
     const marker = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
     const badgeCls = isPairing ? "type-x" : typeClass(parsed.type) || "type-a";
+    const why = { memory: " · Memory trigger", flow: " · Follows on" }[ev.kind] || "";
     const badgeLabel = isPairing
       ? "Audio pairing"
-      : ev.kind === "memory"
-        ? `Cut ${step} · Memory trigger · ${badgeText(parsed.type)}`
-        : `Cut ${step} · ${badgeText(parsed.type)}`;
+      : `Cut ${step}${why} · ${badgeText(parsed.type)}`;
     traceList.appendChild(
       buildCutCard(marker, badgeCls, badgeLabel, parsed.title, ev.contrast)
     );
@@ -233,14 +237,23 @@ function renderMeta(result) {
   if (result.context) {
     metaEl.appendChild(textChip("Context", result.context.label));
     const memory = result.memory;
-    let memoryText;
     if (memory) {
-      const where = memory.placement === "body" ? "" : ` (as the ${memory.placement})`;
-      memoryText = `${memory.title}${where} — ${memory.reasons.join(", ")}`;
+      metaEl.appendChild(textChip("Opened on", `${memory.title} — ${memory.reasons.join(", ")}`));
+      const later = (result.triggered || []).filter((t) => t.artifact_id !== memory.artifact_id);
+      if (later.length) {
+        metaEl.appendChild(textChip("Then", later.map((t) => t.title).join(", ")));
+      }
     } else {
-      memoryText = "none — no clip is tagged with a matching context yet";
+      metaEl.appendChild(textChip("Opened on", "a random clip — none is labelled for this date, season or cue yet"));
     }
-    metaEl.appendChild(textChip("Memory", memoryText));
+  }
+  // Who owns what played, from the Clip library's Ownership column.
+  if (result.sources !== undefined) {
+    const missing = result.clips_without_ownership || 0;
+    const parts = [];
+    if (result.sources.length) parts.push(result.sources.join("; "));
+    if (missing) parts.push(`${missing} clip${missing === 1 ? "" : "s"} with no ownership recorded`);
+    if (parts.length) metaEl.appendChild(textChip("Sources", parts.join(" · ")));
   }
 }
 
@@ -314,9 +327,10 @@ function updateContextUI() {
     const season = contextSeason.value || inferredSeason();
     const cue = contextCue.value.trim();
     contextHint.textContent =
-      `Films will favour clips labelled for ${formatContextDate(date)} — ${season}` +
-      (cue ? `, and clips labelled exactly “${cue.split(",").map((c) => c.trim()).filter(Boolean).join("” or “")}”. ` : ". ") +
-      `Label clips in the Clip library; unlabelled clips are unaffected.`;
+      `Films open on the clip best matching ${formatContextDate(date)} — ${season}` +
+      (cue ? `, or labelled exactly “${cue.split(",").map((c) => c.trim()).filter(Boolean).join("” or “")}”` : "") +
+      `. Other matching clips follow, then clips that share a person, place, tag, theme or mood. ` +
+      `Label clips in the Clip library.`;
   }
   saveContextPrefs();
 }
@@ -333,7 +347,8 @@ async function loadContextOptions() {
     contextOptions.seasons.map((s) => `<option value="${s}">${s[0].toUpperCase()}${s.slice(1)}</option>`).join("");
 
   const prefs = loadContextPrefs();
-  contextToggle.checked = Boolean(prefs.enabled);
+  // On unless someone has switched it off on this computer.
+  contextToggle.checked = prefs.enabled === undefined ? true : Boolean(prefs.enabled);
   if (prefs.dateMode) contextDateMode.value = prefs.dateMode;
   contextDate.value = prefs.date || contextOptions.today;
   if (prefs.season !== undefined) contextSeason.value = prefs.season;

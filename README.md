@@ -71,13 +71,15 @@ Each run, the engine:
 
 Two optional modes: **Diversity mode** (boosts underused clips so favourites don't dominate) and **Exact duration** (trims the final render to the exact requested length; off by default so whole clips are preserved).
 
-**Memory triggers** (optional, *draft*): the screening's date — taken from the computer's own clock — and its season favour clips labelled with a matching date or season, the way an anniversary can bring a memory back. A **cue** (any word or phrase typed in, e.g. "Camp Swift") also brings up clips whose title, tag, theme, person, place or mood is exactly that word or phrase (capitals ignored). The best match always appears partway through the film. Clips carry the context in their index entry:
+**Memory triggers** (on by default): the clips' labels shape the film, the way an anniversary can bring a memory back. The film **opens on the clip that best matches the screening's date** — taken from the computer's own clock — an anniversary (same day and month, any year) first, then the same month, then the same season. **The other matching clips follow**, strongest first. After that **each clip leads to one that shares a label with it** — a person, place, tag, theme or mood — and only when nothing shares one does the engine cut to something different by contrast. B-roll with a mood is paired with audio of the same mood. A **cue** (any word or phrase typed in, e.g. "Camp Swift") counts as the strongest match for clips whose title, tag, theme, person, place or mood is exactly that (capitals ignored). Clips carry the context in their index entry:
 
 ```json
 "context": { "date": "1944-12-18", "season": "winter" }
 ```
 
-Dates match on month and day (an anniversary, whatever the year); the season is inferred from the date when left out. Untagged clips are unaffected, and with memory triggers off the engine behaves exactly as before.
+A date may leave out the year (`"--10-26"`, typed as *26 October* in the Clip library) — matching never uses it. The season is inferred from the date when left out. With memory triggers off, the engine works exactly as before: fully random between the bookends, chosen for contrast.
+
+Each clip can also record its **ownership** (who owns it or holds its rights) in the Clip library; every film lists the owners of what played under **Sources**, for credits and copyright.
 
 ---
 

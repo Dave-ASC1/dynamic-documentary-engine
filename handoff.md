@@ -201,13 +201,39 @@ Re-encoding (not stream-copy) is what makes the cut frame-accurate instead of
 snapping to a keyframe. The price: whatever was playing gets cut off
 mid-shot. The exhibit view keeps this off.
 
-### Memory triggers (draft, October 2026)
+### Memory triggers (October–November 2026)
 
 Dr. Campbell's idea: memories are triggered by surroundings — a date, a
 season — the way veterans' journals open each entry with the date. So a
 screening carries a **context** (its date and season), and clips carry
 matching **context labels** (when it happened), entered by people from
-archival knowledge in the Clip library. It is all in `engine/context.py`.
+archival knowledge in the Clip library. Matching is in `engine/context.py`;
+the film it produces is built in `Sequencer.generate()`.
+
+**What a memory film does** (rebuilt in November 2026, after the late-October
+test on Dr. Campbell's laptop showed the labels barely changing the film —
+she expected the 26 October clip to open it and the autumn clip to follow):
+
+1. **It opens on the best match** — the highest-scoring A- or B-roll
+   (`Sequencer._best_context_match()`), straight after the title piece. An
+   A-roll may open a memory film; otherwise the opener is a B-roll + X-roll
+   pair as before.
+2. **The other matches follow, strongest first.** Among equally strong ones,
+   the one sharing the most labels with the clip before goes first.
+3. **Then the film follows a thread:** each next clip is the one sharing the
+   most labels — tags, themes, people, place, mood, compared like cues;
+   never the title or the auto-detected `color-` tags — with the clip just
+   shown (`Sequencer._select_memory_film_next()`). Only when nothing shares a
+   label does the usual contrast pick take over.
+4. **Audio matches mood:** a B-roll with a mood is paired with an X-roll of
+   the same mood word when there is one (`ArtifactSelector.same_mood()`).
+5. The closing pair is drawn from clips that *don't* match when possible, so
+   the matches are free to follow the opening.
+
+With memory triggers **off**, nothing above applies — verified to produce
+identical films to the engine before this change, seed for seed (600 films
+across both collections). They are **on by default** in the console and the
+exhibit; a saved choice on a computer is respected.
 
 - **The date comes from the computer's own clock.** The engine is offline
   by design, so it looks nothing up; the season is inferred from the date.
@@ -215,30 +241,36 @@ archival knowledge in the Clip library. It is all in `engine/context.py`.
   request in October 2026; old requests that still send weather are
   accepted and the weather is ignored.) The console can pick another date
   to rehearse, e.g. 11 November; the exhibit always uses today.
-- **Matching is points, not rules:** same month and day (an anniversary,
-  any year) 3, same month 2, same season 1, and a **cue** 4 per match.
+- **Matching is points:** same month and day (an anniversary,
+  any year) 3, same month 2, same season 1, and a **cue** 4 per match. The
+  points rank the matches; the year is never compared, so a date can be
+  entered without one (*26 October*, stored as `--10-26`).
 - **A cue is any word or phrase someone types** ("Camp Swift", a veteran's
   name). It matches a clip only when it *exactly equals* one of its labels —
   title, a tag, a theme, a person, the place or the mood —
   ignoring capitals and surrounding punctuation. "camp" does not match
   "Camp Swift"; a long title does not match a word inside it. That keeps
   results predictable: what was labelled is what comes up.
-- **It works alongside juxtaposition, not against it.** Matching clips get a
-  selection-weight boost (×1.5 per point) — but only *within* the top-3
-  contrast pool, so contrast still decides who competes. Then the single
-  best match is **guaranteed**: held back like the closing pair, its screen
-  time reserved, and placed at a random point 25–75% through the body. The
-  cut after it contrasts against it as usual.
-- **No context, or nothing matching, changes nothing** — verified to produce
-  identical films to the engine without this feature, seed for seed.
-- If the only matching clips are B-roll, one may land as an opening/closing
-  bookend instead (the boost applies there too); the result still reports it
-  as the film's memory.
-- The trace marks the memory ("Memory trigger") and any context-boosted
-  pick; the manifest records the context and the memory.
+- **Where a choice is still drawn by weight** (ties, bookends, audio),
+  matching clips get a boost (×1.5 per point).
+- **Nothing matching** still makes a memory film: it opens on a random pair
+  and follows shared labels from there.
+- The trace says why each clip came: "Open · Memory trigger", "Memory
+  trigger", "Follows on — shares Camp Swift", or the usual contrast
+  dimensions; audio pairings note "same mood". The result and manifest
+  record the context, `memory` (the opener), `triggered` (every matching
+  clip that played, in order) and the film's `sources`.
+- **Superseded:** the first draft (October 2026) gave matches only a gentle
+  boost inside the top-3 contrast pool and placed one guaranteed match
+  25–75% through the film. In tests that opened on the anniversary clip in
+  about 1 film in 7, which is what Dr. Campbell saw.
 
-The strength of the pull (gentle boost + one guaranteed memory) is a draft
-default awaiting Dr. Campbell's call — see §5.
+**Ownership (provenance/copyright).** Each clip has an `ownership` text
+label — who owns it or holds its rights — in the Clip library's Ownership
+column. It never affects selection. Every film's result lists the distinct
+owners of what played as `sources`, with a count of clips that have none
+recorded (`clips_without_ownership`); the console shows it as a Sources
+chip, for credits when screening to veterans and their families.
 
 ### The Clip library (labels without editing files)
 
@@ -249,7 +281,8 @@ form per clip; each field saves when the person moves on (`PATCH
 
 - **Checked before saving** (`scripts/clip_library.py`): known pacing/line
   values only, a weight between 0.05 and 1, dates people actually type
-  ("18 December 1944", "Dec 1944", "1944") normalized to `YYYY[-MM[-DD]]`.
+  ("18 December 1944", "Dec 1944", "1944", or year-less "26 October")
+  normalized to `YYYY[-MM[-DD]]` or `--MM[-DD]`. Ownership is free text.
   A bad value is refused with a plain message and nothing is written.
 - **Never loses a change:** saves and the media sync share one lock
   (`dde_runtime.INDEX_LOCK`), every write is atomic (temp file + swap), and
@@ -336,17 +369,18 @@ bookends and generation fails.
   clip, with Date and Season up front; Enter saves a cell and moves down.
   Under the hood it writes the topic's index, e.g. `"people": ["G. Moore"]`,
   `"geography": "Camp Swift"`, `"context": {"date": "1944-12-18"}`. `date` is
-  stored as `YYYY-MM-DD`, `YYYY-MM` or `YYYY`; `season` is optional (inferred
-  from the date's month, northern hemisphere). The table's columns and the
+  stored as `YYYY-MM-DD`, `YYYY-MM` or `YYYY`, or `--MM-DD` / `--MM` when the
+  year isn't known; `season` is optional (inferred from the date's month,
+  northern hemisphere). The table's columns and the
   Details fields are the `COLUMNS` / `DETAILS` lists in
   `web/frontend/library.js`; what is editable and how it is checked is
   `FIELDS` in `scripts/clip_library.py`.
 - **After labelling,** the topic's index file shows as changed in git — that
   is the labelling itself; commit it like any other change.
-- **How strong the pull is:** the point values, `WEIGHT_BOOST_PER_POINT` and
-  `MEMORY_WINDOW` at the top of `engine/context.py`. The guaranteed memory
-  is chosen and placed in `Sequencer._select_context_memory()` /
-  `_place_context_memory()`.
+- **How matches rank:** the point values at the top of `engine/context.py`.
+  The opener is chosen in `Sequencer._best_context_match()`, each later clip
+  in `Sequencer._select_memory_film_next()`; which labels link clips is
+  `link_labels()` in `engine/context.py`.
 
 ### Tune the dissimilarity scoring
 
@@ -464,15 +498,15 @@ None of these have been started unless it says otherwise.
   volumes. FFmpeg's `loudnorm` per segment (in `assembler.py`) would even them
   out. It's a separate change from the fade and shouldn't be mixed into it.
   Two-pass `loudnorm` is more accurate but doubles audio analysis time.
-- **Memory triggers and cues — built, needs labels and decisions.** Built as
-  described in §2, with the Clip library to label clips, but no real clip is
-  labelled yet, and these questions
-  are open with Dr. Campbell: is a clip's date *when it happened* or *when it
-  was filmed*; anniversary vs. month vs. season; how strong the pull should
-  be (gentle, guaranteed — the draft — or anchoring the opening). Dates and
-  seasons come from people's archival knowledge, entered in the Clip library.
-- **A-roll as bookends — undecided.** Should A-roll be allowed to open or
-  close a film? Currently only B-roll + X-roll can. Needs David / Dr. Campbell.
+- **Memory triggers and cues — built, needs labels.** Built as described in
+  §2: a memory film opens on the best match and follows shared labels, as Dr.
+  Campbell described after the late-October test. It needs real clips
+  labelled (dates, seasons, people, places, moods, ownership) in the Clip
+  library. Still open with her: is a clip's date *when it happened* or *when
+  it was filmed*.
+- **A-roll as bookends — partly settled.** In a memory film the best match
+  opens the film whatever its type, so an A-roll can open it. Otherwise
+  only B-roll + X-roll pairs open and close.
 - **Live webcam / stream input — not started beyond the plumbing.** The
   assembler can read a `stream` source type from a per-artifact JSON file,
   but there's no UI or workflow for adding one.

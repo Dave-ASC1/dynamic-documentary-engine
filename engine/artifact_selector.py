@@ -36,7 +36,7 @@ Version: 2.0.0
 
 import random
 
-from engine.context import WEIGHT_BOOST_PER_POINT
+from engine.context import WEIGHT_BOOST_PER_POINT, normalize_label
 
 
 class ArtifactSelector:
@@ -95,6 +95,14 @@ class ArtifactSelector:
         # Artifact ID -> screening-context match points, set per generation
         # by the sequencer (see engine/context.py). Empty means no context.
         self.context_scores = {}
+        # Set by the sequencer for memory films: B-roll with a mood is paired
+        # with audio of the same mood whenever the collection has some.
+        self.match_audio_mood = False
+
+    @property
+    def previous(self):
+        """The clip most recently placed or selected, or None."""
+        return self._last_selected
 
     def set_previous_artifact(self, artifact):
         """
@@ -110,17 +118,20 @@ class ArtifactSelector:
         """
         self._last_selected = artifact
 
-    def place(self, artifact):
+    def place(self, artifact, kind="memory", reasons=None):
         """
         Places a specific artifact as the next primary pick.
 
-        Used for the screening-context memory, which the sequencer chooses
-        by context match rather than by contrast. Registered exactly as a
-        select_next() pick would be, so the following cut contrasts against
-        it as usual.
+        Used in memory films, where the sequencer chooses a clip by its
+        labels rather than by contrast. Registered exactly as a
+        select_next() pick would be.
 
         Args:
             artifact (dict): The artifact to place.
+            kind (str):      Why it was placed — "opening" or "memory" (it
+                             matches the screening) or "flow" (it shares a
+                             label with the clip before). For the trace only.
+            reasons (list):  The matched or shared labels. For the trace only.
 
         Returns:
             dict: The placed artifact.
@@ -207,6 +218,12 @@ class ArtifactSelector:
         if not eligible:
             return None
 
+        # In a memory film, a B-roll with a mood gets audio of that mood
+        # when the collection has any — before least-used and contrast
+        # narrow it further.
+        if self.match_audio_mood and self._last_selected is not None:
+            eligible = self.same_mood(self._last_selected, eligible)
+
         # Audio may be reused within a film (see is_eligible_for_pairing),
         # so narrow to whatever has been heard least before contrast decides
         # among those. This is what makes the behaviour scale with the
@@ -232,6 +249,25 @@ class ArtifactSelector:
             self.rules.register_pairing_selection(selected)
 
         return selected
+
+    def same_mood(self, reference, candidates):
+        """
+        The candidates whose mood is the same word as the reference's —
+        compared without capitals or punctuation — or all of them when the
+        reference has no mood or none share it.
+
+        Args:
+            reference (dict):  The clip whose mood to match (a B-roll).
+            candidates (list): Candidate clips (X-roll).
+
+        Returns:
+            list: The same-mood candidates, or the candidates unchanged.
+        """
+        mood = _mood(reference)
+        if not mood:
+            return candidates
+        same = [a for a in candidates if _mood(a) == mood]
+        return same or candidates
 
     def select_by_type(self, candidates, artifact_type):
         """
@@ -477,3 +513,9 @@ class ArtifactSelector:
             weight *= 1 + WEIGHT_BOOST_PER_POINT * points
 
         return weight
+
+
+def _mood(artifact):
+    """An artifact's mood in compared form, or "" when it has none."""
+    mood = artifact.get("mood") or artifact.get("content", {}).get("mood")
+    return normalize_label(mood) if mood else ""

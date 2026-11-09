@@ -16,10 +16,17 @@ next generated film uses the new labels — nothing to restart.
 Editable labels and where they matter:
 
     title, weight, notes           — basics (notes are for people only)
-    people, geography (place)      — matched by cues
-    mood, pacing, tags, theme,
-    dominant_lines                 — contrast scoring between cuts
-    context.date, context.season   — memory triggers (dates and seasonality)
+    ownership                      — who owns the clip or holds its rights
+                                     (provenance/copyright); listed as the
+                                     film's sources, never used for selection
+    people, geography (place)      — matched by cues, and link clips in a
+                                     memory film
+    mood, tags, theme              — link clips in a memory film (and mood
+                                     picks matching audio); contrast
+                                     scoring otherwise
+    pacing, dominant_lines         — contrast scoring between cuts
+    context.date, context.season   — memory triggers (dates and seasonality);
+                                     a date may leave out the year
 
 Author: Oluwafemisola David Ademoye
 Supporting: Omotola Ajibike Ajao
@@ -50,6 +57,7 @@ FIELDS = {
     "title":            ("text", {"max": 200}),
     "weight":           ("weight", {}),
     "notes":            ("text", {"max": 2000}),
+    "ownership":        ("text", {"max": 300}),
     "people":           ("list", {}),
     "geography":        ("text", {"max": 120}),
     "mood":             ("text", {"max": 60}),
@@ -62,7 +70,7 @@ FIELDS = {
 }
 
 # Fields offered as type-ahead suggestions, drawn from the whole collection.
-SUGGESTED = ("mood", "tags", "theme", "people", "geography")
+SUGGESTED = ("mood", "tags", "theme", "people", "geography", "ownership")
 
 
 class ValidationError(ValueError):
@@ -191,7 +199,7 @@ def is_labelled(entry):
     """True once a person has added anything beyond what auto-detection
     fills in (length, a pacing guess, a colour tag, a filename title)."""
     if any(entry.get(k) for k in ("mood", "theme", "people", "geography", "notes",
-                                  "dominant_lines", "context")):
+                                  "ownership", "dominant_lines", "context")):
         return True
     return any(not str(t).startswith("color-") for t in entry.get("tags") or [])
 
