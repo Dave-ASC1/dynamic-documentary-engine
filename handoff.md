@@ -322,6 +322,10 @@ form per clip; each field saves when the person moves on (`PATCH
   values only, a weight between 0.05 and 1, dates people actually type
   ("18 December 1944", "Dec 1944", "1944", or year-less "26 October")
   normalized to `YYYY[-MM[-DD]]` or `--MM[-DD]`. Ownership is free text.
+- **Season "Auto" names its season.** Each clip the page receives carries
+  `season_auto` (`clip_library.auto_season()`, the engine's own
+  `season_for_month()`), shown as "Auto (winter)"; it is never stored, so
+  it always follows the date.
   A bad value is refused with a plain message and nothing is written.
 - **Never loses a change:** saves and the media sync share one lock
   (`dde_runtime.INDEX_LOCK`), every write is atomic (temp file + swap), and

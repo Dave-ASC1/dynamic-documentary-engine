@@ -87,6 +87,13 @@ function friendlyDate(iso) {
   return d ? `${parseInt(d, 10)} ${month} ${y}` : `${month} ${y}`;
 }
 
+// The Season cell's "Auto" choice, naming the season the engine works out
+// from the date — "Auto (winter)" — or plain "Auto" when the date has no
+// month to work it out from.
+function autoSeasonLabel(clip) {
+  return clip.season_auto ? `Auto (${clip.season_auto})` : "Auto";
+}
+
 function displayValue(def, value) {
   if (value === null || value === undefined) return "";
   if (def.kind === "list") return value.filter((v) => !String(v).startsWith("color-")).join(", ");
@@ -134,7 +141,11 @@ function buildInput(def, clip, className) {
 
   if (def.kind === "enum") {
     const select = el("select", { className, disabled, "aria-label": label });
-    select.appendChild(el("option", { value: "" }, def.empty || "—"));
+    if (def.field === "context.season") {
+      select.appendChild(el("option", { value: "", className: "auto-season" }, autoSeasonLabel(clip)));
+    } else {
+      select.appendChild(el("option", { value: "" }, def.empty || "—"));
+    }
     for (const opt of library.options[def.options]) select.appendChild(el("option", { value: opt }, capital(opt)));
     select.value = value || "";
     return select;
@@ -414,6 +425,9 @@ async function saveField(clip, def, input, container) {
     // Show the value as stored (dates tidied, duplicates removed).
     Object.assign(clip, data);
     input.value = def.kind === "weight" ? String(clip.fields.weight ?? 0.5) : displayValue(def, clip.fields[def.field]);
+    // A new date can change the season "Auto" stands for.
+    const autoOption = input.closest("tr") && input.closest("tr").querySelector("option.auto-season");
+    if (autoOption) autoOption.textContent = autoSeasonLabel(clip);
     clearError(container, input);
     input.classList.add("saved");
     setTimeout(() => input.classList.remove("saved"), 900);

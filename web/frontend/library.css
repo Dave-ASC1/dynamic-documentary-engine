@@ -85,7 +85,7 @@
 
 .clip-table {
   width: 100%;
-  min-width: 1400px;
+  min-width: 1430px;
   border-collapse: collapse;
   font-size: 0.86rem;
 }
@@ -109,7 +109,9 @@
 .col-clip { width: 270px; }
 .col-title { width: 250px; }
 .col-date { width: 160px; }
-.col-season { width: 130px; }
+.col-season { width: 158px; }
+/* Room for "Auto (autumn)" — the season worked out from the date. */
+.clip-row > td.cell-season select { min-width: 8.8rem; }
 .col-mood { width: 110px; }
 .col-tags { width: 170px; }
 .col-people { width: 140px; }

@@ -281,8 +281,10 @@ played it takes a few seconds to prepare.
    year isn't known (films only ever compare the day and month). Press
    **Enter**: it saves and moves down to the next clip, so you can work down
    the column.
-3. If only the season is known, choose it in **Season** (leave it on *Auto*
-   when there's a date).
+3. Leave **Season** on *Auto* when the date has a month — it works the
+   season out and shows it, e.g. *Auto (winter)* for a January date. Choose
+   a season only when the date has no month (just a year, or no date) and
+   the season is known.
 4. Optionally add a **Title**, **Mood**, **Tags**, **People** and **Place**.
    These are what lead one clip to the next in a film: clips that share a
    person, place, tag or mood follow each other, and video with a mood gets

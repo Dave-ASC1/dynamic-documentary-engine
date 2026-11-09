@@ -43,7 +43,7 @@ import shutil
 from datetime import datetime, timezone
 
 import dde_runtime
-from engine.context import SEASONS, normalize_date_input
+from engine.context import SEASONS, normalize_date_input, parse_partial_date, season_for_month
 
 PACING = ("slow", "medium", "fast")
 LINES = ("horizontal", "vertical", "diagonal", "curved", "mixed")
@@ -204,6 +204,14 @@ def is_labelled(entry):
     return any(not str(t).startswith("color-") for t in entry.get("tags") or [])
 
 
+def auto_season(entry):
+    """The season the engine works out from a clip's date — the one "Auto"
+    means — or None when the date has no month (or there is no date).
+    Never stored: it always follows the date."""
+    parsed = parse_partial_date(_get(entry, "context.date"))
+    return season_for_month(parsed[1]) if parsed and parsed[1] else None
+
+
 def clip_view(entry):
     """The page's view of one index entry."""
     return {
@@ -213,6 +221,7 @@ def clip_view(entry):
         "duration_seconds": entry.get("duration_seconds"),
         "labelled": is_labelled(entry),
         "dated": bool(_get(entry, "context.date") or _get(entry, "context.season")),
+        "season_auto": auto_season(entry),
         "fields": {field: _get(entry, field) for field in FIELDS},
     }
 
