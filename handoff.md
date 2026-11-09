@@ -257,11 +257,14 @@ she expected the 26 October clip to open it and the autumn clip to follow):
    the next date the calendar comes round to (`Sequencer._next_date_clip()`).
 2. **The other matches follow, strongest first.** Among equally strong ones,
    the one sharing the most labels with the clip before goes first.
-3. **Then the next dates in the calendar** (added 9 November 2026 at
-   David's request): the other dated clips, onward from the screening date,
-   wrapping past December into January, whatever the year —
-   `TimeSpan.days_ahead_key()`; a month or season sits at its start, before
-   the exact days in it. Clips known only by a year have no place here.
+3. **Then history** (added 9 November 2026 at David's request — "years
+   matter"): the other clips with a year, in historical order onward from
+   the opening clip's date, wrapping back to the earliest after the latest
+   (oldest first when the opener has no year); then clips with a month or
+   season but no year, in calendar order from the screening date
+   (`Sequencer._walk_key()`, using `TimeSpan.timeline_key()` and
+   `days_ahead_key()`). Equally strong matches in step 2 are ordered the
+   same way.
 4. **Then the film follows a thread:** each remaining clip is the one
    sharing the most labels — tags, themes, people, place, mood, compared
    like label filters; never the title or the auto-detected `color-` tags —
@@ -270,8 +273,8 @@ she expected the 26 October clip to open it and the autumn clip to follow):
 5. **Audio matches mood:** a B-roll with a mood is paired with an X-roll of
    the same mood word when there is one (`ArtifactSelector.same_mood()`).
 6. The closing pair is drawn from an undated clip that doesn't match when
-   possible; with every clip dated, from the dated clip the calendar reaches
-   last, so the calendar order holds to the end.
+   possible; with every clip dated, from the dated clip that comes last, so
+   the order holds to the end.
 
 It is the default order in the console and the exhibit; a saved choice on
 a computer is respected.

@@ -16,10 +16,12 @@ Two settings combine:
                     own clock) picks the opening clip — an anniversary (same
                     day and month, any year) first, then the same month,
                     then the same season. The other matching clips follow,
-                    strongest first; then the other dated clips, following
-                    the calendar onward from the screening date and wrapping
-                    past December into January, whatever the year. After
-                    that each undated clip leads to one sharing a person,
+                    strongest first; then the other clips with a year, in
+                    history order onward from the opening clip's date
+                    (wrapping back to the earliest after the latest), and
+                    the clips with a month or season but no year, in
+                    calendar order from the screening date. After that each
+                    undated clip leads to one sharing a person,
                     place, tag, theme or mood with it, and only when nothing
                     shares a label does the engine cut to something
                     different by contrast. When nothing matches today, the

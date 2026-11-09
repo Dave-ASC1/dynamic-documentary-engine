@@ -62,10 +62,12 @@ class Sequencer:
         - "today" (a memory film): the clips' labels drive the film instead
           of chance. It opens on the best match for the screening's date or
           season (or, when nothing matches, the next date in the calendar),
-          the other matches follow strongest first, then the other dated
-          clips follow the calendar onward from the screening date, wrapping
-          into January. After that each undated clip leads to one sharing a
-          person, place, tag, theme or mood with it. Contrast takes over
+          the other matches follow strongest first, then the other clips
+          with a year follow history onward from the opening clip's date,
+          wrapping back to the earliest after the latest; clips with a
+          month or season but no year follow the calendar from the
+          screening date. After that each undated clip leads to one sharing
+          a person, place, tag, theme or mood with it. Contrast takes over
           only where nothing shares a label.
         - "oldest" / "newest" / "calendar": the dated clips play in date
           order — a timeline, or January to December — with no generated
@@ -124,8 +126,11 @@ class Sequencer:
         # Screening-context results of the last generate() call.
         self.memory = None
         self.context_matches = {}
-        # The screening date while a memory film is being built, else None.
+        # The screening date while a memory film is being built, else None,
+        # and the opening clip's place in history (TimeSpan.timeline_key)
+        # that the clips with a year follow on from.
         self.screening_date = None
+        self.history_anchor = None
 
         self.loader = CollectionLoader(collection_path)
         self.collection = self.loader.load()
@@ -239,6 +244,7 @@ class Sequencer:
         # choice is still drawn by weight (bookends, audio, ties).
         memory_film = order == "today"
         self.screening_date = context.date if memory_film else None
+        self.history_anchor = None
         if memory_film:
             for a in body_artifacts:
                 points, reasons = context.match(a)
@@ -317,24 +323,24 @@ class Sequencer:
         # the opening rather than being held back for the last shot.
         closing_pair = None
         if memory_film:
-            # The dated clips follow the calendar, so the close comes from an
-            # undated clip when there is one; otherwise from the dated clip
-            # the calendar reaches last, so the order still holds.
+            # The dated clips follow history and the calendar, so the close
+            # comes from an undated clip when there is one; otherwise from
+            # the dated clip that comes last, so the order still holds.
             unmatched = [
                 a for a in b_roll_artifacts
                 if a.get("artifact_id") not in self.context_matches
             ]
-            undated = [a for a in unmatched if self._days_ahead(a) is None]
+            undated = [a for a in unmatched if self._walk_key(a) is None]
             closing_pair = self._select_random_broll_xroll_pair(undated, x_roll_artifacts)
             if closing_pair is None:
                 dated = [
                     a for a in unmatched
-                    if self._days_ahead(a) is not None and self.rules.is_eligible(a)
+                    if self._walk_key(a) is not None and self.rules.is_eligible(a)
                 ]
                 if dated:
-                    last = max(self._days_ahead(a) for a in dated)
+                    last = max(self._walk_key(a) for a in dated)
                     closing_pair = self._select_random_broll_xroll_pair(
-                        [a for a in dated if self._days_ahead(a) == last],
+                        [a for a in dated if self._walk_key(a) == last],
                         x_roll_artifacts,
                     )
         if closing_pair is None and self.context_matches:
@@ -678,6 +684,8 @@ class Sequencer:
                                     (e.g. "next date after today — …").
         """
         opener_id = opener.get("artifact_id")
+        span = TimeSpan.of(opener)
+        self.history_anchor = span.timeline_key() if span else None
         points, match_reasons = self.context_matches.get(opener_id, (0, []))
         reasons = list(reasons) if reasons else list(match_reasons)
         self.selector.place(opener, kind="opening", reasons=list(reasons))
@@ -709,12 +717,14 @@ class Sequencer:
         Chooses the next clip of a memory film, in order of preference:
 
             1. A clip that matches the screening and hasn't played yet —
-               strongest match first; among equally strong ones, the one
-               sharing the most labels with the clip just shown.
-            2. The next dated clip in the calendar, onward from the
-               screening date and wrapping into January, whatever the year;
-               among clips on the same date, the one sharing the most labels
-               with the clip just shown.
+               strongest match first; among equally strong ones, the next
+               in history (see _walk_key).
+            2. The next dated clip (see _walk_key): clips with a year in
+               history order onward from the opening clip's date, wrapping
+               back to the earliest; then clips with a month or season but
+               no year, in calendar order from the screening date. Among
+               clips on the same date, the one sharing the most labels with
+               the clip just shown.
             3. A clip sharing a label (person, place, tag, theme or mood)
                with the clip just shown — the most shared labels first.
             4. Nothing shares a label: the usual pick by contrast.
@@ -740,18 +750,23 @@ class Sequencer:
                 a for a in matched
                 if self.context_matches[a.get("artifact_id")][0] == best
             ]
+            keyed = [a for a in tier if self._walk_key(a) is not None]
+            if keyed:
+                first = min(self._walk_key(a) for a in keyed)
+                tier = [a for a in keyed if self._walk_key(a) == first]
             pick, _shared = self._most_linked(previous, tier)
             reasons = self.context_matches[pick.get("artifact_id")][1]
             return self.selector.place(pick, kind="memory", reasons=list(reasons))
 
-        dated = [a for a in eligible if self._days_ahead(a) is not None]
+        dated = [a for a in eligible if self._walk_key(a) is not None]
         if dated:
-            soonest = min(self._days_ahead(a) for a in dated)
+            soonest = min(self._walk_key(a) for a in dated)
             pick, _shared = self._most_linked(
-                previous, [a for a in dated if self._days_ahead(a) == soonest]
+                previous, [a for a in dated if self._walk_key(a) == soonest]
             )
+            how = "next in history" if soonest[0] == 0 else "next date in the calendar"
             return self.selector.place(
-                pick, kind="next_date", reasons=[TimeSpan.of(pick).describe()]
+                pick, kind="next_date", reasons=[f"{how} — {TimeSpan.of(pick).describe()}"]
             )
 
         pick, shared = self._most_linked(previous, eligible)
@@ -759,6 +774,39 @@ class Sequencer:
             return self.selector.place(pick, kind="flow", reasons=shared)
 
         return self.selector.select_next(candidates)
+
+    def _walk_key(self, artifact):
+        """
+        Where a clip comes in a memory film once today's matches have
+        played, or None when it has no date or season at all (or this is
+        not a memory film):
+
+            (0, …)  a clip with a year — history order onward from the
+                    opening clip's date (self.history_anchor), wrapping back
+                    to the earliest after the latest; with no anchor, oldest
+                    first. A year alone sits at the start of that year, a
+                    month at the start of that month (TimeSpan.timeline_key).
+            (1, …)  a clip with a month or season but no year — calendar
+                    order onward from the screening date, since history
+                    can't place it.
+
+        Args:
+            artifact (dict): The clip.
+
+        Returns:
+            tuple: The sort key, or None.
+        """
+        if self.screening_date is None:
+            return None
+        span = TimeSpan.of(artifact)
+        if span is None:
+            return None
+        if span.year is not None:
+            key = span.timeline_key()
+            after = self.history_anchor is None or key >= self.history_anchor
+            return 0, 0 if after else 1, key
+        ahead = span.days_ahead_key(self.screening_date)
+        return None if ahead is None else (1, 0, ahead)
 
     def _days_ahead(self, artifact):
         """How soon after the screening date a clip's date comes round in

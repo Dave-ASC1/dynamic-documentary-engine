@@ -357,8 +357,8 @@ const ORDER_HINTS = {
     const season = date ? SEASON_BY_MONTH[parseInt(date.slice(5, 7), 10) - 1] : "";
     return `Opens on the clip labelled closest to ${date ? formatContextDate(date) : "today"} ` +
       `(same day and month, then month, then ${season || "season"}). Other matching clips follow, ` +
-      "then the next dates in the calendar, into January and round again, whatever the year. " +
-      "Clips without a day or month follow by shared people, places, tags and moods.";
+      "then the clips with a year in historical order from there, and clips with only a month or season " +
+      "in calendar order. Undated clips follow by shared people, places, tags and moods.";
   },
   oldest: () => "Clips with a dated year play from the earliest to the latest. Clips without a year are left out.",
   newest: () => "Clips with a dated year play from the latest to the earliest. Clips without a year are left out.",

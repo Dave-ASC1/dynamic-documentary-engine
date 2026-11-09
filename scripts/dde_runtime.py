@@ -1224,7 +1224,8 @@ def generate_and_render(
                 else list(ev.get("reasons") or [])
             )
         elif ev["kind"] == "next_date":
-            contrast = [f"next date in the calendar — {', '.join(ev.get('reasons') or [])}"]
+            # "next in history — …" or "next date in the calendar — …"
+            contrast = list(ev.get("reasons") or [])
         elif ev["kind"] == "dated":
             contrast = [f"in date order — {', '.join(ev.get('reasons') or [])}"]
         elif ev["kind"] == "flow":
