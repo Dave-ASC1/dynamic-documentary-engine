@@ -276,9 +276,11 @@ click it (or its ▶) to watch it with sound. The very first time a clip is
 played it takes a few seconds to prepare.
 
 1. Choose the **Film topic** at the top.
-2. In a clip's row, click the **Date** cell and type the date, e.g.
+2. In a clip's row, click the **Date** cell and type the date the event
+   happened (not when it was filmed), e.g.
    *8 May 1945*, *December 1944* or just *1944* — or *26 October* when the
-   year isn't known (films only ever compare the day and month). Press
+   year isn't known (a film led by today's date only compares the day and
+   month; timelines need the year). Press
    **Enter**: it saves and moves down to the next clip, so you can work down
    the column.
 3. Leave **Season** on *Auto* when the date has a month — it works the

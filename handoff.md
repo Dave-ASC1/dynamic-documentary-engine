@@ -548,10 +548,10 @@ None of these have been started unless it says otherwise.
   described in §2: today's date leads, timeline, through the year and random
   contrast, with year/season/label filters, as Dr. Campbell described after
   the late-October test. It needs real clips labelled (dates, seasons,
-  people, places, moods, ownership) in the Clip library. Still open with
-  her: is a clip's date *when it happened* or *when it was filmed*; and
-  whether a season with a year ("winter 1944") should mean December 1944 –
-  February 1945, as it does now.
+  people, places, moods, ownership) in the Clip library. Settled by David
+  (9 November 2026): a clip's date is **when the event happened**, not when
+  it was filmed; and a season with a year ("winter 1944") means December
+  1944 – February 1945, as built.
 - **A-roll as bookends — partly settled.** In a memory film the best match
   opens the film whatever its type, and a film in date order opens and
   closes on its first and last dates, so an A-roll can do either. Random
