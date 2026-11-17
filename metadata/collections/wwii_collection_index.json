@@ -4,7 +4,7 @@
   "description": "World War II film collection.",
   "version": "1.0.0",
   "created_at": "2026-08-17T15:18:47.658450+00:00",
-  "updated_at": "2026-10-20T04:43:03.286295+00:00",
+  "updated_at": "2026-11-17T04:20:09.850750+00:00",
   "runtime_rules": {
     "min_duration_seconds": 35,
     "max_duration_seconds": 1800,
@@ -31,7 +31,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_braubach_ve_day",
@@ -46,7 +47,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_gm_2_soldiers",
@@ -61,7 +63,8 @@
       "pacing": "medium",
       "tags": [
         "color-brown"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_gm_in_hat_2020",
@@ -76,7 +79,8 @@
       "pacing": "fast",
       "tags": [
         "color-black"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_camp_swift_buildlings",
@@ -91,7 +95,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_camp_swift_on_map",
@@ -106,7 +111,8 @@
       "pacing": "fast",
       "tags": [
         "color-white"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_euro_map_1",
@@ -121,7 +127,8 @@
       "pacing": "medium",
       "tags": [
         "color-brown"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_foxhole",
@@ -136,7 +143,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_group_with_flag_on_steps",
@@ -151,7 +159,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_jeep",
@@ -166,7 +175,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_newspaper_cc_camp",
@@ -181,7 +191,8 @@
       "pacing": "medium",
       "tags": [
         "color-brown"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_small_group",
@@ -196,7 +207,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_truck_2_soldiers",
@@ -211,7 +223,8 @@
       "pacing": "medium",
       "tags": [
         "color-black"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_test_ww2_worksite",
@@ -226,7 +239,8 @@
       "pacing": "medium",
       "tags": [
         "color-brown"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_plane_drop",
@@ -241,7 +255,8 @@
       "pacing": "medium",
       "tags": [
         "color-brown"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_warship_cruising",
@@ -256,7 +271,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_x_anxietylow",
