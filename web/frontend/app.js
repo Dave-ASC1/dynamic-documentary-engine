@@ -355,21 +355,30 @@ function filtersText() {
   return parts.join(", ");
 }
 
-const DATE_ORDER_RULE = "Dated clips play oldest to newest — \"1945\" before \"May 1945\" before " +
-  "\"7 May 1945\" — then clips with only a month or season, January to December. Clips without a date " +
-  "don't play.";
-
+// The line under "Arrange by": what the chosen order does, in one sentence.
 const ORDER_HINTS = {
-  today: () => "Clips dated for today's day and month (or this month, or this season) play first. " +
-    DATE_ORDER_RULE,
-  oldest: () => DATE_ORDER_RULE,
-  contrast: () => "Every clip, each cut as different as possible from the one before — the original engine.",
+  today: "Clips dated for today play first, then every dated clip, oldest to newest. Undated clips don't play.",
+  oldest: "Every dated clip, oldest to newest. Undated clips don't play.",
+  contrast: "Every clip, each cut as different as possible from the last.",
 };
+
+// The fuller explanation, shown when "Arrange by" is hovered or focused.
+const DATE_ORDER_DETAIL = "Clips with a year play oldest to newest, and a partial date goes before the " +
+  "exact dates in its period: 1945, then May 1945, then 7 May 1945. Clips with only a month or season " +
+  "come last, January to December. Clips without a date don't play, so the film ends when they run out.";
+const ORDER_DETAILS = {
+  today: "\u201CDated for today\u201D means the same day and month in any year \u2014 or, failing that, " +
+    "the same month, then the same season. " + DATE_ORDER_DETAIL,
+  oldest: DATE_ORDER_DETAIL,
+  contrast: "The original engine: every clip can play, each cut chosen to be as different as possible " +
+    "from the one before. Dates are ignored.",
+};
+const orderTip = document.getElementById("order-tip");
 
 function updateContextUI() {
   const filters = filtersText();
-  const hint = ORDER_HINTS[filmOrder.value] || (() => "");
-  contextHint.textContent = hint() + (filters ? ` Only clips from ${filters}.` : "");
+  contextHint.textContent = (ORDER_HINTS[filmOrder.value] || "") + (filters ? ` Only clips from ${filters}.` : "");
+  orderTip.textContent = ORDER_DETAILS[filmOrder.value] || "";
   saveContextPrefs();
 }
 
