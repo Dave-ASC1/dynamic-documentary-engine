@@ -91,10 +91,10 @@
         </label>
       </div>
 
-      <div class="field field-centered">
+      <div class="field field-centered has-tooltip">
         <label for="audio-fade-select">Audio transitions</label>
         <div class="field-input">
-          <select id="audio-fade-select" aria-label="Audio transition fade length">
+          <select id="audio-fade-select" aria-label="Audio transition fade length" aria-describedby="audio-fade-tip">
             <option value="0">Off — hard cuts</option>
             <option value="0.3">Subtle (0.3s)</option>
             <option value="0.5">Balanced (0.5s)</option>
@@ -102,8 +102,8 @@
             <option value="1.2">Long (1.2s)</option>
           </select>
         </div>
+        <span class="tooltip" role="tooltip" id="audio-fade-tip">Fades the music across each cut. Longer is softer; short clips shorten the fade automatically.</span>
       </div>
-      <p class="field-hint">Fades the music across each cut. Longer is softer; short clips shorten the fade automatically.</p>
 
       <div class="field field-centered">
         <label for="film-order">Order</label>
