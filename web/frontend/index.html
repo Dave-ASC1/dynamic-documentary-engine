@@ -92,8 +92,13 @@
         </div>
         <p id="context-hint" class="field-hint"></p>
 
-        <div id="context-fields" class="context-fields">
-          <p class="context-group-label">Only clips from — leave blank for all clips</p>
+        <p class="filter-summary">
+          Only clips from: <span id="filter-summary-text">all clips</span>
+          · <button type="button" id="filter-toggle" class="link-btn" aria-expanded="false" aria-controls="context-fields">change</button>
+          <span id="filter-clear-wrap" class="hidden">· <button type="button" id="filter-clear" class="link-btn">clear</button></span>
+        </p>
+        <div id="context-fields" class="context-fields hidden">
+          <p class="context-group-label">Leave a box blank to allow any</p>
           <div class="field field-centered">
             <label for="filter-years">Year</label>
             <div class="field-input">

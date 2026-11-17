@@ -37,6 +37,11 @@ const filterYears = document.getElementById("filter-years");
 const filterSeason = document.getElementById("filter-season");
 const filterLabels = document.getElementById("filter-labels");
 const contextHint = document.getElementById("context-hint");
+const contextFields = document.getElementById("context-fields");
+const filterSummaryText = document.getElementById("filter-summary-text");
+const filterToggle = document.getElementById("filter-toggle");
+const filterClearWrap = document.getElementById("filter-clear-wrap");
+const filterClear = document.getElementById("filter-clear");
 const CONTEXT_KEY = "dde-context";
 let contextOptions = null;
 const cancelBtn = document.getElementById("cancel-btn");
@@ -375,9 +380,34 @@ const ORDER_DETAILS = {
 };
 const orderTip = document.getElementById("order-tip");
 
-function updateContextUI() {
+// The folded "Only clips from" line: what's set (or "all clips"), with
+// "change" to open the three boxes and "clear" once anything is set.
+function renderFilterSummary() {
   const filters = filtersText();
-  contextHint.textContent = (ORDER_HINTS[filmOrder.value] || "") + (filters ? ` Only clips from ${filters}.` : "");
+  filterSummaryText.textContent = filters || "all clips";
+  filterClearWrap.classList.toggle("hidden", !filters);
+  const open = !contextFields.classList.contains("hidden");
+  filterToggle.textContent = open ? "done" : "change";
+  filterToggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+filterToggle.addEventListener("click", () => {
+  const opening = contextFields.classList.contains("hidden");
+  contextFields.classList.toggle("hidden", !opening);
+  renderFilterSummary();
+  if (opening) filterYears.focus();
+});
+
+filterClear.addEventListener("click", () => {
+  filterYears.value = "";
+  filterSeason.value = "";
+  filterLabels.value = "";
+  updateContextUI();
+});
+
+function updateContextUI() {
+  renderFilterSummary();
+  contextHint.textContent = ORDER_HINTS[filmOrder.value] || "";
   orderTip.textContent = ORDER_DETAILS[filmOrder.value] || "";
   saveContextPrefs();
 }

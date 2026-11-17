@@ -427,12 +427,35 @@ h2 {
 
 /* Film plan: screening date (for "Today's date leads") and the
    "Only clips from" filters. */
+/* "Only clips from: all clips · change" — the filters stay folded away
+   until asked for, and the line says what's set. */
+.filter-summary {
+  margin: -0.2rem 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.filter-summary #filter-summary-text { color: var(--text); font-weight: 600; }
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-hover);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+:root[data-theme="dark"] .link-btn { color: #8fb0e8; }
+.link-btn:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; }
+
 .context-fields {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
   width: 100%;
 }
+.context-fields.hidden { display: none; }
 
 .context-group-label {
   margin: 0.2rem 0 -0.4rem;
