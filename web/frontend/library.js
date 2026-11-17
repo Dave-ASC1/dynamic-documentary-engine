@@ -206,6 +206,9 @@ function buildRow(clip) {
   sub.appendChild(el("span", { className: `type-badge ${typeClass(clip.artifact_type)}` }, clip.artifact_type || ""));
   sub.appendChild(el("span", {}, formatSeconds(clip.duration_seconds)));
   text.appendChild(sub);
+  // Says when a clip's own sound doesn't suit its folder (silent A-roll,
+  // or B-roll whose real sound would be replaced by music).
+  if (clip.sound_note) text.appendChild(el("div", { className: "sound-note" }, clip.sound_note));
   cell.appendChild(text);
   nameCell.appendChild(cell);
   tr.appendChild(nameCell);

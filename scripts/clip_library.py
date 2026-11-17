@@ -212,6 +212,20 @@ def auto_season(entry):
     return season_for_month(parsed[1]) if parsed and parsed[1] else None
 
 
+def sound_note(entry):
+    """A plain warning when a clip's own sound doesn't suit its folder, or
+    None. The media sync records "has_sound" (audible sound, not just a
+    silent track) for every A-roll and B-roll clip."""
+    has_sound = entry.get("has_sound")
+    if entry.get("artifact_type") == "A-roll" and has_sound is False:
+        return ("No sound of its own, so as A-roll it plays silently. "
+                "Move it to the b-roll folder to give it music.")
+    if entry.get("artifact_type") == "B-roll" and has_sound is True:
+        return ("Has its own sound, which B-roll replaces with music. "
+                "Move it to the a-roll folder to keep its sound.")
+    return None
+
+
 def clip_view(entry):
     """The page's view of one index entry."""
     return {
@@ -222,6 +236,7 @@ def clip_view(entry):
         "labelled": is_labelled(entry),
         "dated": bool(_get(entry, "context.date") or _get(entry, "context.season")),
         "season_auto": auto_season(entry),
+        "sound_note": sound_note(entry),
         "fields": {field: _get(entry, field) for field in FIELDS},
     }
 

@@ -533,6 +533,42 @@ def _probe_dominant_color(path):
         return None
 
 
+# A sound track counts as real sound when its loudest moment in the first
+# SOUND_PROBE_SECONDS is above SOUND_FLOOR_DB. Many exported clips carry a
+# silent track (digital silence reads about -91 dB), which is no sound at
+# all for our purposes.
+SOUND_PROBE_SECONDS = 30
+SOUND_FLOOR_DB = -60.0
+
+
+def _probe_has_sound(path):
+    """Whether a video file has audible sound of its own: a sound track
+    whose loudest moment in the first SOUND_PROBE_SECONDS rises above
+    SOUND_FLOOR_DB. Returns None when the file can't be read."""
+    try:
+        streams = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a",
+             "-show_entries", "stream=index", "-of", "csv=p=0", path],
+            capture_output=True, text=True, timeout=15,
+        )
+        if streams.returncode != 0:
+            return None
+        if not streams.stdout.strip():
+            return False
+        proc = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-nostats", "-t", str(SOUND_PROBE_SECONDS),
+             "-i", path, "-vn", "-af", "volumedetect", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=60,
+        )
+        match = re.search(r"max_volume:\s*(-?[\d.]+|-inf) dB", proc.stderr)
+        if not match:
+            return False
+        level = match.group(1)
+        return level != "-inf" and float(level) > SOUND_FLOOR_DB
+    except (subprocess.SubprocessError, ValueError, OSError):
+        return None
+
+
 def _infer_pacing(duration):
     """Coarse pacing heuristic from clip length — best-effort only; it
     has no idea what's actually happening in the shot."""
@@ -565,7 +601,11 @@ def _mint_artifact_id(prefix, filename, taken):
 def sync_media_library(index_path, assets_path):
     """Reconciles the collection index against what's actually on disk.
 
-    Returns {"added": [artifact_id, ...], "removed": [artifact_id, ...]}.
+    Returns {"added": [artifact_id, ...], "removed": [artifact_id, ...],
+    "moved": [{"from", "to", "type"}, ...]} — "moved" being clips that went
+    from one of the a-roll/b-roll folders to the other under the same file
+    name, which keep their labels. Also records "has_sound" (audible sound
+    of its own) for A-roll and B-roll clips that don't have it yet.
     Rewrites index_path only if something actually changed. Holds
     INDEX_LOCK throughout, so it never interleaves with a Clip library save.
     """
@@ -582,6 +622,10 @@ def _sync_media_library_locked(index_path, assets_path):
 
     kept = []
     removed = []
+    # Clips whose file has gone, by file name — a clip moved between the
+    # a-roll and b-roll folders comes back under the same name and keeps
+    # its labels instead of starting over.
+    gone_by_name = {}
     for a in artifacts:
         fname = a.get("filename")
         full = os.path.join(assets_path, fname) if fname else None
@@ -589,10 +633,13 @@ def _sync_media_library_locked(index_path, assets_path):
             kept.append(a)
         else:
             removed.append(a["artifact_id"])
+            if fname and a.get("artifact_type") in ("A-roll", "B-roll"):
+                gone_by_name.setdefault(os.path.basename(fname).lower(), a)
 
     indexed_filenames = {a["filename"] for a in kept if a.get("filename")}
     id_prefix = {"A-roll": "a", "B-roll": "b", "X-roll": "x"}
     added = []
+    moved = []
 
     for artifact_type, subdir in _ROLL_SUBDIRS.items():
         dirpath = os.path.join(assets_path, subdir)
@@ -609,6 +656,26 @@ def _sync_media_library_locked(index_path, assets_path):
 
             full = os.path.join(dirpath, fname)
             duration = _probe_duration(full)
+            previous = gone_by_name.pop(fname.lower(), None)
+            if previous is not None and artifact_type in ("A-roll", "B-roll"):
+                # Moved between the a-roll and b-roll folders: same clip,
+                # same labels, new type.
+                entry = dict(previous)
+                entry.update({
+                    "artifact_id": _mint_artifact_id(
+                        id_prefix[artifact_type], fname, existing_ids),
+                    "artifact_type": artifact_type,
+                    "filename": rel,
+                    "has_sound": _probe_has_sound(full),
+                })
+                if duration is not None:
+                    entry["duration_seconds"] = duration
+                existing_ids.add(entry["artifact_id"])
+                kept.append(entry)
+                removed.remove(previous["artifact_id"])
+                moved.append({"from": previous["artifact_id"], "to": entry["artifact_id"],
+                              "type": artifact_type})
+                continue
             entry = {
                 "artifact_id": _mint_artifact_id(id_prefix[artifact_type], fname, existing_ids),
                 "artifact_type": artifact_type,
@@ -627,12 +694,22 @@ def _sync_media_library_locked(index_path, assets_path):
                 color = _probe_dominant_color(full)
                 if color:
                     entry["tags"] = [f"color-{color}"]
+                entry["has_sound"] = _probe_has_sound(full)
 
             existing_ids.add(entry["artifact_id"])
             kept.append(entry)
             added.append(entry["artifact_id"])
 
-    if added or removed:
+    # Clips indexed before sound was checked get checked once, so the Clip
+    # library can say when a clip's sound doesn't suit its folder.
+    checked = 0
+    for a in kept:
+        if a.get("artifact_type") in ("A-roll", "B-roll") and "has_sound" not in a:
+            full = os.path.join(assets_path, a["filename"])
+            a["has_sound"] = _probe_has_sound(full)
+            checked += 1
+
+    if added or removed or moved or checked:
         counts = Counter(a["artifact_type"] for a in kept)
         data["artifacts"] = kept
         data["artifact_counts"] = {
@@ -644,7 +721,7 @@ def _sync_media_library_locked(index_path, assets_path):
         data["updated_at"] = datetime.now(timezone.utc).isoformat()
         write_index(index_path, data)
 
-    return {"added": added, "removed": removed}
+    return {"added": added, "removed": removed, "moved": moved}
 
 
 def _trim_film_to_duration(film_path, target_duration, video_codec="libx264",

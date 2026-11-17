@@ -336,6 +336,18 @@ form per clip; each field saves when the person moves on (`PATCH
   `season_for_month()`), shown as "Auto (winter)"; it is never stored, so
   it always follows the date.
   A bad value is refused with a plain message and nothing is written.
+- **Sound and folders** (added 16 November 2026, ahead of Dr. Campbell's
+  A-roll test): the media sync records `has_sound` for every A-roll and
+  B-roll clip — audible sound, not just a track: `_probe_has_sound()` in
+  `dde_runtime.py` reads the loudest moment of the first 30 s and treats
+  anything at or below -60 dB as silence (the WWII test clips all carry a
+  silent -91 dB track). Clips indexed before then are checked once on the
+  next sync. `clip_library.sound_note()` turns a mismatch (silent A-roll,
+  or B-roll with real sound) into a note under the clip's name.
+- **Moving a clip between `a-roll` and `b-roll` keeps its labels:** the
+  sync matches the vanished entry to the new file by file name, copies its
+  labels onto a new ID with the new type, and reports it under `moved`
+  instead of `removed` + `added`. Renaming a file still starts it over.
 - **Never loses a change:** saves and the media sync share one lock
   (`dde_runtime.INDEX_LOCK`), every write is atomic (temp file + swap), and
   the previous index is kept in `metadata/collections/.backups/<topic>/`

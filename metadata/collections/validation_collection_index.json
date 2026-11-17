@@ -4,7 +4,7 @@
   "description": "Validation collection wired to real files in local-media/assets. All artifacts are body material; generated films choose randomized B-roll/X-roll bookends at runtime.",
   "version": "1.0.0",
   "created_at": "2026-07-02T00:00:00Z",
-  "updated_at": "2026-08-03T15:55:38.982867+00:00",
+  "updated_at": "2026-11-17T04:16:00.279505+00:00",
   "runtime_rules": {
     "min_duration_seconds": 35,
     "max_duration_seconds": 120,
@@ -42,7 +42,8 @@
       "dominant_lines": "diagonal",
       "geography": "local",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": true
     },
     {
       "artifact_id": "val_av_003",
@@ -68,7 +69,8 @@
       "dominant_lines": "mixed",
       "geography": "kitchen",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": true
     },
     {
       "artifact_id": "val_av_004",
@@ -94,7 +96,8 @@
       "dominant_lines": "vertical",
       "geography": "lab",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": true
     },
     {
       "artifact_id": "val_av_005",
@@ -120,7 +123,8 @@
       "dominant_lines": "vertical",
       "geography": "gallery",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": true
     },
     {
       "artifact_id": "val_av_006",
@@ -146,7 +150,8 @@
       "dominant_lines": "diagonal",
       "geography": "street",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": true
     },
     {
       "artifact_id": "val_bv_001",
@@ -172,7 +177,8 @@
       "dominant_lines": "horizontal",
       "geography": "open water",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": false
     },
     {
       "artifact_id": "val_bv_002",
@@ -200,7 +206,8 @@
       "can_repeat": false,
       "must_not_follow": [
         "val_bv_001"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "val_bv_003",
@@ -226,7 +233,8 @@
       "dominant_lines": "diagonal",
       "geography": "sky",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": false
     },
     {
       "artifact_id": "val_bv_004",
@@ -252,7 +260,8 @@
       "dominant_lines": "curved",
       "geography": "stage",
       "can_repeat": false,
-      "must_not_follow": []
+      "must_not_follow": [],
+      "has_sound": false
     },
     {
       "artifact_id": "val_xa_001",
@@ -367,7 +376,8 @@
       "pacing": "medium",
       "tags": [
         "color-gray"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_b_drawn_animation",
@@ -382,7 +392,8 @@
       "pacing": "medium",
       "tags": [
         "color-yellow"
-      ]
+      ],
+      "has_sound": false
     },
     {
       "artifact_id": "auto_x_anxietylow",

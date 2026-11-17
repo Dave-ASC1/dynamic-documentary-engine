@@ -188,6 +188,20 @@ Clips in `a-roll` already carry their own sound and don't need a partner.
 | Video you want other sound played over | `b-roll` |
 | Sound only — music, narration, atmosphere | `x-roll` |
 
+The engine doesn't decide which clips are A-roll — the folder does, and it
+gives neither kind priority over the other. What the folder changes is the
+sound: an `a-roll` clip plays its own sound, a `b-roll` clip's own sound is
+replaced by an `x-roll` recording.
+
+- **The Clip library warns you** when a clip's sound doesn't suit its
+  folder: an `a-roll` clip with no audible sound (it would play silently),
+  or a `b-roll` clip with real sound (it would be replaced by music). Many
+  exported clips carry a silent sound track; the engine listens to the
+  first 30 seconds and treats silence as no sound.
+- **Moving a clip between `a-roll` and `b-roll` keeps its labels** — its
+  dates, tags, ownership and the rest — as long as the file name stays the
+  same. The main page then reports it as moved.
+
 **Adding a new topic** (say, "Swiss"): make a folder inside `local-media`
 named after the topic, and inside it create `assets` (containing `a-roll`,
 `b-roll` and `x-roll`) and `artifacts`. It appears in the engine's topic

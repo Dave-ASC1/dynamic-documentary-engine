@@ -212,7 +212,8 @@ function chip(label, value) {
 }
 
 function renderSyncNotice(sync) {
-  if (!sync || (!sync.added.length && !sync.removed.length)) {
+  const moved = (sync && sync.moved) || [];
+  if (!sync || (!sync.added.length && !sync.removed.length && !moved.length)) {
     syncNotice.classList.add("hidden");
     syncNotice.textContent = "";
     return;
@@ -220,6 +221,9 @@ function renderSyncNotice(sync) {
   const parts = [];
   if (sync.added.length) {
     parts.push(`+${sync.added.length} new clip${sync.added.length === 1 ? "" : "s"} detected in the media library`);
+  }
+  if (moved.length) {
+    parts.push(`${moved.length} clip${moved.length === 1 ? "" : "s"} moved between the a-roll and b-roll folders (labels kept)`);
   }
   if (sync.removed.length) {
     parts.push(`${sync.removed.length} clip${sync.removed.length === 1 ? "" : "s"} retired (source file no longer found)`);

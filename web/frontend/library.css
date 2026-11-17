@@ -200,6 +200,14 @@
   .thumb.is-loading .play { animation: none; }
 }
 .thumb:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; }
+.clip-name .sound-note {
+  margin-top: 0.3rem;
+  max-width: 15rem;
+  color: var(--type-a);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: normal;
+}
 .clip-name .sub { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.25rem; color: var(--muted-dim); font-size: 0.74rem; }
 
 .type-badge {
