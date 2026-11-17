@@ -273,7 +273,7 @@ January to December. **Only clips with a date play** in these two orders:
 when they run out, the film ends, even if it's shorter than the length you
 asked for.
 
-**Only clips from** — folded into one line under *Arrange by* ("Only clips from: all clips · change"); click **change** to open it, and **clear** to go back to every clip. It holds a **Year** (*1944*) or a
+**Only clips from** (leave blank for every clip) — a **Year** (*1944*) or a
 range (*1942–1945*), a **Season**, or clips **Labelled** with exactly a word
 or phrase (*Camp Swift*, *G. Moore*). Typing a year switches the order to
 the timeline; pick another order afterwards if you want one. If nothing fits
