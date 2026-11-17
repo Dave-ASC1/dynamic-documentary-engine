@@ -502,13 +502,20 @@ h2 {
 }
 
 .has-tooltip { position: relative; }
+/* The Diversity mode and Exact duration notes centre on their row, which is
+   always mid-page, not on their own toggle — a wide note centred on the
+   left-hand toggle would hang off the screen's edge on mid-sized screens. */
+.toggle-row { position: relative; }
+.toggle-row .has-tooltip { position: static; }
 
 .has-tooltip .tooltip {
   position: absolute;
   top: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%) translateY(-4px);
-  width: 240px;
+  /* Wide and short — two or three lines across rather than a tall column. */
+  width: 560px;
+  max-width: calc(100vw - 32px);
   background: var(--panel-solid);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -898,7 +905,7 @@ video#player {
 
 @media (max-width: 560px) {
   .toggle-row { gap: 1rem; }
-  .has-tooltip .tooltip { width: 200px; }
+  .has-tooltip .tooltip { width: calc(100vw - 32px); }
 
   .brand-logo {
     top: 1rem;
