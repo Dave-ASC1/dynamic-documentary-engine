@@ -1294,19 +1294,10 @@ def generate_and_render(
         ranking = ev["ranking"] or []
         match = sequencer.context_matches.get(chosen.get("artifact_id"))
         if ev["kind"] in ("opening", "memory"):
-            # Placed for its context match, not its contrast — say so. An
-            # opener that isn't a match is the next date after today.
-            contrast = (
-                [f"memory trigger — {', '.join(match[1])}"] if match
-                else list(ev.get("reasons") or [])
-            )
-        elif ev["kind"] == "next_date":
-            # "next in history — …" or "next date in the calendar — …"
-            contrast = list(ev.get("reasons") or [])
+            # Played first for matching today's date — say so.
+            contrast = [f"matches today — {', '.join(match[1])}"] if match else []
         elif ev["kind"] == "dated":
             contrast = [f"in date order — {', '.join(ev.get('reasons') or [])}"]
-        elif ev["kind"] == "flow":
-            contrast = [f"follows on — shares {', '.join(ev.get('reasons') or [])}"]
         else:
             contrast = dims(ev["prev"], chosen)
             if match:

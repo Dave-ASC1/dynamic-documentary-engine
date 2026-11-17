@@ -258,21 +258,20 @@ can go back to any of them.
 
 **Order** — how the film is put together:
 
-- **Today's date leads** (the usual choice) — the film opens on the clip
-  labelled closest to today's date (taken from the computer's clock): the
-  same day and month first, then the same month, then the same season.
-  Other matching clips follow, then the dated clips in historical order,
-  onward from the opening clip's date — the years matter. Clips with a
-  month or season but no year come next, in calendar order from today.
-  Clips with no date come last, each leading to one that shares a person,
-  place, tag, theme or mood with it. If no clip matches today, the film
-  opens on the next date coming up.
-- **Timeline, oldest first** or **newest first** — the dated clips in date
-  order. A clip needs a year to have a place on a timeline.
-- **Through the year** — January to December, whatever the year. A clip
-  labelled only *Winter* plays at the start of winter (December).
-- **Random contrast** — every cut as different as possible from the one
-  before, the way the engine always worked.
+- **Today's date leads** (the usual choice) — clips dated for today's day
+  and month (any year), then this month, then this season, play first —
+  today is the computer's own date. Then every other dated clip, in date
+  order.
+- **Timeline** — every dated clip, in date order.
+- **Random contrast** — every clip, each cut as different as possible from
+  the one before, the way the engine always worked.
+
+**Date order** is always the same: clips with a year play oldest to newest,
+and a partial date goes before the exact dates in its period — *1945*, then
+*May 1945*, then *7 May 1945*. Clips with only a month or season come last,
+January to December. **Only clips with a date play** in these two orders:
+when they run out, the film ends, even if it's shorter than the length you
+asked for.
 
 **Only clips from** (leave blank for every clip) — a **Year** (*1944*) or a
 range (*1942–1945*), a **Season**, or clips **Labelled** with exactly a word

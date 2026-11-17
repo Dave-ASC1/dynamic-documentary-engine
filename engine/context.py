@@ -1,10 +1,9 @@
 """
 context.py
 ----------
-Dynamic Documentary Engine — Film Plan ("Memory Triggers", dates and order)
+Dynamic Documentary Engine — Film Plan (dates, order and which clips)
 
-Lets the clips' labels shape a film: what it includes and in what order.
-Two settings combine:
+Lets the clips' labels shape a film. Two settings combine:
 
     Which clips — all of them, or only clips from a year or range of years
                   (1944, 1942–1945), from a season, or labelled with a word
@@ -12,35 +11,24 @@ Two settings combine:
                   pictures (A-roll and B-roll); audio is always free to pair.
 
     What order  — one of ORDERS:
-        "today"     Today's date leads. The screening's date (the computer's
-                    own clock) picks the opening clip — an anniversary (same
-                    day and month, any year) first, then the same month,
-                    then the same season. The other matching clips follow,
-                    strongest first; then the other clips with a year, in
-                    history order onward from the opening clip's date
-                    (wrapping back to the earliest after the latest), and
-                    the clips with a month or season but no year, in
-                    calendar order from the screening date. After that each
-                    undated clip leads to one sharing a person,
-                    place, tag, theme or mood with it, and only when nothing
-                    shares a label does the engine cut to something
-                    different by contrast. When nothing matches today, the
-                    film opens on the next date in the calendar instead.
-                    See Sequencer.generate.
-        "oldest"    Timeline, oldest first.
-        "newest"    Timeline, newest first.
-        "calendar"  Through the year, January to December, whatever the year.
-        "contrast"  Random contrast — the engine as it always was.
+        "today"     Today's date leads: the clips matching today's date
+                    (the computer's own clock) — same day and month, then
+                    same month, then same season, whatever the year — play
+                    first; then every other dated clip in date order.
+        "oldest"    Timeline: every dated clip in date order.
+        "contrast"  Random contrast — the engine as it always was, every
+                    clip, each cut as different as possible from the last.
 
-In every order but "contrast", B-roll with a mood is paired with audio of
-the same mood. With no film plan at all the engine works exactly as before.
+    Date order (Sequencer._generate_in_date_order): clips with a year,
+    oldest to newest — a partial date before the exact dates in its period,
+    so "1945" before "May 1945" before "7 May 1945" — then clips with a
+    month or season but no year, January to December. Only dated clips play
+    in "today" and "oldest"; when they run out, the film ends.
 
 Every date label is a stretch of time (see TimeSpan): "9 May 1950" is that
 day, "December 1944" the month, "1944" the year, "winter" December to
 February in any year, and "winter" with the year 1944 December 1944 to
-February 1945. A season on its own is placed at the start of its months for
-ordering — spring 1 March, summer 1 June, autumn 1 September, winter
-1 December — so give the month when it is known.
+February 1945.
 
 Clip metadata (optional, in a collection index entry):
 
@@ -72,13 +60,14 @@ SEASON_START_MONTH = {"spring": 3, "summer": 6, "autumn": 9, "winter": 12}
 # What order a film is built in, with the words the pages show for each.
 ORDERS = {
     "today": "Today's date leads",
-    "oldest": "Timeline, oldest first",
-    "newest": "Timeline, newest first",
-    "calendar": "Through the year",
+    "oldest": "Timeline",
     "contrast": "Random contrast",
 }
-# The orders that place clips by their dates rather than choosing them.
-DATE_ORDERS = ("oldest", "newest", "calendar")
+# The orders that place the dated clips in date order.
+DATE_ORDERS = ("today", "oldest")
+# Orders offered before 17 November 2026, and what settings saved with them
+# now mean.
+RETIRED_ORDERS = {"newest": "oldest", "calendar": "oldest", "from_today": "today"}
 
 # Points a clip earns for each way it matches the screening date, in the
 # "today" order. Dates match on month and day only — an anniversary,
@@ -237,50 +226,6 @@ def _artifact_labels(artifact):
     return labels
 
 
-def _link_label_map(artifact):
-    """{compared form: label as written} for the labels that can link clips
-    (see link_labels)."""
-    content = artifact.get("content", {})
-    labels = {}
-    for key in ("tags", "theme", "people", "geography", "mood"):
-        values = artifact.get(key) or content.get(key) or []
-        if isinstance(values, str):
-            values = [values]
-        for value in values:
-            if not value or str(value).startswith("color-"):
-                continue
-            compared = normalize_label(value)
-            if compared:
-                labels.setdefault(compared, " ".join(str(value).split()))
-    return labels
-
-
-def link_labels(artifact):
-    """The labels that can connect one clip to the next in a memory film:
-    its tags, themes, people, place and mood, in compared form. The title is
-    left out (it names one clip), and so are the auto-detected "color-" tags,
-    which describe the picture rather than what it is about."""
-    return set(_link_label_map(artifact))
-
-
-def shared_labels(first, second):
-    """Labels two clips have in common (see link_labels), as written on the
-    second clip, sorted.
-
-    Args:
-        first (dict):  A clip.
-        second (dict): Another clip.
-
-    Returns:
-        list: The shared labels; empty when nothing links them.
-    """
-    if not first or not second:
-        return []
-    written = _link_label_map(second)
-    common = link_labels(first) & set(written)
-    return sorted((written[label] for label in common), key=str.lower)
-
-
 def _label_list(value):
     """Labels as typed ("Camp Swift, 1252nd") -> ["Camp Swift", "1252nd"]."""
     if isinstance(value, str):
@@ -362,26 +307,6 @@ class TimeSpan:
         if self.month is None:
             return None
         return (self.month, self.day or 0)
-
-    def days_ahead_key(self, today):
-        """Sort key for following the calendar onward from the screening
-        date, whatever the year: how many days after today this span next
-        begins, wrapping past December into January. A month or season sits
-        at its start, before the exact days in it — as on a timeline.
-
-        Args:
-            today (datetime.date): The screening date.
-
-        Returns:
-            tuple: (days ahead, 0 for a month or season / 1 for a day), or
-                   None for a span that is only a year.
-        """
-        if self.month is None:
-            return None
-        # 2000 is a leap year, so 29 February has a place.
-        start = datetime.date(2000, self.month, self.day or 1)
-        ahead = (start - datetime.date(2000, today.month, today.day)).days % 366
-        return ahead, 0 if self.day is None else 1
 
     def describe(self):
         """Plain words, e.g. "9 May 1950", "December 1944",
@@ -505,10 +430,7 @@ class ScreeningContext:
         data = data or {}
         labels = data.get("labels")
         order = data.get("order") or None
-        if order == "from_today":
-            # Briefly a separate order on 9 November 2026; it is now part of
-            # "today", so settings saved then still work.
-            order = "today"
+        order = RETIRED_ORDERS.get(order, order)
         return cls(
             date=data.get("date"),
             season=data.get("season") or None,

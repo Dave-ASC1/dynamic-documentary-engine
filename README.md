@@ -71,16 +71,15 @@ Each run, the engine:
 
 Two optional modes: **Diversity mode** (boosts underused clips so favourites don't dominate) and **Exact duration** (trims the final render to the exact requested length; off by default so whole clips are preserved).
 
-**Order and which clips** (the clips' labels shape the film). Two settings combine:
+**Order and which clips** (the clips' dates shape the film). Two settings combine:
 
 - **Order** —
-  - *Today's date leads* (default): the film **opens on the clip that best matches the screening's date** — taken from the computer's own clock — an anniversary (same day and month, any year) first, then the same month, then the same season. **The other matching clips follow**, strongest first, then **the other dated clips follow in historical order** onward from the opening clip's date (wrapping back to the earliest after the latest; oldest first when the opening clip has no year), and clips with only a month or season but no year in calendar order from today. Clips with no date come after that, each **leading to one that shares a label with it** — a person, place, tag, theme or mood — and only when nothing shares one does the engine cut to something different by contrast. If nothing matches today, the film opens on the next date coming up.
-  - *Timeline, oldest first* / *newest first*: dated clips in date order across the years.
-  - *Through the year*: January to December, whatever the year — clips from the same month in different years sit together.
-  - *Random contrast*: the original engine — fully random between the bookends, chosen for contrast. Exactly as before.
-- **Only clips from** (optional): a **year** or range (1944, 1942–1945), a **season**, and/or clips **labelled** exactly with a word or phrase (Camp Swift, G. Moore; capitals ignored). Choosing a year switches the order to the timeline unless you pick another.
+  - *Today's date leads* (default): clips dated for today's day and month (any year), then this month, then this season, play first; then every other dated clip in date order.
+  - *Timeline*: every dated clip in date order.
+  - *Random contrast*: the original engine — every clip, each cut chosen for contrast. Exactly as before.
+- **Only clips from** (optional): a **year** or range (1944, 1942–1945), a **season**, and/or clips **labelled** exactly with a word or phrase (Camp Swift, G. Moore; capitals ignored). Choosing a year switches the order to Timeline unless you pick another.
 
-Every date label is a **stretch of time**: *9 May 1950* is that day, *December 1944* the month, *1944* the year, *winter* December to February in any year, and *winter* with the year 1944 December 1944 to February 1945. A season-only label counts for all of its months when matching the screening date, and sits at the start of its season on a timeline (winter at 1 December). Clips with nothing placing them in the chosen order — no year for a timeline, only a year for *Through the year* — are left out of that film. In every order but *Random contrast*, B-roll with a mood is paired with audio of the same mood. Clips carry the labels in their index entry:
+**Date order** is one rule: clips with a year play oldest to newest, a partial date before the exact dates in its period (*1945* → *May 1945* → *7 May 1945*); then clips with only a month or season, January to December. **Only dated clips play** in the two date orders — when they run out, the film ends. Today's date is the computer's own; a season-only clip matches any day in its months (*winter* = December to February). Clips carry dates in their index entry:
 
 ```json
 "context": { "date": "1944-12-18", "season": "winter" }

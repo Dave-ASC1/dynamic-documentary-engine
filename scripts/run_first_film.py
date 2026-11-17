@@ -83,10 +83,8 @@ def print_trace(events):
         step += 1
         tag = {
             "pairing": "B-roll audio pairing",
-            "opening": "memory trigger — opens the film",
-            "memory": "memory trigger",
-            "flow": "follows on — shares " + ", ".join(ev.get("reasons") or []),
-            "next_date": ", ".join(ev.get("reasons") or []),
+            "opening": "matches today — opens the film",
+            "memory": "matches today",
             "dated": "in date order — " + ", ".join(ev.get("reasons") or []),
         }.get(kind, "body pick")
         print(f"\nStep {step}  [{tag}]")

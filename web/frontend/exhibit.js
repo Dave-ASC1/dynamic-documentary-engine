@@ -135,12 +135,10 @@ function yearsValid() {
 // "Today's date leads" always uses today — the server's own clock — so a
 // long-running exhibit rolls over by itself.
 const ORDER_HINTS = {
-  today: "Each film opens on the clip labelled closest to today's date or season; other matching " +
-    "clips follow, then the dated clips in historical order, then clips sharing a person, place, tag or mood.",
-  oldest: "Clips with a dated year play from the earliest to the latest.",
-  newest: "Clips with a dated year play from the latest to the earliest.",
-  calendar: "Clips play from January to December, whatever the year.",
-  contrast: "Every cut is as different as possible from the one before.",
+  today: "Clips dated for today's day, month or season play first, then every dated clip from oldest " +
+    "to newest. Clips without a date don't play.",
+  oldest: "Every dated clip from oldest to newest. Clips without a date don't play.",
+  contrast: "Every clip, each cut as different as possible from the one before.",
 };
 
 async function loadContextOptions(saved) {
@@ -171,7 +169,9 @@ async function loadContextOptions(saved) {
   // Older saved settings had an on/off switch and a cue: off meant the
   // random contrast film, and a cue is now "Only clips labelled".
   const plan = (saved && saved.context) || {};
-  setupOrder.value = plan.order || (plan.enabled === false ? "contrast" : "today");
+  // Orders retired in November 2026 fall back to the nearest one left.
+  const retired = { newest: "oldest", calendar: "oldest", from_today: "today" };
+  setupOrder.value = retired[plan.order] || plan.order || (plan.enabled === false ? "contrast" : "today");
   if (!setupOrder.value) setupOrder.value = "today";
   setupYears.value = plan.years || "";
   setupSeason.value = plan.only_season || "";
