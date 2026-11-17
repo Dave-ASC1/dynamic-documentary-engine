@@ -5,9 +5,33 @@ const durationInput = document.getElementById("duration");
 const diversityToggle = document.getElementById("diversity-toggle");
 const exactDurationToggle = document.getElementById("exact-duration-toggle");
 const audioFadeSelect = document.getElementById("audio-fade-select");
+const audioFadeTip = document.getElementById("audio-fade-tip");
 const savedFade = localStorage.getItem("dde-audio-fade");
 if (savedFade !== null) audioFadeSelect.value = savedFade;
-audioFadeSelect.addEventListener("change", () => localStorage.setItem("dde-audio-fade", audioFadeSelect.value));
+
+// What each Audio transitions choice does — shown in the hover note for the
+// selected choice, and on each choice in the list. The fade is the music
+// under B-roll dipping out and back in at every cut (engine/assembler.py).
+const AUDIO_FADE_NOTES = {
+  "0": "No fade. The music switches instantly at every cut, like a hard edit.",
+  "0.3": "A quick dip of about a third of a second at each cut — just enough to soften the jump.",
+  "0.5": "About half a second out and back in at each cut — smooth but brisk.",
+  "0.8": "Just under a second each way — the music eases out and back in. The default.",
+  "1.2": "Over a second each way — slow, gentle transitions. Best with longer clips.",
+};
+const AUDIO_FADE_COMMON = "Each cut varies a little around this length, and a short clip gets a shorter " +
+  "fade. Only the music under B-roll fades; A-roll keeps its own sound as it is.";
+
+function updateAudioFadeTip() {
+  const note = AUDIO_FADE_NOTES[audioFadeSelect.value] || "";
+  audioFadeTip.textContent = audioFadeSelect.value === "0" ? note : `${note} ${AUDIO_FADE_COMMON}`;
+}
+for (const opt of audioFadeSelect.options) opt.title = AUDIO_FADE_NOTES[opt.value] || "";
+updateAudioFadeTip();
+audioFadeSelect.addEventListener("change", () => {
+  localStorage.setItem("dde-audio-fade", audioFadeSelect.value);
+  updateAudioFadeTip();
+});
 const filmOrder = document.getElementById("film-order");
 const filterYears = document.getElementById("filter-years");
 const filterSeason = document.getElementById("filter-season");
